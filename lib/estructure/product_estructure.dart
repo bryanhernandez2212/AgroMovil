@@ -3,7 +3,7 @@ import 'package:agromarket/views/vendor/list_product_view.dart';
 import 'package:agromarket/views/vendor/register_product_view.dart';
 import 'package:agromarket/views/buyer/buyer_home_view.dart';
 import 'package:agromarket/views/buyer/buyer_cart_view.dart';
-import 'package:agromarket/views/buyer/buyer_favorites_view.dart';
+import 'package:agromarket/views/buyer/buyer_list_productos.dart';
 import 'package:agromarket/services/user_role_service.dart';
 import 'package:agromarket/widgets/banner_ad_widget.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
@@ -56,11 +56,38 @@ class _ProductEstructureViewState extends State<ProductEstructureView> {
     
     return Scaffold(
       extendBody: true,
-      backgroundColor: const Color.fromARGB(255, 255, 255, 255),
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      backgroundColor: Colors.white,
+      body: Container(
+        color: Colors.white,
+        child: SafeArea(
+          top: true,
+          bottom: false,
+          child: Container(
+            color: Colors.white,
+            child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+            // Título específico para registro de productos - primero para evitar espacio verde
+            if (!isBuyer && currentIndex == 1)
+              Container(
+                color: Colors.white,
+                width: double.infinity,
+                padding: EdgeInsets.only(
+                  top: MediaQuery.of(context).padding.top + 8,
+                  bottom: 8,
+                  left: 20,
+                  right: 20,
+                ),
+                child: const Text(
+                  'Agregar producto',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF115213),
+                  ),
+                ),
+              ),
+            
             // Banner "AgroMarket" - solo para compradores en Home
             if (isBuyer && currentIndex == 0)
               Padding(
@@ -105,8 +132,10 @@ class _ProductEstructureViewState extends State<ProductEstructureView> {
             
             // Título para otras vistas
             if (currentTitle != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 16, left: 20, right: 20),
+              Container(
+                color: Colors.white,
+                width: double.infinity,
+                padding: const EdgeInsets.only(top: 16, left: 20, right: 20, bottom: 8),
                 child: Text(
                   currentTitle,
                   style: const TextStyle(
@@ -119,6 +148,8 @@ class _ProductEstructureViewState extends State<ProductEstructureView> {
 
             _buildContentArea(),
           ],
+        ),
+          ),
         ),
       ),
       bottomNavigationBar: Stack(
@@ -140,7 +171,10 @@ class _ProductEstructureViewState extends State<ProductEstructureView> {
 
   Widget _buildContentArea() {
     return Expanded(
-      child: _currentContent ?? _buildEmptyContent(),
+      child: Container(
+        color: Colors.white,
+        child: _currentContent ?? _buildEmptyContent(),
+      ),
     );
   }
   Widget _buildEmptyContent() {
@@ -211,7 +245,7 @@ class _ProductEstructureViewState extends State<ProductEstructureView> {
         case 0:
           return const BuyerHomeView();
         case 1:
-          return const BuyerFavoritesView();
+          return const BuyerListProductosView();
         case 2:
           return const BuyerCartView();
         case 3:
@@ -260,7 +294,7 @@ class _ProductEstructureViewState extends State<ProductEstructureView> {
         case 0:
           return null; 
         case 1:
-          return 'Registro de productos';
+          return null; // Sin título para registro de productos
         case 2:
           return 'Mis productos';
         case 3:

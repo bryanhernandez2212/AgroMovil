@@ -5,6 +5,7 @@ import 'package:agromarket/models/product_model.dart';
 import 'package:agromarket/services/product_service.dart';
 import 'package:agromarket/widgets/role_guard.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:agromarket/estructure/product_estructure.dart';
 
 class RegisterProductViewContent extends StatefulWidget {
@@ -28,14 +29,14 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
   
-  // Variables para manejo de imagen y estado
-  File? _selectedImage;
+  // Variables para manejo de imágenes y estado
+  List<File> _selectedImages = []; // Lista de imágenes seleccionadas (hasta 5)
+  List<String> _existingImageUrls = []; // URLs de imágenes existentes si se está editando
   String? _selectedCategory;
   String? _selectedUnit;
   bool _isLoadingAllow = false;
   List<String> _categories = [];
   List<String> _units = [];
-  String? _existingImageUrl; // URL de imagen existente si se está editando
 
   @override
   void initState() {
@@ -78,7 +79,10 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
     _descriptionController.text = product.descripcion;
     _selectedCategory = product.categoria;
     _selectedUnit = product.unidad;
-    _existingImageUrl = product.imagenUrl;
+    // Cargar imágenes existentes (array o imagen única)
+    _existingImageUrls = product.imagenes.isNotEmpty 
+        ? List<String>.from(product.imagenes)
+        : (product.imagenUrl.isNotEmpty ? [product.imagenUrl] : []);
     
     setState(() {});
   }
@@ -114,38 +118,88 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
     super.dispose();
   }
 
-  // Método para seleccionar imagen
-  Future<void> _pickImage() async {
+  // Método para seleccionar imágenes (hasta 5)
+  Future<void> _pickImages() async {
     try {
+      // Verificar límite de 5 imágenes
+      if (_selectedImages.length + _existingImageUrls.length >= 5) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Máximo 5 imágenes permitidas'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        return;
+      }
+
       final ImagePicker picker = ImagePicker();
-      final XFile? image = await picker.pickImage(
-        source: ImageSource.gallery,
+      final List<XFile> images = await picker.pickMultiImage(
         maxWidth: 1024,
         maxHeight: 1024,
         imageQuality: 85,
       );
       
-      if (image != null) {
+      if (images.isNotEmpty) {
+        int remainingSlots = 5 - _selectedImages.length - _existingImageUrls.length;
+        int imagesToAdd = images.length > remainingSlots ? remainingSlots : images.length;
+        
         setState(() {
-          _selectedImage = File(image.path);
+          for (int i = 0; i < imagesToAdd; i++) {
+            _selectedImages.add(File(images[i].path));
+          }
         });
         
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Imagen seleccionada exitosamente'),
-            duration: Duration(seconds: 2),
-          ),
-        );
+        if (images.length > remainingSlots) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Solo se agregaron $remainingSlots imágenes (máximo 5 permitidas)'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${images.length} imagen(es) seleccionada(s) exitosamente'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
       }
     } catch (e) {
-      print('Error seleccionando imagen: $e');
+      print('Error seleccionando imágenes: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error seleccionando imagen: ${e.toString()}'),
+          content: Text('Error seleccionando imágenes: ${e.toString()}'),
           duration: const Duration(seconds: 3),
         ),
       );
     }
+  }
+
+  // Método para eliminar imagen seleccionada
+  void _removeImage(int index) {
+    setState(() {
+      _selectedImages.removeAt(index);
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Imagen eliminada'),
+        duration: Duration(seconds: 1),
+      ),
+    );
+  }
+
+  // Método para eliminar imagen existente (al editar)
+  void _removeExistingImage(int index) {
+    setState(() {
+      _existingImageUrls.removeAt(index);
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Imagen eliminada'),
+        duration: Duration(seconds: 1),
+      ),
+    );
   }
 
 
@@ -184,6 +238,12 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
       return;
     }
 
+    // Validar que haya al menos una imagen (nueva o existente)
+    if (_selectedImages.isEmpty && _existingImageUrls.isEmpty) {
+      _showErrorDialog('Por favor selecciona al menos una imagen del producto');
+      return;
+    }
+
     setState(() {
       _isLoadingAllow = true;
     });
@@ -200,32 +260,58 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
         return;
       }
 
-      String imageUrl = '';
+      String productId = widget.productToEdit?.id ?? '';
+      List<String> allImageUrls = List<String>.from(_existingImageUrls); // URLs existentes
       
-      // Si se está editando y no se seleccionó nueva imagen, usar la existente
-      if (widget.productToEdit != null && _selectedImage == null) {
-        imageUrl = _existingImageUrl ?? '';
-        print('Usando imagen existente: $imageUrl');
-      } else if (_selectedImage != null) {
-        // Subir nueva imagen si se seleccionó una
-        print('Subiendo imagen...');
-        final imageResult = await ProductService.uploadProductImage(
-          _selectedImage!, 
-          _nameController.text.trim()
+      // Si hay nuevas imágenes para subir
+      if (_selectedImages.isNotEmpty) {
+        // Si es producto nuevo, primero crear el documento para obtener el ID
+        if (productId.isEmpty) {
+          print('Creando documento temporal para obtener ID...');
+          final tempProduct = ProductModel.fromForm(
+            nombre: _nameController.text.trim(),
+            categoria: _selectedCategory!,
+            descripcion: _descriptionController.text.trim(),
+            precio: double.parse(_priceController.text.trim()),
+            stock: int.parse(_stockController.text.trim()),
+            unidad: _selectedUnit!,
+            imagenUrl: allImageUrls.isNotEmpty ? allImageUrls.first : '', // Usar existente si hay
+            imagenes: allImageUrls, // Mantener existentes
+            vendedorEmail: user.email ?? '',
+            vendedorId: user.uid,
+            vendedorNombre: user.displayName ?? 'Usuario',
+          );
+          
+          // Crear documento temporal
+          final docRef = await FirebaseFirestore.instance.collection('productos').add(tempProduct.toJson());
+          productId = docRef.id;
+          await docRef.update({'id': productId});
+          print('Documento creado con ID: $productId');
+        }
+        
+        // Subir nuevas imágenes
+        print('Subiendo ${_selectedImages.length} imagen(es)...');
+        final imagesResult = await ProductService.uploadProductImages(
+          _selectedImages,
+          _nameController.text.trim(),
+          productId,
         );
         
-        if (imageResult['success']) {
-          imageUrl = imageResult['imageUrl'];
-          print('Imagen subida exitosamente: $imageUrl');
+        if (imagesResult['success']) {
+          List<String> newImageUrls = List<String>.from(imagesResult['imageUrls']);
+          allImageUrls.addAll(newImageUrls);
+          print('Imágenes subidas exitosamente. Total URLs: ${allImageUrls.length}');
         } else {
-          _showErrorDialog('Error subiendo imagen: ${imageResult['message']}');
+          // Si falló la subida de imágenes nuevas y es producto nuevo, eliminar documento temporal
+          if (widget.productToEdit == null && productId.isNotEmpty) {
+            await FirebaseFirestore.instance.collection('productos').doc(productId).delete();
+          }
+          _showErrorDialog('Error subiendo imágenes: ${imagesResult['message']}');
           return;
         }
-      } else {
-        print('No se seleccionó imagen, usando URL placeholder');
       }
 
-      // Crear el modelo del producto
+      // Crear el modelo del producto con todas las URLs
       print('Creando modelo del producto...');
       final product = ProductModel.fromForm(
         nombre: _nameController.text.trim(),
@@ -234,11 +320,12 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
         precio: double.parse(_priceController.text.trim()),
         stock: int.parse(_stockController.text.trim()),
         unidad: _selectedUnit!,
-        imagenUrl: imageUrl,
+        imagenUrl: allImageUrls.isNotEmpty ? allImageUrls.first : '', // Primera como principal
+        imagenes: allImageUrls, // Array completo
         vendedorEmail: user.email ?? '',
         vendedorId: user.uid,
         vendedorNombre: user.displayName ?? 'Usuario',
-        id: widget.productToEdit?.id ?? '', // Preservar ID si se está editando
+        id: productId,
       );
 
       print('Producto creado: ${product.nombre}');
@@ -251,9 +338,10 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
         print('Actualizando producto con ID: ${widget.productToEdit!.id}');
         result = await ProductService.updateProduct(widget.productToEdit!.id, product);
       } else {
-        // Guardar nuevo producto
-        print('Llamando a ProductService.saveProduct...');
-        result = await ProductService.saveProduct(product);
+        // Actualizar el documento con las imágenes
+        print('Actualizando documento con URLs de imágenes...');
+        await FirebaseFirestore.instance.collection('productos').doc(productId).update(product.toJson());
+        result = {'success': true, 'message': 'Producto guardado exitosamente', 'productId': productId};
       }
       
       print('Resultado: $result');
@@ -350,275 +438,340 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
                   opacity: _fadeAnimation,
                   child: SlideTransition(
                     position: _slideAnimation,
-                    child: Center(
-                      child: Container(
-                        width: constraints.maxWidth * 0.95,
-                        height: constraints.maxHeight * 10,
-                        margin: EdgeInsets.symmetric(
-                          horizontal: constraints.maxWidth * 0.025,
-                          vertical: constraints.maxHeight * 0.05,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(25),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.15),
-                              blurRadius: 25,
-                              offset: const Offset(0, 15),
+                    child: Column(
+                      children: [
+                        // Título "Editar producto" cuando se está editando
+                        if (widget.productToEdit != null)
+                          Container(
+                            color: Colors.white,
+                            width: double.infinity,
+                            padding: EdgeInsets.only(
+                              top: MediaQuery.of(context).padding.top + 12,
+                              bottom: 4,
+                              left: 20,
+                              right: 20,
                             ),
-                          ],
-                        ),
-                        child: Column(
-                          children: [
-                            Container(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: constraints.maxWidth * 0.05,
+                            child: const Text(
+                              'Editar producto',
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF115213),
+                              ),
+                            ),
+                          ),
+                        Expanded(
+                          child: Center(
+                            child: Container(
+                              width: constraints.maxWidth * 0.95,
+                              height: constraints.maxHeight * 10,
+                              margin: EdgeInsets.symmetric(
+                                horizontal: constraints.maxWidth * 0.025,
                                 vertical: constraints.maxHeight * 0.02,
                               ),
-                              decoration: const BoxDecoration(
-                                color: Colors.transparent,
-                                borderRadius: BorderRadius.only(
-                                  topLeft: Radius.circular(25),
-                                  topRight: Radius.circular(25),
-                                ),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(25),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.15),
+                                    blurRadius: 25,
+                                    offset: const Offset(0, 15),
+                                  ),
+                                ],
                               ),
                               child: Column(
                                 children: [
-                                  SizedBox(height: constraints.maxHeight * 0.01),
-                                  const Text(
-                                    "Completa la información de tu producto",
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Color(0xFF2F4157),
-                                      height: 1.4,
+                                  Container(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: constraints.maxWidth * 0.05,
+                                      vertical: constraints.maxHeight * 0.02,
                                     ),
-                                    textAlign: TextAlign.center,
+                                    decoration: const BoxDecoration(
+                                      color: Colors.transparent,
+                                      borderRadius: BorderRadius.only(
+                                        topLeft: Radius.circular(25),
+                                        topRight: Radius.circular(25),
+                                      ),
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        SizedBox(height: constraints.maxHeight * 0.01),
+                                        const Text(
+                                          "Completa la información de tu producto",
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: Color(0xFF2F4157),
+                                            height: 1.4,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  
+                                  // Contenido con scroll
+                                  Expanded(
+                                    child: SingleChildScrollView(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: constraints.maxWidth * 0.05,
+                                        vertical: constraints.maxHeight * 0.01,
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          // Título de la sección de imágenes
+                                          Text(
+                                            "Imágenes del producto (máximo 5)",
+                                            style: TextStyle(
+                                              fontSize: constraints.maxWidth * 0.04,
+                                              fontWeight: FontWeight.bold,
+                                              color: const Color(0xFF2F4157),
+                                            ),
+                                          ),
+                                          SizedBox(height: constraints.maxHeight * 0.01),
+                                          
+                                          // Galería de imágenes
+                                          Container(
+                                            height: constraints.maxHeight * 0.15,
+                                            child: ListView(
+                                              scrollDirection: Axis.horizontal,
+                                              children: [
+                                                // Mostrar imágenes existentes (al editar)
+                                                ..._existingImageUrls.asMap().entries.map((entry) {
+                                                  int index = entry.key;
+                                                  String url = entry.value;
+                                                  return _buildImageContainer(
+                                                    imageUrl: url,
+                                                    isNetwork: true,
+                                                    onRemove: () => _removeExistingImage(index),
+                                                    constraints: constraints,
+                                                  );
+                                                }),
+                                                
+                                                // Mostrar imágenes nuevas seleccionadas
+                                                ..._selectedImages.asMap().entries.map((entry) {
+                                                  int index = entry.key;
+                                                  File imageFile = entry.value;
+                                                  return _buildImageContainer(
+                                                    imageFile: imageFile,
+                                                    isNetwork: false,
+                                                    onRemove: () => _removeImage(index),
+                                                    constraints: constraints,
+                                                  );
+                                                }),
+                                                
+                                                // Botón para agregar más imágenes
+                                                if (_selectedImages.length + _existingImageUrls.length < 5)
+                                                  _buildAddImageButton(
+                                                    onTap: _pickImages,
+                                                    constraints: constraints,
+                                                  ),
+                                              ],
+                                            ),
+                                          ),
+                                          
+                                          // Indicador de cantidad de imágenes
+                                          if (_selectedImages.length + _existingImageUrls.length > 0)
+                                            Padding(
+                                              padding: EdgeInsets.only(top: constraints.maxHeight * 0.005),
+                                              child: Text(
+                                                "${_selectedImages.length + _existingImageUrls.length}/5 imágenes seleccionadas",
+                                                style: TextStyle(
+                                                  fontSize: constraints.maxWidth * 0.03,
+                                                  color: const Color(0xFF2F4157).withOpacity(0.6),
+                                                ),
+                                              ),
+                                            ),
+                                          
+                                          SizedBox(height: constraints.maxHeight * 0.03),
+                                          
+                                          // Campos del formulario
+                                          _buildFormField(
+                                            label: "Nombre del producto",
+                                            controller: _nameController,
+                                            icon: Icons.inventory_2,
+                                            constraints: constraints,
+                                          ),
+                                          
+                                          SizedBox(height: constraints.maxHeight * 0.015),
+                                          
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: _buildFormField(
+                                                  label: "Precio",
+                                                  controller: _priceController,
+                                                  icon: Icons.attach_money,
+                                                  keyboardType: TextInputType.number,
+                                                  constraints: constraints,
+                                                ),
+                                              ),
+                                              SizedBox(width: constraints.maxWidth * 0.03),
+                                              Expanded(
+                                                child: _buildFormField(
+                                                  label: "Stock",
+                                                  controller: _stockController,
+                                                  icon: Icons.inventory,
+                                                  keyboardType: TextInputType.number,
+                                                  constraints: constraints,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          
+                                          SizedBox(height: constraints.maxHeight * 0.015),
+                                          
+                                          _buildDropdownField(
+                                            label: "Categoría",
+                                            value: _selectedCategory,
+                                            items: _categories,
+                                            icon: Icons.category,
+                                            onChanged: (String? value) {
+                                              setState(() {
+                                                _selectedCategory = value;
+                                              });
+                                            },
+                                            constraints: constraints,
+                                          ),
+                                          
+                                          SizedBox(height: constraints.maxHeight * 0.015),
+                                          
+                                          _buildFormField(
+                                            label: "Descripción",
+                                            controller: _descriptionController,
+                                            icon: Icons.description,
+                                            maxLines: 3,
+                                            constraints: constraints,
+                                          ),
+                                          
+                                          SizedBox(height: constraints.maxHeight * 0.015),
+                                          
+                                          _buildDropdownField(
+                                            label: "Unidad",
+                                            value: _selectedUnit,
+                                            items: _units,
+                                            icon: Icons.straighten,
+                                            onChanged: (String? value) {
+                                              setState(() {
+                                                _selectedUnit = value;
+                                              });
+                                            },
+                                            constraints: constraints,
+                                          ),
+                                          
+                                          SizedBox(height: constraints.maxHeight * 0.03),
+                                          
+                                          // Botones de acción
+                                          if (widget.productToEdit != null)
+                                            // Botones al editar: Cancelar y Actualizar
+                                            Row(
+                                              children: [
+                                                Expanded(
+                                                  child: SizedBox(
+                                                    height: 45,
+                                                    child: OutlinedButton(
+                                                      onPressed: _isLoadingAllow ? null : () => Navigator.of(context).pop(),
+                                                      style: OutlinedButton.styleFrom(
+                                                        foregroundColor: const Color(0xFF2F4157),
+                                                        side: const BorderSide(
+                                                          color: Color(0xFF577C8E),
+                                                          width: 2,
+                                                        ),
+                                                        shape: RoundedRectangleBorder(
+                                                          borderRadius: BorderRadius.circular(25),
+                                                        ),
+                                                      ),
+                                                      child: const Text(
+                                                        "Cancelar",
+                                                        style: TextStyle(
+                                                          fontSize: 16,
+                                                          fontWeight: FontWeight.bold,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                                SizedBox(width: constraints.maxWidth * 0.03),
+                                                Expanded(
+                                                  child: SizedBox(
+                                                    height: 45,
+                                                    child: ElevatedButton(
+                                                      onPressed: _isLoadingAllow ? null : _saveProduct,
+                                                      style: ElevatedButton.styleFrom(
+                                                        backgroundColor: const Color.fromARGB(255, 41, 78, 44),
+                                                        foregroundColor: Colors.white,
+                                                        shape: RoundedRectangleBorder(
+                                                          borderRadius: BorderRadius.circular(25),
+                                                        ),
+                                                        elevation: 5,
+                                                      ),
+                                                      child: _isLoadingAllow
+                                                          ? const SizedBox(
+                                                              width: 20,
+                                                              height: 20,
+                                                              child: CircularProgressIndicator(
+                                                                strokeWidth: 2,
+                                                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                                              ),
+                                                            )
+                                                          : const Text(
+                                                              "Actualizar",
+                                                              style: TextStyle(
+                                                                fontSize: 16,
+                                                                fontWeight: FontWeight.bold,
+                                                              ),
+                                                            ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            )
+                                          else
+                                            // Botón al agregar nuevo producto
+                                            SizedBox(
+                                              width: double.infinity,
+                                              height: 45,
+                                              child: ElevatedButton(
+                                                onPressed: _isLoadingAllow ? null : _saveProduct,
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: const Color.fromARGB(255, 41, 78, 44),
+                                                  foregroundColor: Colors.white,
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius: BorderRadius.circular(25),
+                                                  ),
+                                                  elevation: 5,
+                                                ),
+                                                child: _isLoadingAllow
+                                                    ? const SizedBox(
+                                                        width: 20,
+                                                        height: 20,
+                                                        child: CircularProgressIndicator(
+                                                          strokeWidth: 2,
+                                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                                        ),
+                                                      )
+                                                    : const Text(
+                                                        "Guardar Producto",
+                                                        style: TextStyle(
+                                                          fontSize: 16,
+                                                          fontWeight: FontWeight.bold,
+                                                        ),
+                                                      ),
+                                              ),
+                                            ),
+                                          
+                                          SizedBox(height: constraints.maxHeight * 0.02),
+                                        ],
+                                      ),
+                                    ),
                                   ),
                                 ],
                               ),
                             ),
-                            
-                            // Contenido con scroll
-                            Expanded(
-                              child: SingleChildScrollView(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: constraints.maxWidth * 0.05,
-                                  vertical: constraints.maxHeight * 0.01,
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Center(
-                                      child: GestureDetector(
-                                        onTap: _pickImage,
-                                        child: Container(
-                                          height: constraints.maxHeight * 0.12,
-                                          width: double.infinity,
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFFF5F5F5),
-                                            borderRadius: BorderRadius.circular(20),
-                                            border: Border.all(
-                                              color: const Color(0xFF577C8E).withOpacity(0.3),
-                                              width: 2,
-                                              style: BorderStyle.solid,
-                                            ),
-                                          ),
-                                          child: _selectedImage != null
-                                              ? ClipRRect(
-                                                  borderRadius: BorderRadius.circular(18),
-                                                  child: Image.file(
-                                                    _selectedImage!,
-                                                    fit: BoxFit.cover,
-                                                  ),
-                                                )
-                                              : (_existingImageUrl != null && _existingImageUrl!.isNotEmpty)
-                                                  ? ClipRRect(
-                                                      borderRadius: BorderRadius.circular(18),
-                                                      child: Image.network(
-                                                        _existingImageUrl!,
-                                                        fit: BoxFit.cover,
-                                                        errorBuilder: (context, error, stackTrace) {
-                                                          return Column(
-                                                            mainAxisAlignment: MainAxisAlignment.center,
-                                                            children: [
-                                                              Container(
-                                                                width: 50,
-                                                                height: 50,
-                                                                decoration: BoxDecoration(
-                                                                  color: const Color(0xFF4CAF50).withOpacity(0.1),
-                                                                  shape: BoxShape.circle,
-                                                                ),
-                                                                child: const Icon(
-                                                                  Icons.add_a_photo,
-                                                                  color: Color(0xFF226602),
-                                                                  size: 25,
-                                                                ),
-                                                              ),
-                                                              const SizedBox(height: 8),
-                                                              const Text(
-                                                                "Toca para cambiar imagen",
-                                                                style: TextStyle(
-                                                                  fontSize: 12,
-                                                                  color: Color(0xFF2F4157),
-                                                                  fontWeight: FontWeight.w500,
-                                                                ),
-                                                              ),
-                                                            ],
-                                                          );
-                                                        },
-                                                      ),
-                                                    )
-                                                  : Column(
-                                                      mainAxisAlignment: MainAxisAlignment.center,
-                                                      children: [
-                                                        Container(
-                                                          width: 50,
-                                                          height: 50,
-                                                          decoration: BoxDecoration(
-                                                            color: const Color(0xFF4CAF50).withOpacity(0.1),
-                                                            shape: BoxShape.circle,
-                                                          ),
-                                                          child: const Icon(
-                                                            Icons.add_a_photo,
-                                                            color: Color(0xFF226602),
-                                                            size: 25,
-                                                          ),
-                                                        ),
-                                                        const SizedBox(height: 8),
-                                                        const Text(
-                                                          "Toca para subir imagen",
-                                                          style: TextStyle(
-                                                            fontSize: 12,
-                                                            color: Color(0xFF2F4157),
-                                                            fontWeight: FontWeight.w500,
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                        ),
-                                      ),
-                                    ),
-                                    
-                                    SizedBox(height: constraints.maxHeight * 0.02),
-                                    
-                                    // Campos del formulario
-                                    _buildFormField(
-                                      label: "Nombre del producto",
-                                      controller: _nameController,
-                                      icon: Icons.inventory_2,
-                                      constraints: constraints,
-                                    ),
-                                    
-                                    SizedBox(height: constraints.maxHeight * 0.015),
-                                    
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: _buildFormField(
-                                            label: "Precio",
-                                            controller: _priceController,
-                                            icon: Icons.attach_money,
-                                            keyboardType: TextInputType.number,
-                                            constraints: constraints,
-                                          ),
-                                        ),
-                                        SizedBox(width: constraints.maxWidth * 0.03),
-                                        Expanded(
-                                          child: _buildFormField(
-                                            label: "Stock",
-                                            controller: _stockController,
-                                            icon: Icons.inventory,
-                                            keyboardType: TextInputType.number,
-                                            constraints: constraints,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    
-                                    SizedBox(height: constraints.maxHeight * 0.015),
-                                    
-                                    _buildDropdownField(
-                                      label: "Categoría",
-                                      value: _selectedCategory,
-                                      items: _categories,
-                                      icon: Icons.category,
-                                      onChanged: (String? value) {
-                                        setState(() {
-                                          _selectedCategory = value;
-                                        });
-                                      },
-                                      constraints: constraints,
-                                    ),
-                                    
-                                    SizedBox(height: constraints.maxHeight * 0.015),
-                                    
-                                    _buildFormField(
-                                      label: "Descripción",
-                                      controller: _descriptionController,
-                                      icon: Icons.description,
-                                      maxLines: 3,
-                                      constraints: constraints,
-                                    ),
-                                    
-                                    SizedBox(height: constraints.maxHeight * 0.015),
-                                    
-                                    _buildDropdownField(
-                                      label: "Unidad",
-                                      value: _selectedUnit,
-                                      items: _units,
-                                      icon: Icons.straighten,
-                                      onChanged: (String? value) {
-                                        setState(() {
-                                          _selectedUnit = value;
-                                        });
-                                      },
-                                      constraints: constraints,
-                                    ),
-                                    
-                                    SizedBox(height: constraints.maxHeight * 0.03),
-                                    
-                                    // Botón de guardar
-                                    SizedBox(
-                                      width: double.infinity,
-                                      height: 45,
-                                      child: ElevatedButton(
-                                        onPressed: _isLoadingAllow ? null : _saveProduct,
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: const Color.fromARGB(255, 41, 78, 44),
-                                          foregroundColor: Colors.white,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(25),
-                                          ),
-                                          elevation: 5,
-                                        ),
-                                        child: _isLoadingAllow
-                                            ? const SizedBox(
-                                                width: 20,
-                                                height: 20,
-                                                child: CircularProgressIndicator(
-                                                  strokeWidth: 2,
-                                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                                ),
-                                              )
-                                            : Text(
-                                                widget.productToEdit != null ? "Actualizar Producto" : "Guardar Producto",
-                                                style: const TextStyle(
-                                                  fontSize: 16,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                      ),
-                                    ),
-                                    
-                                    SizedBox(height: constraints.maxHeight * 0.02),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
                 );
@@ -699,7 +852,132 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
     );
   }
 
-  // Método para crear dropdown fields con diseño simple
+  // Método para construir contenedor de imagen en la galería
+  Widget _buildImageContainer({
+    File? imageFile,
+    String? imageUrl,
+    required bool isNetwork,
+    required VoidCallback onRemove,
+    required BoxConstraints constraints,
+  }) {
+    return Container(
+      width: constraints.maxWidth * 0.25,
+      height: constraints.maxHeight * 0.15,
+      margin: EdgeInsets.only(right: constraints.maxWidth * 0.02),
+      child: Stack(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(15),
+            child: isNetwork && imageUrl != null
+                ? Image.network(
+                    imageUrl,
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    height: double.infinity,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        color: const Color(0xFFF5F5F5),
+                        child: const Icon(
+                          Icons.broken_image,
+                          color: Color(0xFF577C8E),
+                          size: 30,
+                        ),
+                      );
+                    },
+                  )
+                : imageFile != null
+                    ? Image.file(
+                        imageFile,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: double.infinity,
+                      )
+                    : Container(
+                        color: const Color(0xFFF5F5F5),
+                        child: const Icon(
+                          Icons.image,
+                          color: Color(0xFF577C8E),
+                          size: 30,
+                        ),
+                      ),
+          ),
+          // Botón para eliminar
+          Positioned(
+            top: 5,
+            right: 5,
+            child: GestureDetector(
+              onTap: onRemove,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(
+                  color: Colors.red,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.close,
+                  color: Colors.white,
+                  size: 16,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Método para construir botón de agregar imagen
+  Widget _buildAddImageButton({
+    required VoidCallback onTap,
+    required BoxConstraints constraints,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: constraints.maxWidth * 0.25,
+        height: constraints.maxHeight * 0.15,
+        margin: EdgeInsets.only(right: constraints.maxWidth * 0.02),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF5F5F5),
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(
+            color: const Color(0xFF577C8E).withOpacity(0.3),
+            width: 2,
+            style: BorderStyle.solid,
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFF4CAF50).withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.add_a_photo,
+                color: Color(0xFF226602),
+                size: 22,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              "Agregar",
+              style: TextStyle(
+                fontSize: constraints.maxWidth * 0.03,
+                color: const Color(0xFF2F4157),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+    // Método para crear dropdown fields con diseño simple
   Widget _buildDropdownField({
     required String label,
     required String? value,

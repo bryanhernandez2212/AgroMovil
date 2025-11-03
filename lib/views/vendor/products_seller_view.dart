@@ -129,7 +129,12 @@ class _ListProductViewContentState extends State<ListProductViewContent> {
                       : RefreshIndicator(
                           onRefresh: _loadProducts,
                           child: ListView.builder(
-                            padding: const EdgeInsets.all(16),
+                            padding: EdgeInsets.only(
+                              left: 16,
+                              right: 16,
+                              top: 16,
+                              bottom: 100 + MediaQuery.of(context).padding.bottom, // Espacio para el menú (75px) + espacio extra para los botones
+                            ),
                             itemCount: _filteredProducts.length,
                             itemBuilder: (context, index) {
                               return _buildProductCard(_filteredProducts[index]);
