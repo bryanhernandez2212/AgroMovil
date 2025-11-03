@@ -233,7 +233,7 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
     setState(() {
       if (stock == 0) {
         // Sin límite de stock, permitir incrementar
-        quantity++;
+      quantity++;
       } else if (quantity < stock) {
       quantity++;
       } else {
@@ -262,20 +262,20 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
               padding: EdgeInsets.only(
                 bottom: 100 + MediaQuery.of(context).padding.bottom, // Espacio para el menú de navegación
               ),
-              child: Column(
-                children: [
+        child: Column(
+          children: [
                   // Imagen principal
             _buildHeaderImage(context),
                   // Contenido del producto
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                         // Título del producto
-                        Text(
-                          name,
-                          style: const TextStyle(
+                    Text(
+                      name,
+                      style: const TextStyle(
                             fontSize: 30,
                             fontWeight: FontWeight.bold,
                             color: Color(0xFF1A1A1A),
@@ -286,8 +286,8 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                         const SizedBox(height: 8),
                         
                         // Descripción
-                        Text(
-                          description,
+                    Text(
+                      description,
                           style: const TextStyle(
                             fontSize: 15,
                             color: Color(0xFF666666),
@@ -342,8 +342,8 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                                 const SizedBox(height: 4),
                                 Text(
                                   'por $unit',
-                                  style: const TextStyle(
-                                    fontSize: 14,
+                      style: const TextStyle(
+                        fontSize: 14,
                                     color: Color(0xFF666666),
                                     fontWeight: FontWeight.w500,
                                   ),
@@ -357,10 +357,10 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                                 children: [
                                   const Icon(Icons.star, color: Colors.amber, size: 20),
                                   const SizedBox(width: 6),
-                                  Text(
+                    Text(
                                     widget.product!.calificacionPromedio.toStringAsFixed(1),
-                                    style: const TextStyle(
-                                      fontSize: 18,
+                      style: const TextStyle(
+                        fontSize: 18,
                                       fontWeight: FontWeight.bold,
                                       color: Color(0xFF1A1A1A),
                                     ),
@@ -391,31 +391,31 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                             const SizedBox(width: 8),
                             Text(
                               stock > 0 ? 'Stock disponible: $stock $unit' : 'Sin stock disponible',
-                              style: TextStyle(
+                        style: TextStyle(
                                 fontSize: 14,
                                 color: stock > 0 ? const Color(0xFF115213) : Colors.red.shade700,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
+                          fontWeight: FontWeight.w600,
                         ),
+                      ),
+                          ],
+                    ),
                         const SizedBox(height: 32),
-                        
+
                         const SizedBox(height: 24),
                         
                         // Selector de cantidad
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
                             _roundIconButton(
                               icon: Icons.remove, 
                               onTap: _decrement,
                               enabled: quantity > 1,
                             ),
                             const SizedBox(width: 32),
-                            Text(
-                              '$quantity',
-                              style: const TextStyle(
+                        Text(
+                          '$quantity',
+                          style: const TextStyle(
                                 fontSize: 28,
                                 fontWeight: FontWeight.bold,
                                 color: Color(0xFF1A1A1A),
@@ -434,7 +434,7 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                             padding: const EdgeInsets.only(top: 12),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
+                          children: [
                                 Icon(Icons.warning_amber_rounded, 
                                   color: Colors.red.shade700, 
                                   size: 16,
@@ -446,11 +446,11 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                                     fontSize: 12,
                                     color: Colors.red.shade700,
                                     fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
+                              ),
                             ),
-                          ),
+                          ],
+                        ),
+                      ),
                         const SizedBox(height: 24),
                         
                         // Total
@@ -478,9 +478,9 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                         const SizedBox(height: 24),
                         
                         // Botones de acción
-                        _filledPillButton(
-                          label: 'Comprar ahora',
-                          onTap: () {},
+                    _filledPillButton(
+                      label: 'Comprar ahora',
+                      onTap: () {},
                         ),
                         const SizedBox(height: 12),
                         _primaryHollowButton(
@@ -490,6 +490,15 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                       ],
                     ),
                   ),
+                  
+                  const SizedBox(height: 32),
+                  // Divisor entre botones y vendedor
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 20),
+                    height: 1,
+                    color: Colors.grey[300],
+                  ),
+                  const SizedBox(height: 32),
                   
                   // Sección de información del vendedor
                   Padding(
@@ -520,14 +529,23 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
           child: GestureDetector(
             onTap: () => Navigator.pop(context),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.5),
-                borderRadius: BorderRadius.circular(12),
+                color: Colors.white.withOpacity(0.9),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-              child: const Text(
-                'Regresar',
-                style: TextStyle(color: Colors.white, fontSize: 12),
+              child: const Icon(
+                Icons.arrow_back,
+                color: Color(0xFF1A1A1A),
+                size: 24,
               ),
             ),
           ),
@@ -591,8 +609,8 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
             ),
             const SizedBox(width: 16),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     vendorName,
@@ -601,8 +619,8 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF1A1A1A),
                     ),
-                  ),
-                  const SizedBox(height: 8),
+                    ),
+                    const SizedBox(height: 8),
                   _buildVendorInfoRow(
                     icon: Icons.location_on_outlined,
                     label: 'Ubicación',
@@ -664,18 +682,9 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Encabezado con línea divisoria
+        // Encabezado
         Row(
           children: [
-            Container(
-              height: 2,
-              width: 40,
-              decoration: BoxDecoration(
-                color: const Color(0xFF115213),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(width: 12),
             const Text(
               'Comentarios',
               style: TextStyle(
@@ -754,7 +763,7 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
         
         // Lista de comentarios
         if (_isLoadingComments)
-          const Center(
+                    const Center(
             child: Padding(
               padding: EdgeInsets.all(40),
               child: CircularProgressIndicator(
@@ -773,9 +782,9 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                     Icons.comment_outlined,
                     size: 64,
                     color: Colors.grey[300],
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
                     'Aún no hay comentarios',
                     style: TextStyle(
                       color: Colors.grey[600],
@@ -863,9 +872,9 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
             children: [
               const Text(
                 'Calificación',
-                style: TextStyle(
+                        style: TextStyle(
                   fontSize: 14,
-                  fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w600,
                   color: Color(0xFF666666),
                 ),
               ),
@@ -896,17 +905,17 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                   color: Colors.amber.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Text(
+                      child: Text(
                   _selectedRating.toStringAsFixed(1),
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF1A1A1A),
                   ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
           const SizedBox(height: 20),
           
           // Campo de texto mejorado
@@ -941,7 +950,7 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             ),
           ),
-          const SizedBox(height: 20),
+                    const SizedBox(height: 20),
           
           // Botón enviar mejorado
           SizedBox(
@@ -976,13 +985,13 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
+                              ),
+                            ),
+                          ],
       ),
     );
   }
@@ -1097,13 +1106,7 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          // Línea divisoria sutil
-          Container(
-            height: 1,
-            color: Colors.grey[200],
-          ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           // Texto del comentario
           Text(
             comment.comentario,
@@ -1112,9 +1115,9 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
               color: Color(0xFF1A1A1A),
               height: 1.6,
               letterSpacing: 0.2,
+              ),
             ),
-          ),
-        ],
+          ],
       ),
     );
   }
@@ -1144,14 +1147,14 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
     final hasMultipleImages = images.length > 1;
     
     return Stack(
-        children: [
-          AspectRatio(
-            aspectRatio: 16 / 9,
-            child: ClipRRect(
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(12),
-                bottomRight: Radius.circular(12),
-              ),
+      children: [
+        AspectRatio(
+          aspectRatio: 16 / 9,
+          child: ClipRRect(
+            borderRadius: const BorderRadius.only(
+              bottomLeft: Radius.circular(12),
+              bottomRight: Radius.circular(12),
+            ),
             child: hasMultipleImages
                 ? _buildScrollablePageView(images)
                 : _buildSingleImage(images.isNotEmpty ? images.first : 'assets/fondo.png'),
@@ -1159,7 +1162,7 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
         ),
         // Indicadores de página si hay múltiples imágenes
         if (hasMultipleImages)
-          Positioned(
+        Positioned(
             bottom: 10,
             left: 0,
             right: 0,
@@ -1171,16 +1174,16 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                   width: 8,
                   height: 8,
                   margin: const EdgeInsets.symmetric(horizontal: 4),
-                  decoration: BoxDecoration(
+              decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: _currentImageIndex == index
                         ? Colors.white
                         : Colors.white.withOpacity(0.4),
                   ),
-                ),
               ),
             ),
           ),
+        ),
       ],
     );
   }
