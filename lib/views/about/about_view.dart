@@ -14,7 +14,6 @@ class AboutView extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 20),
-              
               // Header
               const Center(
                 child: Text(

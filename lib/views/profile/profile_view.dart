@@ -3,6 +3,10 @@ import 'package:provider/provider.dart';
 import 'package:agromarket/controllers/auth_controller.dart';
 import 'package:agromarket/views/auth/login_view.dart';
 import 'package:agromarket/views/about/about_view.dart';
+import 'package:agromarket/services/user_role_service.dart';
+import 'package:agromarket/estructure/product_estructure.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ProfileView extends StatefulWidget {
   const ProfileView({super.key});
@@ -68,9 +72,6 @@ class _ProfileViewState extends State<ProfileView> {
                       ),
                     ],
                   ),
-                  
-                  const SizedBox(height: 30),
-
                   // Foto de perfil
                   Center(
                     child: Stack(
@@ -297,9 +298,7 @@ class _ProfileViewState extends State<ProfileView> {
                   ),
           ),
         ),
-        
-        const SizedBox(height: 12),
-        
+        const SizedBox(height: 12),     
         SizedBox(
           width: double.infinity,
           height: 50,
@@ -326,66 +325,287 @@ class _ProfileViewState extends State<ProfileView> {
   }
 
   Widget _buildActionButtons() {
-    return Column(
-      children: [
-        SizedBox(
-          width: double.infinity,
-          height: 50,
-          child: ElevatedButton.icon(
-            onPressed: _navigateToAbout,
-            icon: const Icon(Icons.info_outline, size: 20),
-            label: const Text("Acerca de"),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF115213),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
+    return Consumer<AuthController>(
+      builder: (context, authController, child) {
+        final user = authController.currentUser;
+        final currentRole = UserRoleService.getUserRole();
+        
+        final roles = user?.roles ?? const <String>[];
+        final hasSeller = roles.any((r) => r.toLowerCase().contains('vend'));
+        final hasBuyer = roles.any((r) => r.toLowerCase().contains('compr') || r.toLowerCase().contains('buyer'));
+
+        return Column(
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF115213)),
               ),
-              elevation: 2,
-            ),
-          ),
-        ),
-        
-        const SizedBox(height: 12),
-        
-        SizedBox(
-          width: double.infinity,
-          height: 50,
-          child: ElevatedButton.icon(
-            onPressed: _showLogoutDialog,
-            icon: const Icon(Icons.logout, size: 20),
-            label: const Text("Cerrar Sesión"),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFE8F5C8),
-              foregroundColor: const Color(0xFF115213),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              elevation: 2,
-            ),
-          ),
-        ),
-        
-        const SizedBox(height: 12),
-        
-        SizedBox(
-          width: double.infinity,
-          height: 50,
-          child: OutlinedButton.icon(
-            onPressed: _showDeleteDialog,
-            icon: const Icon(Icons.delete_outline, size: 20),
-            label: const Text("Eliminar Cuenta"),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.red,
-              side: const BorderSide(color: Colors.red),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Modo de navegación",
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF115213),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  RadioListTile<String>(
+                    value: UserRoleService.sellerRole,
+                    groupValue: currentRole ?? (hasSeller ? UserRoleService.sellerRole : UserRoleService.buyerRole),
+                    onChanged: hasSeller ? (val) => _switchRole(true, authController) : null,
+                    activeColor: const Color(0xFF115213),
+                    title: const Text('🏪 Modo Vendedor'),
+                  ),
+                  RadioListTile<String>(
+                    value: UserRoleService.buyerRole,
+                    groupValue: currentRole ?? (hasSeller ? UserRoleService.sellerRole : UserRoleService.buyerRole),
+                    onChanged: hasBuyer ? (val) => _switchRole(false, authController) : null,
+                    activeColor: const Color(0xFF115213),
+                    title: const Text('🛒 Modo Comprador'),
+                  ),
+                ],
               ),
             ),
-          ),
-        ),
-      ],
+            
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF115213)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Gestionar roles",
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF115213),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.store,
+                            color: hasSeller ? const Color(0xFF4CAF50) : Colors.grey,
+                            size: 24,
+                          ),
+                          const SizedBox(width: 12),
+                          const Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Rol Vendedor',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF333333),
+                                ),
+                              ),
+                              Text(
+                                'Publicar y vender productos',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF666666),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      Switch(
+                        value: hasSeller,
+                        onChanged: (value) => _toggleRole('vendedor', value, authController),
+                        activeColor: const Color(0xFF4CAF50),
+                      ),
+                    ],
+                  ),  
+                  const SizedBox(height: 16),
+                  const Divider(),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.shopping_cart,
+                            color: hasBuyer ? const Color(0xFF1976D2) : Colors.grey,
+                            size: 24,
+                          ),
+                          const SizedBox(width: 12),
+                          const Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Rol Comprador',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF333333),
+                                ),
+                              ),
+                              Text(
+                                'Explorar y comprar productos',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF666666),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      Switch(
+                        value: hasBuyer,
+                        onChanged: (value) => _toggleRole('comprador', value, authController),
+                        activeColor: const Color(0xFF1976D2),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            
+            const SizedBox(height: 12),
+            
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: _navigateToAbout,
+                icon: const Icon(Icons.info_outline, size: 20),
+                label: const Text("Acerca de"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF115213),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 2,
+                ),
+              ),
+            ),
+            
+            const SizedBox(height: 12),
+            
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: _showLogoutDialog,
+                icon: const Icon(Icons.logout, size: 20),
+                label: const Text("Cerrar Sesión"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFE8F5C8),
+                  foregroundColor: const Color(0xFF115213),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 2,
+                ),
+              ),
+            ),
+            
+            const SizedBox(height: 12),
+            
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: OutlinedButton.icon(
+                onPressed: _showDeleteDialog,
+                icon: const Icon(Icons.delete_outline, size: 20),
+                label: const Text("Eliminar Cuenta"),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.red,
+                  side: const BorderSide(color: Colors.red),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
+  }
+
+  void _switchRole(bool toSeller, AuthController authController) {
+    // Cambiar el rol en el servicio
+    if (toSeller) {
+      UserRoleService.setUserRole(UserRoleService.sellerRole);
+    } else {
+      UserRoleService.setUserRole(UserRoleService.buyerRole);
+    }
+    
+    // Navegar a la estructura con el nuevo rol
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const ProductEstructureView(),
+      ),
+    );
+  }
+
+  Future<void> _toggleRole(String role, bool enable, AuthController authController) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      if (enable) {
+        // Agregar el rol al array en Firestore
+        await FirebaseFirestore.instance
+            .collection('usuarios')
+            .doc(user.uid)
+            .update({
+          'roles': FieldValue.arrayUnion([role]),
+          'updated_at': FieldValue.serverTimestamp(),
+        });
+        _showSuccessSnackBar('¡Rol activado exitosamente!');
+      } else {
+        // Remover el rol del array en Firestore
+        await FirebaseFirestore.instance
+            .collection('usuarios')
+            .doc(user.uid)
+            .update({
+          'roles': FieldValue.arrayRemove([role]),
+          'updated_at': FieldValue.serverTimestamp(),
+        });
+        _showSuccessSnackBar('¡Rol desactivado exitosamente!');
+      }
+
+      // Recargar datos del usuario
+      await authController.reloadUserData();
+      
+      setState(() {
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      _showErrorSnackBar('Error al modificar rol: ${e.toString()}');
+    }
   }
 
   void _toggleEditMode() {

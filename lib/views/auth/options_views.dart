@@ -1,4 +1,5 @@
 import 'package:agromarket/estructure/product_estructure.dart';
+import 'package:agromarket/services/user_role_service.dart';
 import 'package:flutter/material.dart';
 
 class OptionPage extends StatefulWidget {
@@ -127,6 +128,9 @@ class _OptionPageState extends State<OptionPage> with TickerProviderStateMixin {
                                     icon: Icons.local_florist,
                                     cardColor: const Color(0xFF4CAF50),
                                     onTap: () {
+                                      // Guardar rol de vendedor
+                                      UserRoleService.setUserRole(UserRoleService.sellerRole);
+                                      
                                       Navigator.pushReplacement(
                                         context,
                                         MaterialPageRoute(
@@ -145,6 +149,9 @@ class _OptionPageState extends State<OptionPage> with TickerProviderStateMixin {
                                     icon: Icons.shopping_cart,
                                     cardColor: const Color(0xFF2F4157),
                                     onTap: () {
+                                      // Guardar rol de comprador
+                                      UserRoleService.setUserRole(UserRoleService.buyerRole);
+                                      
                                       Navigator.pushReplacement(
                                         context,
                                         MaterialPageRoute(

@@ -16,6 +16,8 @@ class _RegisterPageState extends State<RegisterPage> {
   final _confirmPasswordController = TextEditingController();
   bool _obscureText = true;
   bool _obscureRepeatText = true;
+  String _selectedRole = 'comprador';
+  final List<String> _availableRoles = ['comprador', 'vendedor'];
 
   @override
   void dispose() {
@@ -60,6 +62,7 @@ class _RegisterPageState extends State<RegisterPage> {
       _nombreController.text.trim(),
       _emailController.text.trim(),
       _passwordController.text,
+      _selectedRole,
     );
 
     if (success && mounted) {
@@ -308,6 +311,11 @@ class _RegisterPageState extends State<RegisterPage> {
                       },
                     ),
                     
+                    const SizedBox(height: 20),
+                    
+                    // Campo de selección de rol
+                    _buildRoleSelector(),
+                    
                     const SizedBox(height: 30),
                     
                     // Botón de registro
@@ -443,6 +451,61 @@ class _RegisterPageState extends State<RegisterPage> {
         ),
       ),
     );
+  }
+
+  Widget _buildRoleSelector() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.grey[300]!),
+      ),
+      child: DropdownButtonFormField<String>(
+        value: _selectedRole,
+        decoration: InputDecoration(
+          hintText: 'Selecciona tu rol',
+          hintStyle: TextStyle(color: Colors.grey[500]),
+          prefixIcon: Icon(Icons.person_outline, color: Colors.grey[600]),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+        ),
+        items: _availableRoles.map((String role) {
+          return DropdownMenuItem<String>(
+            value: role,
+            child: Text(
+              _getRoleDisplayName(role),
+              style: const TextStyle(
+                fontSize: 16,
+                color: Color(0xFF333333),
+              ),
+            ),
+          );
+        }).toList(),
+        onChanged: (String? newValue) {
+          if (newValue != null) {
+            setState(() {
+              _selectedRole = newValue;
+            });
+          }
+        },
+        dropdownColor: Colors.white,
+        style: const TextStyle(
+          fontSize: 16,
+          color: Color(0xFF333333),
+        ),
+      ),
+    );
+  }
+
+  String _getRoleDisplayName(String role) {
+    switch (role) {
+      case 'comprador':
+        return 'Comprador';
+      case 'vendedor':
+        return 'Vendedor';
+      default:
+        return role;
+    }
   }
 
 }

@@ -116,14 +116,19 @@ class ProductService {
       final QuerySnapshot snapshot = await _firestore
           .collection('productos')
           .where('vendedor_id', isEqualTo: user.uid)
-          .orderBy('fecha_publicacion', descending: true)
           .get();
 
-      return snapshot.docs.map((doc) {
+      // Ordenar en memoria después de obtener los datos
+      final products = snapshot.docs.map((doc) {
         final data = doc.data() as Map<String, dynamic>;
         data['id'] = doc.id;
         return ProductModel.fromJson(data);
       }).toList();
+
+      // Ordenar por fecha de publicación descendente
+      products.sort((a, b) => b.fechaPublicacion.compareTo(a.fechaPublicacion));
+
+      return products;
     } catch (e) {
       print('Error obteniendo productos: $e');
       return [];
@@ -136,14 +141,19 @@ class ProductService {
       final QuerySnapshot snapshot = await _firestore
           .collection('productos')
           .where('activo', isEqualTo: true)
-          .orderBy('fecha_publicacion', descending: true)
           .get();
 
-      return snapshot.docs.map((doc) {
+      // Ordenar en memoria después de obtener los datos
+      final products = snapshot.docs.map((doc) {
         final data = doc.data() as Map<String, dynamic>;
         data['id'] = doc.id;
         return ProductModel.fromJson(data);
       }).toList();
+
+      // Ordenar por fecha de publicación descendente
+      products.sort((a, b) => b.fechaPublicacion.compareTo(a.fechaPublicacion));
+
+      return products;
     } catch (e) {
       print('Error obteniendo productos activos: $e');
       return [];

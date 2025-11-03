@@ -67,7 +67,7 @@ class AuthController extends ChangeNotifier {
   }
 
   /// Registro con Firebase Auth
-  Future<bool> register(String nombre, String email, String password) async {
+  Future<bool> register(String nombre, String email, String password, String rol) async {
     _setLoading(true);
     _clearError();
 
@@ -78,6 +78,7 @@ class AuthController extends ChangeNotifier {
         nombre: nombre,
         email: email,
         password: password,
+        rol: rol,
       );
       
       print('📝 AuthController: Resultado del registro: $result');
@@ -245,11 +246,22 @@ class AuthController extends ChangeNotifier {
   /// Cargar datos del usuario desde Firebase
   Future<void> _loadUserData(String uid) async {
     try {
+      print('🔄 AuthController: Cargando datos del usuario con UID: $uid');
       final userData = await FirebaseService.getCurrentUserData();
+      print('📊 AuthController: Datos obtenidos de Firestore: $userData');
+      
       if (userData != null) {
         _currentUser = UserModel.fromJson(userData);
+        print('✅ AuthController: Usuario cargado correctamente');
+        print('👤 AuthController: Nombre: ${_currentUser!.nombre}');
+        print('📧 AuthController: Email: ${_currentUser!.email}');
+        print('🎭 AuthController: Rol activo: ${_currentUser!.rolActivo}');
+        print('🎭 AuthController: Roles: ${_currentUser!.roles}');
+        print('✅ AuthController: Activo: ${_currentUser!.activo}');
         _isLoggedIn = true;
         notifyListeners();
+      } else {
+        print('❌ AuthController: No se encontraron datos del usuario');
       }
     } catch (e) {
       print('❌ Error cargando datos del usuario: $e');
@@ -334,5 +346,13 @@ class AuthController extends ChangeNotifier {
 
   void clearError() {
     _clearError();
+  }
+
+  /// Forzar recarga de datos del usuario (útil para debugging)
+  Future<void> reloadUserData() async {
+    final user = FirebaseService.getCurrentUser();
+    if (user != null) {
+      await _loadUserData(user.uid);
+    }
   }
 }

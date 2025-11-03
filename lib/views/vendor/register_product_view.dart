@@ -1,19 +1,22 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
-import 'package:agromarket/views/product_admin/products_seller_view.dart';
 import 'package:agromarket/models/product_model.dart';
 import 'package:agromarket/services/product_service.dart';
+import 'package:agromarket/widgets/role_guard.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:agromarket/estructure/product_estructure.dart';
 
-class RegisterProductView extends StatefulWidget {
-  const RegisterProductView({super.key});
+class RegisterProductViewContent extends StatefulWidget {
+  final ProductModel? productToEdit;
+  
+  const RegisterProductViewContent({super.key, this.productToEdit});
 
   @override
-  State<RegisterProductView> createState() => _RegisterProductViewState();
+  State<RegisterProductViewContent> createState() => _RegisterProductViewContentState();
 }
 
-class _RegisterProductViewState extends State<RegisterProductView> with TickerProviderStateMixin {
+class _RegisterProductViewContentState extends State<RegisterProductViewContent> with TickerProviderStateMixin {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _priceController = TextEditingController();
   final TextEditingController _stockController = TextEditingController();
@@ -32,6 +35,7 @@ class _RegisterProductViewState extends State<RegisterProductView> with TickerPr
   bool _isLoadingAllow = false;
   List<String> _categories = [];
   List<String> _units = [];
+  String? _existingImageUrl; // URL de imagen existente si se está editando
 
   @override
   void initState() {
@@ -59,6 +63,24 @@ class _RegisterProductViewState extends State<RegisterProductView> with TickerPr
     
     _animationController.forward();
     _loadInitialData();
+    
+    // Si hay un producto para editar, precargar los datos
+    if (widget.productToEdit != null) {
+      _loadProductData(widget.productToEdit!);
+    }
+  }
+
+  // Cargar datos del producto para editar
+  void _loadProductData(ProductModel product) {
+    _nameController.text = product.nombre;
+    _priceController.text = product.precio.toString();
+    _stockController.text = product.stock.toString();
+    _descriptionController.text = product.descripcion;
+    _selectedCategory = product.categoria;
+    _selectedUnit = product.unidad;
+    _existingImageUrl = product.imagenUrl;
+    
+    setState(() {});
   }
 
   // Cargar datos iniciales
@@ -67,9 +89,11 @@ class _RegisterProductViewState extends State<RegisterProductView> with TickerPr
       _categories = await ProductService.getCategories();
       _units = ProductService.getUnits();
       
-      // Establecer valores por defecto
-      if (_categories.isNotEmpty) _selectedCategory = _categories.first;
-      if (_units.isNotEmpty) _selectedUnit = _units.first;
+      // Establecer valores por defecto solo si no hay producto para editar
+      if (widget.productToEdit == null) {
+        if (_categories.isNotEmpty) _selectedCategory = _categories.first;
+        if (_units.isNotEmpty) _selectedUnit = _units.first;
+      }
       
       setState(() {}); // Actualizar la UI con los datos cargados
     } catch (e) {
@@ -178,8 +202,12 @@ class _RegisterProductViewState extends State<RegisterProductView> with TickerPr
 
       String imageUrl = '';
       
-      // Subir imagen si se seleccionó una
-      if (_selectedImage != null) {
+      // Si se está editando y no se seleccionó nueva imagen, usar la existente
+      if (widget.productToEdit != null && _selectedImage == null) {
+        imageUrl = _existingImageUrl ?? '';
+        print('Usando imagen existente: $imageUrl');
+      } else if (_selectedImage != null) {
+        // Subir nueva imagen si se seleccionó una
         print('Subiendo imagen...');
         final imageResult = await ProductService.uploadProductImage(
           _selectedImage!, 
@@ -210,23 +238,32 @@ class _RegisterProductViewState extends State<RegisterProductView> with TickerPr
         vendedorEmail: user.email ?? '',
         vendedorId: user.uid,
         vendedorNombre: user.displayName ?? 'Usuario',
+        id: widget.productToEdit?.id ?? '', // Preservar ID si se está editando
       );
 
       print('Producto creado: ${product.nombre}');
       print('Datos del producto: ${product.toJson()}');
 
-      // Guardar producto
-      print('Llamando a ProductService.saveProduct...');
-      final result = await ProductService.saveProduct(product);
+      // Guardar o actualizar producto
+      Map<String, dynamic> result;
+      if (widget.productToEdit != null) {
+        // Actualizar producto existente
+        print('Actualizando producto con ID: ${widget.productToEdit!.id}');
+        result = await ProductService.updateProduct(widget.productToEdit!.id, product);
+      } else {
+        // Guardar nuevo producto
+        print('Llamando a ProductService.saveProduct...');
+        result = await ProductService.saveProduct(product);
+      }
       
-      print('Resultado del guardado: $result');
+      print('Resultado: $result');
       
       if (result['success']) {
-        print('Producto guardado exitosamente');
+        print(widget.productToEdit != null ? 'Producto actualizado exitosamente' : 'Producto guardado exitosamente');
         _showSuccessDialog();
       } else {
-        print('Error guardando producto: ${result['message']}');
-        _showErrorDialog('Error guardando producto: ${result['message']}');
+        print('Error: ${result['message']}');
+        _showErrorDialog('Error ${widget.productToEdit != null ? 'actualizando' : 'guardando'} producto: ${result['message']}');
       }
     } catch (e) {
       print('Error en el proceso de guardado: $e');
@@ -258,25 +295,33 @@ class _RegisterProductViewState extends State<RegisterProductView> with TickerPr
   }
 
   // Mostrar diálogo de éxito
-  void _showSuccessDialog() {
-    showDialog(
+  Future<void> _showSuccessDialog() async {
+    await showDialog(
       context: context,
       barrierDismissible: false, // Evita que se cierre tocando fuera
       builder: (context) => AlertDialog(
         title: const Text('Éxito'),
-        content: const Text('Producto guardado exitosamente'),
+        content: Text(widget.productToEdit != null 
+            ? 'Producto actualizado exitosamente' 
+            : 'Producto guardado exitosamente'),
         actions: [
           TextButton(
             onPressed: () {
-              // Cerrar el diálogo primero
+              // Cerrar el diálogo
               Navigator.of(context).pop();
-              // Luego navegar
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const ProductsView(),
-                ),
-              );
+              
+              // Si se está editando, regresar con resultado true para recargar la lista
+              if (widget.productToEdit != null) {
+                Navigator.of(context).pop(true);
+              } else {
+                // Si es nuevo producto, navegar a la vista de productos del vendedor
+                // El índice 2 corresponde a "Mis productos" en la estructura
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (context) => const ProductEstructureView(currentIndex: 2),
+                  ),
+                );
+              }
             },
             child: const Text('OK'),
           ),
@@ -289,7 +334,8 @@ class _RegisterProductViewState extends State<RegisterProductView> with TickerPr
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return VendorGuard(
+      child: Scaffold(
       body: Stack(
         children: [
           Container(
@@ -386,33 +432,70 @@ class _RegisterProductViewState extends State<RegisterProductView> with TickerPr
                                                     fit: BoxFit.cover,
                                                   ),
                                                 )
-                                              : Column(
-                                                  mainAxisAlignment: MainAxisAlignment.center,
-                                                  children: [
-                                                    Container(
-                                                      width: 50,
-                                                      height: 50,
-                                                      decoration: BoxDecoration(
-                                                        color: const Color(0xFF4CAF50).withOpacity(0.1),
-                                                        shape: BoxShape.circle,
+                                              : (_existingImageUrl != null && _existingImageUrl!.isNotEmpty)
+                                                  ? ClipRRect(
+                                                      borderRadius: BorderRadius.circular(18),
+                                                      child: Image.network(
+                                                        _existingImageUrl!,
+                                                        fit: BoxFit.cover,
+                                                        errorBuilder: (context, error, stackTrace) {
+                                                          return Column(
+                                                            mainAxisAlignment: MainAxisAlignment.center,
+                                                            children: [
+                                                              Container(
+                                                                width: 50,
+                                                                height: 50,
+                                                                decoration: BoxDecoration(
+                                                                  color: const Color(0xFF4CAF50).withOpacity(0.1),
+                                                                  shape: BoxShape.circle,
+                                                                ),
+                                                                child: const Icon(
+                                                                  Icons.add_a_photo,
+                                                                  color: Color(0xFF226602),
+                                                                  size: 25,
+                                                                ),
+                                                              ),
+                                                              const SizedBox(height: 8),
+                                                              const Text(
+                                                                "Toca para cambiar imagen",
+                                                                style: TextStyle(
+                                                                  fontSize: 12,
+                                                                  color: Color(0xFF2F4157),
+                                                                  fontWeight: FontWeight.w500,
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          );
+                                                        },
                                                       ),
-                                                      child: const Icon(
-                                                        Icons.add_a_photo,
-                                                        color: Color(0xFF226602),
-                                                        size: 25,
-                                                      ),
+                                                    )
+                                                  : Column(
+                                                      mainAxisAlignment: MainAxisAlignment.center,
+                                                      children: [
+                                                        Container(
+                                                          width: 50,
+                                                          height: 50,
+                                                          decoration: BoxDecoration(
+                                                            color: const Color(0xFF4CAF50).withOpacity(0.1),
+                                                            shape: BoxShape.circle,
+                                                          ),
+                                                          child: const Icon(
+                                                            Icons.add_a_photo,
+                                                            color: Color(0xFF226602),
+                                                            size: 25,
+                                                          ),
+                                                        ),
+                                                        const SizedBox(height: 8),
+                                                        const Text(
+                                                          "Toca para subir imagen",
+                                                          style: TextStyle(
+                                                            fontSize: 12,
+                                                            color: Color(0xFF2F4157),
+                                                            fontWeight: FontWeight.w500,
+                                                          ),
+                                                        ),
+                                                      ],
                                                     ),
-                                                    const SizedBox(height: 8),
-                                                    const Text(
-                                                      "Toca para subir imagen",
-                                                      style: TextStyle(
-                                                        fontSize: 12,
-                                                        color: Color(0xFF2F4157),
-                                                        fontWeight: FontWeight.w500,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
                                         ),
                                       ),
                                     ),
@@ -518,9 +601,9 @@ class _RegisterProductViewState extends State<RegisterProductView> with TickerPr
                                                   valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                                                 ),
                                               )
-                                            : const Text(
-                                                "Guardar Producto",
-                                                style: TextStyle(
+                                            : Text(
+                                                widget.productToEdit != null ? "Actualizar Producto" : "Guardar Producto",
+                                                style: const TextStyle(
                                                   fontSize: 16,
                                                   fontWeight: FontWeight.bold,
                                                 ),
@@ -544,6 +627,7 @@ class _RegisterProductViewState extends State<RegisterProductView> with TickerPr
           ),
         ],
       ),
+    ),
     );
   }
 
@@ -694,5 +778,17 @@ class _RegisterProductViewState extends State<RegisterProductView> with TickerPr
         ),
       ],
     );
+  }
+}
+
+// Mantener la clase original para compatibilidad
+class RegisterProductView extends StatelessWidget {
+  final ProductModel? productToEdit;
+  
+  const RegisterProductView({super.key, this.productToEdit});
+
+  @override
+  Widget build(BuildContext context) {
+    return RegisterProductViewContent(productToEdit: productToEdit);
   }
 }

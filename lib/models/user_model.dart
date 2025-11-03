@@ -2,6 +2,10 @@ class UserModel {
   final String id; // Cambiado de int a String para Firebase UID
   final String nombre;
   final String email;
+  final bool activo;
+  final String rolActivo;
+  final List<String> roles;
+  final DateTime? fechaRegistro;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -9,6 +13,10 @@ class UserModel {
     required this.id,
     required this.nombre,
     required this.email,
+    this.activo = true,
+    this.rolActivo = 'comprador',
+    this.roles = const ['comprador'],
+    this.fechaRegistro,
     this.createdAt,
     this.updatedAt,
   });
@@ -18,6 +26,14 @@ class UserModel {
       id: json['id'] ?? '',
       nombre: json['nombre'] ?? '',
       email: json['email'] ?? '',
+      activo: json['activo'] ?? true,
+      rolActivo: json['rol_activo'] ?? 'comprador',
+      roles: json['roles'] != null 
+          ? List<String>.from(json['roles'])
+          : ['comprador'],
+      fechaRegistro: json['fecha_registro'] != null 
+          ? DateTime.tryParse(json['fecha_registro'].toString())
+          : null,
       createdAt: json['created_at'] != null 
           ? DateTime.tryParse(json['created_at'].toString())
           : null,
@@ -32,6 +48,10 @@ class UserModel {
       'id': id,
       'nombre': nombre,
       'email': email,
+      'activo': activo,
+      'rol_activo': rolActivo,
+      'roles': roles,
+      if (fechaRegistro != null) 'fecha_registro': fechaRegistro!.toIso8601String(),
       if (createdAt != null) 'created_at': createdAt!.toIso8601String(),
       if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
     };
@@ -39,7 +59,7 @@ class UserModel {
 
   @override
   String toString() {
-    return 'UserModel(id: $id, nombre: $nombre, email: $email)';
+    return 'UserModel(id: $id, nombre: $nombre, email: $email, activo: $activo, rolActivo: $rolActivo, roles: $roles)';
   }
 
   @override

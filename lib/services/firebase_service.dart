@@ -10,6 +10,7 @@ class FirebaseService {
     required String nombre,
     required String email,
     required String password,
+    required String rol,
   }) async {
     try {
       print('Registrando usuario: $email');
@@ -24,6 +25,10 @@ class FirebaseService {
         await _firestore.collection('usuarios').doc(userCredential.user!.uid).set({
           'nombre': nombre,
           'email': email,
+          'activo': true,
+          'rol_activo': rol,
+          'roles': [rol],
+          'fecha_registro': FieldValue.serverTimestamp(),
           'created_at': FieldValue.serverTimestamp(),
           'updated_at': FieldValue.serverTimestamp(),
         });
@@ -36,6 +41,10 @@ class FirebaseService {
             'id': userCredential.user!.uid,
             'nombre': nombre,
             'email': email,
+            'activo': true,
+            'rol_activo': rol,
+            'roles': [rol],
+            'fecha_registro': FieldValue.serverTimestamp(),
           }
         };
       } else {
@@ -105,6 +114,10 @@ class FirebaseService {
               'id': userCredential.user!.uid,
               'nombre': userData['nombre'],
               'email': userData['email'],
+              'activo': userData['activo'] ?? true,
+              'rol_activo': userData['rol_activo'] ?? 'comprador',
+              'roles': userData['roles'] ?? ['comprador'],
+              'fecha_registro': userData['fecha_registro'],
             }
           };
         } else {
@@ -245,7 +258,7 @@ class FirebaseService {
     return _auth.currentUser;
   }
 
-  /// Verificar si hay un usuario autenticado
+  // Verificar si hay un usuario autenticado
   static bool isUserSignedIn() {
     return _auth.currentUser != null;
   }
@@ -265,13 +278,25 @@ class FirebaseService {
 
       if (userDoc.exists) {
         final data = userDoc.data()!;
-        return {
+        print('🔥 FirebaseService: Datos obtenidos de Firestore: $data');
+        print('🔥 FirebaseService: rol_activo: ${data['rol_activo']}');
+        print('🔥 FirebaseService: roles: ${data['roles']}');
+        print('🔥 FirebaseService: activo: ${data['activo']}');
+        
+        final result = {
           'id': user.uid,
           'nombre': data['nombre'],
           'email': data['email'],
+          'activo': data['activo'] ?? true,
+          'rol_activo': data['rol_activo'] ?? 'comprador',
+          'roles': data['roles'] ?? ['comprador'],
+          'fecha_registro': data['fecha_registro'],
           'created_at': data['created_at'],
           'updated_at': data['updated_at'],
         };
+        
+        print('🔥 FirebaseService: Datos procesados: $result');
+        return result;
       }
       return null;
     } catch (e) {
@@ -357,6 +382,10 @@ class FirebaseService {
             'id': userId,
             'nombre': userData['nombre'] ?? nombre,
             'email': userData['email'] ?? email,
+            'activo': userData['activo'] ?? true,
+            'rol_activo': userData['rol_activo'] ?? 'comprador',
+            'roles': userData['roles'] ?? ['comprador'],
+            'fecha_registro': userData['fecha_registro'],
           }
         };
       }
@@ -367,6 +396,10 @@ class FirebaseService {
         'nombre': nombre,
         'email': email,
         'provider': 'microsoft',
+        'activo': true,
+        'rol_activo': 'comprador',
+        'roles': ['comprador'],
+        'fecha_registro': FieldValue.serverTimestamp(),
         'created_at': FieldValue.serverTimestamp(),
         'updated_at': FieldValue.serverTimestamp(),
       };
@@ -384,6 +417,10 @@ class FirebaseService {
           'id': userId,
           'nombre': nombre,
           'email': email,
+          'activo': true,
+          'rol_activo': 'comprador',
+          'roles': ['comprador'],
+          'fecha_registro': FieldValue.serverTimestamp(),
         }
       };
     } catch (e) {

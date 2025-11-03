@@ -1,6 +1,11 @@
-import 'package:agromarket/views/product_admin/list_product_view.dart';
-import 'package:agromarket/views/product_admin/register_product_view.dart';
 import 'package:agromarket/views/profile/profile_view.dart';
+import 'package:agromarket/views/vendor/list_product_view.dart';
+import 'package:agromarket/views/vendor/register_product_view.dart';
+import 'package:agromarket/views/buyer/buyer_home_view.dart';
+import 'package:agromarket/views/buyer/buyer_cart_view.dart';
+import 'package:agromarket/views/buyer/buyer_favorites_view.dart';
+import 'package:agromarket/services/user_role_service.dart';
+import 'package:agromarket/widgets/banner_ad_widget.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:flutter/material.dart';
 
@@ -47,6 +52,7 @@ class _ProductEstructureViewState extends State<ProductEstructureView> {
   @override
   Widget build(BuildContext context) {
     final currentTitle = _getTitleForIndex(currentIndex);
+    final isBuyer = UserRoleService.isBuyer();
     
     return Scaffold(
       extendBody: true,
@@ -55,6 +61,49 @@ class _ProductEstructureViewState extends State<ProductEstructureView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Banner "AgroMarket" - solo para compradores en Home
+            if (isBuyer && currentIndex == 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 16, left: 20, right: 20),
+                child: Text(
+                  'AgroMarket',
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF115213),
+                  ),
+                ),
+              ),
+            
+            // Barra de búsqueda - solo para compradores en Home
+            if (isBuyer && currentIndex == 0 && widget.showSearchBar)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Material(
+                    elevation: 4,
+                    borderRadius: BorderRadius.circular(30),
+                    shadowColor: Colors.black26,
+                    child: TextField(
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.search, color: Color(0xFF115213)),
+                        hintText: 'Buscar productos...',
+                        hintStyle: const TextStyle(color: Colors.grey, fontSize: 16),
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                        enabledBorder: _buildInputBorder(const Color(0xFF115213), 1),
+                        focusedBorder: _buildInputBorder(const Color(0xFF115213), 2),
+                      ),
+                      onChanged: widget.onSearchChanged,
+                    ),
+                  ),
+                ),
+              ),
+            
+            // Título para otras vistas
             if (currentTitle != null)
               Padding(
                 padding: const EdgeInsets.only(top: 16, left: 20, right: 20),
@@ -72,7 +121,20 @@ class _ProductEstructureViewState extends State<ProductEstructureView> {
           ],
         ),
       ),
-      bottomNavigationBar: _buildCurvedNavigationBar(),
+      bottomNavigationBar: Stack(
+        children: [
+          _buildCurvedNavigationBar(),
+          // Banner de AdMob en la parte superior de la barra de navegación
+          const Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: BannerAdWidget(
+              alignment: Alignment.topCenter,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -110,12 +172,25 @@ class _ProductEstructureViewState extends State<ProductEstructureView> {
 
   /// Elementos de navegación
   List<Widget> _buildNavigationItems() {
-    return [
-      _buildNavItem(Icons.home_outlined, currentIndex == 0), 
-      _buildNavItem(Icons.add, currentIndex == 1), 
-      _buildNavItem(Icons.add, currentIndex == 2), 
-      _buildNavItem(Icons.person, currentIndex == 3),
-    ];
+    final isBuyer = UserRoleService.isBuyer();
+    
+    if (isBuyer) {
+      // Navegación para compradores
+      return [
+        _buildNavItem(Icons.home_outlined, currentIndex == 0), 
+        _buildNavItem(Icons.favorite_outline, currentIndex == 1), 
+        _buildNavItem(Icons.shopping_cart_outlined, currentIndex == 2), 
+        _buildNavItem(Icons.person, currentIndex == 3),
+      ];
+    } else {
+      // Navegación para vendedores
+      return [
+        _buildNavItem(Icons.home_outlined, currentIndex == 0), 
+        _buildNavItem(Icons.add, currentIndex == 1), 
+        _buildNavItem(Icons.add, currentIndex == 2), 
+        _buildNavItem(Icons.person, currentIndex == 3),
+      ];
+    }
   }
 
   /// Maneja los taps de navegación
@@ -128,33 +203,71 @@ class _ProductEstructureViewState extends State<ProductEstructureView> {
 
   /// Obtiene el contenido correspondiente al índice
   Widget _getContentForIndex(int index) {
-    switch (index) {
-      case 0:
-        return _buildHomeContent();
-      case 1:
-        return const RegisterProductView();
-      case 2:
-        return const ListProductView();
-      case 3:
-        return const ProfileView();
-      default:
-        return _buildEmptyContent();
+    final isBuyer = UserRoleService.isBuyer();
+    
+    if (isBuyer) {
+      // Contenido para compradores
+      switch (index) {
+        case 0:
+          return const BuyerHomeView();
+        case 1:
+          return const BuyerFavoritesView();
+        case 2:
+          return const BuyerCartView();
+        case 3:
+          return const ProfileView();
+        default:
+          return _buildEmptyContent();
+      }
+    } else {
+      // Contenido para vendedores
+      switch (index) {
+        case 0:
+          return _buildHomeContent();
+        case 1:
+          return const RegisterProductView();
+        case 2:
+          return const ListProductView();
+        case 3:
+          return const ProfileView();
+        default:
+          return _buildEmptyContent();
+      }
     }
   }
 
   /// Obtiene el título correspondiente al índice
   String? _getTitleForIndex(int index) {
-    switch (index) {
-      case 0:
-        return null; 
-      case 1:
-        return 'Registro de productos';
-      case 2:
-        return 'Mis productos';
-      case 3:
-        return null; 
-      default:
-        return null;
+    final isBuyer = UserRoleService.isBuyer();
+    
+    if (isBuyer) {
+      // Títulos para compradores
+      switch (index) {
+        case 0:
+          return null; // Home no tiene título, usa el banner "AgroMarket"
+        case 1:
+          return 'Favoritos';
+        case 2:
+          return 'Carrito de compras';
+        case 3:
+          return null; 
+        default:
+          return null;
+      }
+    } else {
+      // Títulos para vendedores
+      switch (index) {
+        case 0:
+          return null; 
+        case 1:
+          return 'Registro de productos';
+        case 2:
+          return 'Mis productos';
+        case 3:
+          return null; 
+        default:
+          return null;
+      }
     }
   }
 
@@ -199,6 +312,14 @@ class _ProductEstructureViewState extends State<ProductEstructureView> {
       icon,
       size: 28,
       color: isSelected ? Colors.white : const Color.fromARGB(255, 255, 255, 255),
+    );
+  }
+
+  /// Construye el borde del input de búsqueda
+  OutlineInputBorder _buildInputBorder(Color color, double width) {
+    return OutlineInputBorder(
+      borderRadius: BorderRadius.circular(30),
+      borderSide: BorderSide(color: color, width: width),
     );
   }
 }

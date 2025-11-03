@@ -3,6 +3,9 @@ import 'package:provider/provider.dart';
 import 'package:agromarket/controllers/auth_controller.dart';
 import 'package:agromarket/views/auth/register_view.dart';
 import 'package:agromarket/views/auth/reset_password.dart';
+import 'package:agromarket/views/auth/options_views.dart';
+import 'package:agromarket/estructure/product_estructure.dart';
+import 'package:agromarket/services/user_role_service.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -38,7 +41,30 @@ class _LoginPageState extends State<LoginPage> {
 
     if (success && mounted) {
       _showSuccessSnackBar('¡Bienvenido! Has iniciado sesión correctamente');
-      Navigator.pushReplacementNamed(context, '/home');
+
+      final user = authController.currentUser;
+      final roles = user?.roles ?? const <String>[];
+
+      if (roles.length <= 1) {
+        // Un solo rol: dirigir directo a su estructura
+        final singleRole = roles.isNotEmpty ? roles.first : 'comprador';
+        if (singleRole.toLowerCase().contains('vend')) {
+          UserRoleService.setUserRole(UserRoleService.sellerRole);
+        } else {
+          UserRoleService.setUserRole(UserRoleService.buyerRole);
+        }
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const ProductEstructureView()),
+        );
+      } else {
+        // Tiene más de un rol: mostrar opciones
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const OptionPage()),
+        );
+      }
     } else if (mounted) {
       _showErrorSnackBar(authController.errorMessage ?? 'Error al iniciar sesión. Verifica tus credenciales');
     }
@@ -51,7 +77,27 @@ class _LoginPageState extends State<LoginPage> {
     
     if (success) {
       _showSuccessSnackBar('¡Bienvenido! Has iniciado sesión con Microsoft');
-      Navigator.pushReplacementNamed(context, '/home');
+
+      final user = authController.currentUser;
+      final roles = user?.roles ?? const <String>[];
+
+      if (roles.length <= 1) {
+        final singleRole = roles.isNotEmpty ? roles.first : 'comprador';
+        if (singleRole.toLowerCase().contains('vend')) {
+          UserRoleService.setUserRole(UserRoleService.sellerRole);
+        } else {
+          UserRoleService.setUserRole(UserRoleService.buyerRole);
+        }
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const ProductEstructureView()),
+        );
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const OptionPage()),
+        );
+      }
     } else {
       _showErrorSnackBar(authController.errorMessage ?? 'Error al iniciar sesión con Microsoft. Inténtalo de nuevo');
     }
