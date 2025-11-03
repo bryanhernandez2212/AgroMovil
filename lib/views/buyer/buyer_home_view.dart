@@ -39,6 +39,9 @@ class _BuyerHomeViewState extends State<BuyerHomeView> {
           // Grid de categorías
           Expanded(
             child: GridView.builder(
+              padding: EdgeInsets.only(
+                bottom: 100 + MediaQuery.of(context).padding.bottom, // Espacio para el menú de navegación
+              ),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
                 crossAxisSpacing: 16,

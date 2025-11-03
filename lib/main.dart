@@ -35,6 +35,24 @@ class AgroMarketApp extends StatelessWidget {
         title: 'AgroMarket',
         theme: ThemeData(
           primarySwatch: Colors.green,
+          scaffoldBackgroundColor: Colors.white,
+          appBarTheme: const AppBarTheme(
+            backgroundColor: Colors.white,
+            elevation: 0,
+            iconTheme: IconThemeData(color: Color(0xFF2F4157)),
+          ),
+          // Eliminar el efecto glow/overscroll rosado
+          colorScheme: const ColorScheme.light(
+            primary: Color(0xFF226602),
+            surface: Colors.white,
+            background: Colors.white,
+            onSurface: Color(0xFF2F4157),
+            onBackground: Color(0xFF2F4157),
+          ),
+          // Desactivar el efecto splash rosado del Material
+          splashColor: Colors.transparent,
+          highlightColor: Colors.transparent,
+          splashFactory: NoSplash.splashFactory,
         ),
         home: const LoginPage(), 
         routes: {

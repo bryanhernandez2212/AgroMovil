@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 import '../models/product_model.dart';
+import '../models/comment_model.dart';
 
 class ProductService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -63,7 +64,7 @@ class ProductService {
     }
   }
 
-  // Subir imagen del producto
+  // Subir imagen del producto (método individual)
   static Future<Map<String, dynamic>> uploadProductImage(File imageFile, String productName) async {
     try {
       print('Subiendo imagen para producto: $productName');
@@ -101,6 +102,62 @@ class ProductService {
       return {
         'success': false,
         'message': 'Error subiendo imagen: ${e.toString()}',
+      };
+    }
+  }
+
+  // Subir múltiples imágenes del producto (hasta 5)
+  static Future<Map<String, dynamic>> uploadProductImages(List<File> imageFiles, String productName, String productId) async {
+    try {
+      print('Subiendo ${imageFiles.length} imágenes para producto: $productName');
+      
+      // Validar que no exceda el límite de 5 imágenes
+      if (imageFiles.length > 5) {
+        return {
+          'success': false,
+          'message': 'Máximo 5 imágenes permitidas',
+        };
+      }
+      
+      // Obtener el usuario actual
+      final User? user = _auth.currentUser;
+      if (user == null) {
+        return {
+          'success': false,
+          'message': 'Usuario no autenticado',
+        };
+      }
+
+      List<String> imageUrls = [];
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      
+      // Subir cada imagen
+      for (int i = 0; i < imageFiles.length; i++) {
+        final fileName = 'imagen_${i}_$timestamp.jpg';
+        final storageRef = _storage.ref().child('productos/$productId/$fileName');
+
+        print('Subiendo imagen ${i + 1}/${imageFiles.length} a Firebase Storage...');
+        final uploadTask = storageRef.putFile(imageFiles[i]);
+        final snapshot = await uploadTask;
+        
+        // Obtener la URL de descarga
+        final downloadUrl = await snapshot.ref.getDownloadURL();
+        imageUrls.add(downloadUrl);
+        
+        print('Imagen ${i + 1} subida exitosamente: $downloadUrl');
+      }
+
+      print('Todas las imágenes subidas exitosamente. Total: ${imageUrls.length}');
+      return {
+        'success': true,
+        'message': 'Imágenes subidas exitosamente',
+        'imageUrls': imageUrls,
+      };
+    } catch (e) {
+      print('Error subiendo imágenes: $e');
+      return {
+        'success': false,
+        'message': 'Error subiendo imágenes: ${e.toString()}',
       };
     }
   }
@@ -216,5 +273,198 @@ class ProductService {
   // Obtener unidades disponibles
   static List<String> getUnits() {
     return ['kg', 'g', 'lb', 'oz', 'unidad', 'docena', 'caja', 'bolsa'];
+  }
+
+  // Obtener comentarios de un producto
+  static Future<List<CommentModel>> getProductComments(String productId) async {
+    try {
+      print('📖 Obteniendo comentarios del producto: $productId');
+      
+      final QuerySnapshot snapshot = await _firestore
+          .collection('productos')
+          .doc(productId)
+          .collection('comentarios')
+          .orderBy('fecha_creacion', descending: true)
+          .get();
+
+      print('   - Total de comentarios encontrados: ${snapshot.docs.length}');
+
+      final comments = snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        data['id'] = doc.id;
+        final comment = CommentModel.fromJson(data);
+        print('   - Comentario ID: ${comment.id}, Usuario: ${comment.userName}, Calificación: ${comment.calificacion}');
+        return comment;
+      }).toList();
+
+      return comments;
+    } catch (e, stackTrace) {
+      print('❌ Error obteniendo comentarios: $e');
+      print('Stack trace: $stackTrace');
+      return [];
+    }
+  }
+
+  // Agregar comentario a un producto
+  static Future<Map<String, dynamic>> addComment(
+    String productId,
+    String comentario,
+    double calificacion,
+  ) async {
+    try {
+      final User? user = _auth.currentUser;
+      if (user == null) {
+        return {
+          'success': false,
+          'message': 'Usuario no autenticado',
+        };
+      }
+
+      // Validar calificación
+      if (calificacion < 1.0 || calificacion > 5.0) {
+        return {
+          'success': false,
+          'message': 'La calificación debe estar entre 1 y 5',
+        };
+      }
+
+      // Obtener nombre del usuario de Firestore si está disponible
+      String userName = user.displayName ?? 'Usuario';
+      try {
+        final userDoc = await _firestore.collection('usuarios').doc(user.uid).get();
+        if (userDoc.exists) {
+          final userData = userDoc.data();
+          userName = userData?['nombre'] ?? user.displayName ?? 'Usuario';
+        }
+      } catch (e) {
+        print('No se pudo obtener nombre del usuario de Firestore: $e');
+      }
+
+      final commentData = {
+        'id': '', // Se actualizará después
+        'producto_id': productId,
+        'usuario_id': user.uid,
+        'usuario_nombre': userName,
+        'usuario_email': user.email ?? '',
+        'comentario': comentario.trim(),
+        'calificacion': calificacion,
+        'fecha_creacion': FieldValue.serverTimestamp(),
+      };
+
+      print('💬 Guardando comentario en Firestore...');
+      print('   - Producto ID: $productId');
+      print('   - Usuario: $userName (${user.email})');
+      print('   - Calificación: $calificacion');
+      print('   - Comentario: ${comentario.substring(0, comentario.length > 50 ? 50 : comentario.length)}...');
+
+      // Guardar comentario en la subcolección
+      // Estructura: productos/{productId}/comentarios/{commentId}
+      final docRef = await _firestore
+          .collection('productos')
+          .doc(productId)
+          .collection('comentarios')
+          .add(commentData);
+
+      // Actualizar ID del comentario
+      await docRef.update({'id': docRef.id});
+
+      print('✅ Comentario guardado exitosamente con ID: ${docRef.id}');
+      print('   - Ruta: productos/$productId/comentarios/${docRef.id}');
+
+      // Recalcular calificación promedio del producto
+      await _updateProductRating(productId);
+
+      return {
+        'success': true,
+        'message': 'Comentario agregado exitosamente',
+        'commentId': docRef.id,
+      };
+    } catch (e, stackTrace) {
+      print('❌ Error agregando comentario: $e');
+      print('Stack trace: $stackTrace');
+      return {
+        'success': false,
+        'message': 'Error agregando comentario: ${e.toString()}',
+      };
+    }
+  }
+
+  // Obtener información completa del vendedor
+  static Future<Map<String, dynamic>> getVendorInfo(String vendorId) async {
+    try {
+      // Obtener datos del usuario/vendedor
+      final userDoc = await _firestore.collection('usuarios').doc(vendorId).get();
+      
+      Map<String, dynamic> vendorData = {
+        'nombre': '',
+        'email': '',
+        'ubicacion': '',
+        'totalProductos': 0,
+      };
+      
+      if (userDoc.exists) {
+        final userData = userDoc.data() as Map<String, dynamic>;
+        vendorData['nombre'] = userData['nombre'] ?? '';
+        vendorData['email'] = userData['email'] ?? '';
+        vendorData['ubicacion'] = userData['ubicacion'] ?? userData['direccion'] ?? 'No especificada';
+      }
+      
+      // Contar productos activos del vendedor
+      final productsSnapshot = await _firestore
+          .collection('productos')
+          .where('vendedor_id', isEqualTo: vendorId)
+          .where('activo', isEqualTo: true)
+          .get();
+      
+      vendorData['totalProductos'] = productsSnapshot.docs.length;
+      
+      return vendorData;
+    } catch (e) {
+      print('Error obteniendo información del vendedor: $e');
+      return {
+        'nombre': '',
+        'email': '',
+        'ubicacion': 'No disponible',
+        'totalProductos': 0,
+      };
+    }
+  }
+
+  // Actualizar calificación promedio del producto
+  static Future<void> _updateProductRating(String productId) async {
+    try {
+      print('⭐ Recalculando calificación promedio del producto: $productId');
+      
+      final comments = await getProductComments(productId);
+      
+      if (comments.isEmpty) {
+        print('   - No hay comentarios, estableciendo calificación a 0');
+        await _firestore.collection('productos').doc(productId).update({
+          'calificacion_promedio': 0.0,
+          'total_calificaciones': 0,
+        });
+        return;
+      }
+
+      double sumaCalificaciones = 0.0;
+      for (var comment in comments) {
+        sumaCalificaciones += comment.calificacion;
+      }
+
+      final promedio = sumaCalificaciones / comments.length;
+
+      print('   - Calificación promedio: ${promedio.toStringAsFixed(2)}');
+      print('   - Total de calificaciones: ${comments.length}');
+
+      await _firestore.collection('productos').doc(productId).update({
+        'calificacion_promedio': promedio,
+        'total_calificaciones': comments.length,
+      });
+
+      print('✅ Calificación actualizada en el producto');
+    } catch (e, stackTrace) {
+      print('❌ Error actualizando calificación: $e');
+      print('Stack trace: $stackTrace');
+    }
   }
 }
