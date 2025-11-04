@@ -117,32 +117,30 @@ class _ProductEstructureViewState extends State<ProductEstructureView> {
                 ),
               ),
 
-            _buildContentArea(),
+            // Área de contenido con padding inferior para evitar solapamiento con el banner
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).viewInsets.bottom,
+                ),
+                child: _currentContent ?? _buildEmptyContent(),
+              ),
+            ),
           ],
         ),
       ),
-      bottomNavigationBar: Stack(
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
+          // Banner de AdMob justo encima de la barra de navegación
+          const BannerAdWidget(),
+          // Barra de navegación
           _buildCurvedNavigationBar(),
-          // Banner de AdMob en la parte superior de la barra de navegación
-          const Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: BannerAdWidget(
-              alignment: Alignment.topCenter,
-            ),
-          ),
         ],
       ),
     );
   }
 
-  Widget _buildContentArea() {
-    return Expanded(
-      child: _currentContent ?? _buildEmptyContent(),
-    );
-  }
   Widget _buildEmptyContent() {
     return const Center(
       child: Text(

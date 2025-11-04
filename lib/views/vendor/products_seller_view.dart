@@ -390,16 +390,11 @@ class _ListProductViewContentState extends State<ListProductViewContent> {
 
       // Eliminar el producto
       final result = await ProductService.deleteProduct(product.id);
-
-      // Cerrar indicador de carga
       if (!mounted) return;
-      Navigator.of(context).pop();
-
+      Navigator.of(context).pop(); // Cerrar el indicador de carga
       if (result['success']) {
-        // Recargar la lista de productos
         await _loadProducts();
         
-        // Mostrar mensaje de éxito
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -409,7 +404,7 @@ class _ListProductViewContentState extends State<ListProductViewContent> {
           ),
         );
       } else {
-        // Mostrar mensaje de error
+
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
