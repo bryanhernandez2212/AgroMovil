@@ -62,7 +62,6 @@ class _ListProductViewContentState extends State<ListProductViewContent> {
       builder: (context, authController, child) {
         return Column(
           children: [
-            // Barra de búsqueda
             if (_products.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.all(16.0),

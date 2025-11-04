@@ -34,7 +34,7 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
     try {
       final screenWidth = MediaQuery.sizeOf(context).width.truncate();
       
-      debugPrint('📱 Ancho de pantalla para banner: $screenWidth');
+      debugPrint('Ancho de pantalla para banner: $screenWidth');
       
       // Obtener el tamaño del anuncio adaptativo para la orientación actual
       // Este método calcula automáticamente el tamaño óptimo basado en el ancho proporcionado
