@@ -1,5 +1,9 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:agromarket/services/email_service.dart';
+import 'package:agromarket/services/api_service.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class FirebaseService {
   static final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -11,6 +15,10 @@ class FirebaseService {
     required String email,
     required String password,
     required String rol,
+    String? nombreEmpresa,
+    String? ubicacion,
+    double? ubicacionLat,
+    double? ubicacionLng,
   }) async {
     try {
       print('Registrando usuario: $email');
@@ -21,8 +29,8 @@ class FirebaseService {
       );
 
       if (userCredential.user != null) {
-        // Guardar datos en Firestore
-        await _firestore.collection('usuarios').doc(userCredential.user!.uid).set({
+        // Preparar datos base
+        final userData = <String, dynamic>{
           'nombre': nombre,
           'email': email,
           'activo': true,
@@ -31,7 +39,27 @@ class FirebaseService {
           'fecha_registro': FieldValue.serverTimestamp(),
           'created_at': FieldValue.serverTimestamp(),
           'updated_at': FieldValue.serverTimestamp(),
-        });
+        };
+
+        // Agregar campos opcionales solo para vendedores
+        if (rol == 'vendedor') {
+          // Nombre de tienda
+          if (nombreEmpresa != null && nombreEmpresa.isNotEmpty) {
+            userData['nombre_tienda'] = nombreEmpresa;
+          }
+          // Ubicación
+          if (ubicacion != null && ubicacion.isNotEmpty) {
+            userData['ubicacion'] = ubicacion;
+            userData['ubicacion_formatted'] = ubicacion;
+          }
+          if (ubicacionLat != null && ubicacionLng != null) {
+            userData['ubicacion_lat'] = ubicacionLat;
+            userData['ubicacion_lng'] = ubicacionLng;
+          }
+        }
+
+        // Guardar datos en Firestore
+        await _firestore.collection('usuarios').doc(userCredential.user!.uid).set(userData);
 
         print('Usuario registrado exitosamente');
         return {
@@ -65,8 +93,14 @@ class FirebaseService {
         case 'invalid-email':
           message = 'El email no es válido';
           break;
+        case 'operation-not-allowed':
+          message = 'Esta operación no está permitida';
+          break;
+        case 'network-request-failed':
+          message = 'Error de conexión. Verifica tu internet';
+          break;
         default:
-          message = 'Error de autenticación: ${e.message}';
+          message = 'Error al crear la cuenta. Inténtalo de nuevo';
       }
       
       print('Error en registro: $message');
@@ -147,8 +181,17 @@ class FirebaseService {
         case 'user-disabled':
           message = 'Usuario deshabilitado';
           break;
+        case 'too-many-requests':
+          message = 'Demasiados intentos fallidos. Intenta más tarde';
+          break;
+        case 'network-request-failed':
+          message = 'Error de conexión. Verifica tu internet';
+          break;
+        case 'invalid-credential':
+          message = 'Credenciales incorrectas. Verifica tu email y contraseña';
+          break;
         default:
-          message = 'Error de autenticación: ${e.message}';
+          message = 'Credenciales incorrectas. Verifica tu email y contraseña';
       }
       
       print('Error en login: $message');
@@ -201,18 +244,64 @@ class FirebaseService {
     }
   }
 
-  /// Enviar email de recuperación de contraseña
+  /// Enviar email de recuperación de contraseña usando nuestro servicio personalizado
   static Future<Map<String, dynamic>> sendPasswordResetEmail(String email) async {
     try {
-      print('Enviando email de recuperación a: $email');
+      print('📧 Enviando email de recuperación personalizado a: $email');
       
-      await _auth.sendPasswordResetEmail(email: email);
+      // Verificar que el usuario existe y obtener su nombre desde Firestore
+      String? userName;
+      try {
+        final userQuery = await _firestore
+            .collection('usuarios')
+            .where('email', isEqualTo: email)
+            .limit(1)
+            .get();
+        
+        if (userQuery.docs.isNotEmpty) {
+          final userData = userQuery.docs.first.data();
+          userName = userData['nombre'] as String?;
+          print('✅ Usuario encontrado en Firestore');
+        }
+      } catch (e) {
+        print('⚠️ Error verificando usuario en Firestore: $e');
+        // Continuar intentando enviar el correo
+      }
       
-      print('Email de recuperación enviado exitosamente');
-      return {
-        'success': true,
-        'message': 'Se ha enviado un email de recuperación a $email',
-      };
+      // Generar enlace de recuperación usando Firebase
+      // Usamos ActionCodeSettings para manejar el enlace en la app
+      final actionCodeSettings = ActionCodeSettings(
+        url: 'https://agromarket.com/reset-password',
+        handleCodeInApp: true,
+        androidPackageName: 'com.example.agromarket',
+        iOSBundleId: 'com.example.agromarket',
+      );
+      
+      // Usar nuestro servicio personalizado para enviar correo con código de 6 dígitos
+      print('📧 Enviando correo personalizado con código de 6 dígitos...');
+      final emailResult = await EmailService.sendPasswordResetEmail(
+        email: email,
+        userName: userName,
+      );
+      
+      if (emailResult['success']) {
+        print('✅ Email personalizado con código enviado exitosamente');
+        return {
+          'success': true,
+          'message': 'Se ha enviado un código de recuperación a $email',
+        };
+      } else {
+        // Si falla nuestro servicio, usar Firebase como respaldo SOLO EN ESTE CASO
+        print('⚠️ Falló nuestro servicio de email, usando Firebase como respaldo');
+        await _auth.sendPasswordResetEmail(
+          email: email,
+          actionCodeSettings: actionCodeSettings,
+        );
+        return {
+          'success': true,
+          'message': 'Se ha enviado un email de recuperación a $email',
+        };
+      }
     } on FirebaseAuthException catch (e) {
       String message;
       switch (e.code) {
@@ -225,17 +314,298 @@ class FirebaseService {
         case 'too-many-requests':
           message = 'Demasiados intentos. Intenta más tarde';
           break;
+        case 'network-request-failed':
+          message = 'Error de conexión. Verifica tu internet';
+          break;
         default:
-          message = 'Error: ${e.message}';
+          message = 'Error al enviar el email. Inténtalo de nuevo';
       }
       
-      print('Error enviando email de recuperación: $message');
+      print('❌ Error enviando email de recuperación: $message');
       return {
         'success': false,
         'message': message,
       };
     } catch (e) {
-      print('Error inesperado enviando email: $e');
+      print('❌ Error inesperado enviando email: $e');
+      return {
+        'success': false,
+        'message': 'Error inesperado: ${e.toString()}',
+      };
+    }
+  }
+
+  /// Cambiar contraseña después de verificar código de recuperación
+  /// Usa el backend para cambiar la contraseña directamente
+  static Future<Map<String, dynamic>> resetPasswordWithCode({
+    required String email,
+    required String sessionToken,
+    required String newPassword,
+  }) async {
+    try {
+      print('🔄 Cambiando contraseña con código verificado para: $email');
+      print('🔑 Session Token: ${sessionToken.substring(0, 20)}...');
+      print('🔒 Nueva contraseña: ${"*" * newPassword.length} (${newPassword.length} caracteres)');
+
+      final requestBody = {
+        'email': email,
+        'session_token': sessionToken,
+        'new_password': newPassword,
+      };
+      
+      print('📤 Enviando solicitud a: ${ApiService.baseUrl}/reset-password-with-code');
+      print('📦 Body: ${jsonEncode({
+        'email': email,
+        'session_token': sessionToken.substring(0, 20) + '...',
+        'new_password': '*' * newPassword.length,
+      })}');
+
+      // Enviar solicitud al backend para cambiar la contraseña
+      final response = await http.post(
+        Uri.parse('${ApiService.baseUrl}/reset-password-with-code'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        
+        // Si el backend dice que debemos usar Firebase directamente
+        if (data['use_firebase'] == true) {
+          print('🔄 Usando Firebase directamente para cambiar contraseña');
+          
+          // Generar enlace de recuperación de Firebase
+          final actionCodeSettings = ActionCodeSettings(
+            url: 'https://agromarket.com/reset-password',
+            handleCodeInApp: false,
+          );
+
+          try {
+            // Enviar email de reset - esto generará un enlace que el usuario puede usar
+            await _auth.sendPasswordResetEmail(
+              email: email,
+              actionCodeSettings: actionCodeSettings,
+            );
+
+            print('✅ Email de cambio de contraseña enviado desde Firebase');
+            
+            return {
+              'success': true,
+              'message': 'Se ha enviado un enlace a tu correo para cambiar la contraseña. Por favor, revisa tu bandeja de entrada.',
+              'requires_email_link': true,
+            };
+          } catch (e) {
+            print('⚠️ Error generando enlace de Firebase: $e');
+            return {
+              'success': false,
+              'message': 'Error generando enlace de recuperación. Por favor, intenta de nuevo.',
+            };
+          }
+        }
+        
+        print('✅ Contraseña cambiada exitosamente por el backend');
+        
+        // Enviar notificación por correo
+        try {
+          final userDoc = await _firestore
+              .collection('usuarios')
+              .where('email', isEqualTo: email)
+              .limit(1)
+              .get();
+          
+          String? userName;
+          if (userDoc.docs.isNotEmpty) {
+            final userData = userDoc.docs.first.data();
+            userName = userData['nombre'] as String?;
+          }
+          
+          await _sendPasswordChangedNotification(
+            email: email,
+            userName: userName,
+          );
+        } catch (e) {
+          print('⚠️ Advertencia: No se pudo enviar notificación: $e');
+        }
+        
+        return {
+          'success': true,
+          'message': data['message'] ?? 'Contraseña cambiada exitosamente',
+        };
+      } else {
+        print('❌ Error del servidor: ${response.statusCode}');
+        print('📄 Respuesta del servidor: ${response.body}');
+        try {
+          final errorData = jsonDecode(response.body);
+          final errorMessage = errorData['message'] ?? 'Error cambiando contraseña';
+          print('💬 Mensaje de error: $errorMessage');
+          return {
+            'success': false,
+            'message': errorMessage,
+          };
+        } catch (e) {
+          print('⚠️ Error parseando respuesta: $e');
+          return {
+            'success': false,
+            'message': 'Error del servidor: ${response.statusCode}. ${response.body}',
+          };
+        }
+      }
+    } catch (e) {
+      print('❌ Error inesperado: $e');
+      return {
+        'success': false,
+        'message': 'Error de conexión: ${e.toString()}',
+      };
+    }
+  }
+
+  /// Cambiar contraseña usando un enlace de Firebase (desde deep link o URL)
+  static Future<Map<String, dynamic>> confirmPasswordReset({
+    required String code,
+    required String newPassword,
+  }) async {
+    try {
+      print('🔄 Confirmando cambio de contraseña con código de Firebase');
+      
+      await _auth.confirmPasswordReset(
+        code: code,
+        newPassword: newPassword,
+      );
+      
+      print('✅ Contraseña cambiada exitosamente');
+      return {
+        'success': true,
+        'message': 'Contraseña cambiada exitosamente',
+      };
+    } on FirebaseAuthException catch (e) {
+      String message;
+      switch (e.code) {
+        case 'expired-action-code':
+          message = 'El código ha expirado. Solicita un nuevo código.';
+          break;
+        case 'invalid-action-code':
+          message = 'El código es inválido. Solicita un nuevo código.';
+          break;
+        case 'weak-password':
+          message = 'La nueva contraseña es muy débil';
+          break;
+        case 'network-request-failed':
+          message = 'Error de conexión. Verifica tu internet';
+          break;
+        default:
+          message = 'Error al cambiar la contraseña. Inténtalo de nuevo';
+      }
+      
+      print('❌ Error cambiando contraseña: $message');
+      return {
+        'success': false,
+        'message': message,
+      };
+    } catch (e) {
+      print('❌ Error inesperado: $e');
+      return {
+        'success': false,
+        'message': 'Error inesperado: ${e.toString()}',
+      };
+    }
+  }
+
+  /// Cambiar contraseña del usuario autenticado (requiere contraseña actual)
+  static Future<Map<String, dynamic>> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        return {
+          'success': false,
+          'message': 'No hay usuario autenticado',
+        };
+      }
+
+      if (user.email == null) {
+        return {
+          'success': false,
+          'message': 'El usuario no tiene email asociado',
+        };
+      }
+
+      print('Cambiando contraseña para usuario: ${user.email}');
+
+      // Re-autenticar al usuario con la contraseña actual
+      final credential = EmailAuthProvider.credential(
+        email: user.email!,
+        password: currentPassword,
+      );
+
+      await user.reauthenticateWithCredential(credential);
+      print('Re-autenticación exitosa');
+
+      // Cambiar la contraseña
+      await user.updatePassword(newPassword);
+      print('Contraseña actualizada exitosamente');
+
+      // Enviar notificación por correo usando el servicio de email
+      try {
+        // Obtener nombre del usuario desde Firestore
+        final userDoc = await _firestore.collection('usuarios').doc(user.uid).get();
+        String? userName;
+        if (userDoc.exists && userDoc.data() != null) {
+          final userData = userDoc.data()!;
+          userName = userData['nombre'] as String?;
+        }
+        
+        // Importar y usar el servicio de email
+        final emailResult = await _sendPasswordChangedNotification(
+          email: user.email!,
+          userName: userName,
+        );
+        
+        if (!emailResult['success']) {
+          print('⚠️ Advertencia: No se pudo enviar notificación por correo: ${emailResult['message']}');
+          // No fallar el proceso si el email no se puede enviar
+        }
+      } catch (e) {
+        print('⚠️ Advertencia: Error enviando notificación: $e');
+        // No fallar el proceso si el email no se puede enviar
+      }
+
+      return {
+        'success': true,
+        'message': 'Contraseña actualizada exitosamente',
+      };
+    } on FirebaseAuthException catch (e) {
+      String message;
+      switch (e.code) {
+        case 'wrong-password':
+          message = 'La contraseña actual es incorrecta';
+          break;
+        case 'weak-password':
+          message = 'La nueva contraseña es muy débil';
+          break;
+        case 'requires-recent-login':
+          message = 'Por seguridad, debes iniciar sesión nuevamente';
+          break;
+        case 'network-request-failed':
+          message = 'Error de conexión. Verifica tu internet';
+          break;
+        case 'invalid-credential':
+          message = 'La contraseña actual es incorrecta';
+          break;
+        default:
+          message = 'Error al cambiar la contraseña. Inténtalo de nuevo';
+      }
+      
+      print('Error cambiando contraseña: $message');
+      return {
+        'success': false,
+        'message': message,
+      };
+    } catch (e) {
+      print('Error inesperado cambiando contraseña: $e');
       return {
         'success': false,
         'message': 'Error inesperado: ${e.toString()}',
@@ -282,6 +652,9 @@ class FirebaseService {
         print('🔥 FirebaseService: rol_activo: ${data['rol_activo']}');
         print('🔥 FirebaseService: roles: ${data['roles']}');
         print('🔥 FirebaseService: activo: ${data['activo']}');
+        print('🔥 FirebaseService: nombre_tienda: ${data['nombre_tienda']}');
+        print('🔥 FirebaseService: ubicacion: ${data['ubicacion']}');
+        print('🔥 FirebaseService: ubicacion_formatted: ${data['ubicacion_formatted']}');
         
         final result = {
           'id': user.uid,
@@ -294,6 +667,23 @@ class FirebaseService {
           'created_at': data['created_at'],
           'updated_at': data['updated_at'],
         };
+        
+        // Agregar campos de vendedor si existen
+        if (data.containsKey('nombre_tienda')) {
+          result['nombre_tienda'] = data['nombre_tienda'];
+        }
+        if (data.containsKey('ubicacion')) {
+          result['ubicacion'] = data['ubicacion'];
+        }
+        if (data.containsKey('ubicacion_formatted')) {
+          result['ubicacion_formatted'] = data['ubicacion_formatted'];
+        }
+        if (data.containsKey('ubicacion_lat')) {
+          result['ubicacion_lat'] = data['ubicacion_lat'];
+        }
+        if (data.containsKey('ubicacion_lng')) {
+          result['ubicacion_lng'] = data['ubicacion_lng'];
+        }
         
         print('🔥 FirebaseService: Datos procesados: $result');
         return result;
@@ -441,6 +831,25 @@ class FirebaseService {
     } catch (e) {
       print('Error conectando a Firebase: $e');
       return false;
+    }
+  }
+
+  /// Método privado para enviar notificación de cambio de contraseña
+  static Future<Map<String, dynamic>> _sendPasswordChangedNotification({
+    required String email,
+    String? userName,
+  }) async {
+    try {
+      return await EmailService.sendPasswordChangedEmail(
+        email: email,
+        userName: userName,
+      );
+    } catch (e) {
+      print('Error enviando notificación de cambio de contraseña: $e');
+      return {
+        'success': false,
+        'message': 'Error enviando notificación: ${e.toString()}',
+      };
     }
   }
 }

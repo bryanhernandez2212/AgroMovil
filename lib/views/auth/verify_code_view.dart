@@ -1,45 +1,106 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:agromarket/controllers/auth_controller.dart';
-import 'package:agromarket/views/auth/verify_code_view.dart';
+import 'package:agromarket/views/auth/new_password_view.dart';
 
-class ResetPassword extends StatefulWidget {
-  const ResetPassword({super.key});
+class VerifyCodeView extends StatefulWidget {
+  final String email;
+  
+  const VerifyCodeView({
+    super.key,
+    required this.email,
+  });
 
   @override
-  State<ResetPassword> createState() => _ResetPasswordState();
+  State<VerifyCodeView> createState() => _VerifyCodeViewState();
 }
 
-class _ResetPasswordState extends State<ResetPassword> {
-  final _emailController = TextEditingController();
-  final _formKey = GlobalKey<FormState>();
+class _VerifyCodeViewState extends State<VerifyCodeView> {
+  final List<TextEditingController> _codeControllers = List.generate(6, (_) => TextEditingController());
+  final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
+  String? _sessionToken;
+  String? _errorMessage;
 
   @override
   void dispose() {
-    _emailController.dispose();
+    for (var controller in _codeControllers) {
+      controller.dispose();
+    }
+    for (var node in _focusNodes) {
+      node.dispose();
+    }
     super.dispose();
   }
 
-  Future<void> _sendResetEmail() async {
-    if (_formKey.currentState!.validate()) {
-      final authController = Provider.of<AuthController>(context, listen: false);
-      
-      final success = await authController.sendPasswordResetEmail(_emailController.text.trim());
-      
-      if (success && mounted) {
-        _showSuccessSnackBar('Código de verificación enviado. Revisa tu bandeja de entrada');
-        // Navegar a la vista de verificación de código
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => VerifyCodeView(
-              email: _emailController.text.trim(),
-            ),
+  void _onCodeChanged(int index, String value) {
+    if (value.length == 1 && index < 5) {
+      _focusNodes[index + 1].requestFocus();
+    } else if (value.isEmpty && index > 0) {
+      _focusNodes[index - 1].requestFocus();
+    }
+    
+    // Si todos los campos están llenos, verificar automáticamente
+    if (_codeControllers.every((controller) => controller.text.isNotEmpty)) {
+      _verifyCode();
+    }
+  }
+
+  Future<void> _verifyCode() async {
+    final code = _codeControllers.map((c) => c.text).join();
+    
+    if (code.length != 6) {
+      setState(() {
+        _errorMessage = 'Por favor ingresa el código completo';
+      });
+      return;
+    }
+
+    setState(() {
+      _errorMessage = null;
+    });
+
+    final authController = Provider.of<AuthController>(context, listen: false);
+    final success = await authController.verifyResetCode(
+      widget.email,
+      code,
+    );
+
+    if (success && mounted) {
+      _sessionToken = authController.resetSessionToken;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => NewPasswordView(
+            email: widget.email,
+            sessionToken: _sessionToken!,
           ),
-        );
-      } else if (mounted) {
-        _showErrorSnackBar(authController.errorMessage ?? 'Error al enviar el email. Inténtalo de nuevo');
+        ),
+      );
+    } else if (mounted) {
+      setState(() {
+        _errorMessage = authController.errorMessage ?? 'Código incorrecto';
+      });
+      // Limpiar campos
+      for (var controller in _codeControllers) {
+        controller.clear();
       }
+      _focusNodes[0].requestFocus();
+    }
+  }
+
+  Future<void> _resendCode() async {
+    final authController = Provider.of<AuthController>(context, listen: false);
+    final success = await authController.sendPasswordResetEmail(widget.email);
+    
+    if (success && mounted) {
+      _showSuccessSnackBar('Nuevo código enviado. Revisa tu correo.');
+      // Limpiar campos
+      for (var controller in _codeControllers) {
+        controller.clear();
+      }
+      _focusNodes[0].requestFocus();
+    } else if (mounted) {
+      _showErrorSnackBar(authController.errorMessage ?? 'Error al reenviar código');
     }
   }
 
@@ -50,28 +111,12 @@ class _ResetPasswordState extends State<ResetPassword> {
           children: [
             const Icon(Icons.error_outline, color: Colors.white, size: 20),
             const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                message,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
+            Expanded(child: Text(message)),
           ],
         ),
         backgroundColor: Colors.red,
         behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        margin: const EdgeInsets.all(16),
-        animation: CurvedAnimation(
-          parent: kAlwaysCompleteAnimation,
-          curve: Curves.easeOut,
-        ),
+        duration: const Duration(seconds: 3),
       ),
     );
   }
@@ -83,28 +128,12 @@ class _ResetPasswordState extends State<ResetPassword> {
           children: [
             const Icon(Icons.check_circle_outline, color: Colors.white, size: 20),
             const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                message,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
+            Expanded(child: Text(message)),
           ],
         ),
         backgroundColor: const Color(0xFF115213),
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 2),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        margin: const EdgeInsets.all(16),
-        animation: CurvedAnimation(
-          parent: kAlwaysCompleteAnimation,
-          curve: Curves.easeOut,
-        ),
       ),
     );
   }
@@ -141,7 +170,6 @@ class _ResetPasswordState extends State<ResetPassword> {
             ),
           ),
 
-          // Botón de regreso
           Positioned(
             top: 50,
             left: 20,
@@ -189,16 +217,14 @@ class _ResetPasswordState extends State<ResetPassword> {
               ),
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(30),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Row(
                       children: [
                         const Expanded(
                           child: Text(
-                            'Recuperar contraseña',
+                            'Verificar código',
                             style: TextStyle(
                               fontSize: 36,
                               fontWeight: FontWeight.w700,
@@ -222,7 +248,7 @@ class _ResetPasswordState extends State<ResetPassword> {
                     const SizedBox(height: 8),
 
                     const Text(
-                      'Recupera tu cuenta mediante correo electrónico',
+                      'Ingresa el código de 6 dígitos que recibiste por correo',
                       style: TextStyle(
                         fontSize: 18,
                         color: Color(0xFF757575),
@@ -232,14 +258,84 @@ class _ResetPasswordState extends State<ResetPassword> {
 
                     const SizedBox(height: 40),
 
-                    _buildEmailField(),
+                    // Campos de código
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: List.generate(6, (index) {
+                        return SizedBox(
+                          width: 45,
+                          height: 60,
+                          child: TextField(
+                            controller: _codeControllers[index],
+                            focusNode: _focusNodes[index],
+                            textAlign: TextAlign.center,
+                            keyboardType: TextInputType.number,
+                            maxLength: 1,
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1B5E20),
+                            ),
+                            decoration: InputDecoration(
+                              counterText: '',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFF2E7D32),
+                                  width: 2,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFF2E7D32),
+                                  width: 2,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFF2E7D32),
+                                  width: 3,
+                                ),
+                              ),
+                            ),
+                            onChanged: (value) => _onCodeChanged(index, value),
+                          ),
+                        );
+                      }),
+                    ),
+
+                    if (_errorMessage != null) ...[
+                      const SizedBox(height: 20),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.red.withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.error, color: Colors.red, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _errorMessage!,
+                                style: const TextStyle(color: Colors.red),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
 
                     const SizedBox(height: 30),
 
                     Consumer<AuthController>(
                       builder: (context, authController, child) {
                         return GestureDetector(
-                          onTap: authController.isLoading ? null : _sendResetEmail,
+                          onTap: authController.isLoading ? null : _verifyCode,
                           child: Container(
                             width: double.infinity,
                             height: 50,
@@ -260,7 +356,7 @@ class _ResetPasswordState extends State<ResetPassword> {
                                       ),
                                     )
                                   : const Text(
-                                      'Enviar enlace',
+                                      'Verificar código',
                                       style: TextStyle(
                                         color: Colors.white,
                                         fontSize: 16,
@@ -273,37 +369,22 @@ class _ResetPasswordState extends State<ResetPassword> {
                       },
                     ),
 
-                    // Mostrar error si existe
-                    Consumer<AuthController>(
-                      builder: (context, authController, child) {
-                        if (authController.errorMessage != null) {
-                          return Container(
-                            margin: const EdgeInsets.only(top: 16),
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.red.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.red.withOpacity(0.3)),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.error, color: Colors.red, size: 20),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    authController.errorMessage!,
-                                    style: const TextStyle(color: Colors.red),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }
-                        return const SizedBox.shrink();
-                      },
+                    const SizedBox(height: 20),
+
+                    Center(
+                      child: TextButton(
+                        onPressed: _resendCode,
+                        child: const Text(
+                          'Reenviar código',
+                          style: TextStyle(
+                            color: Color(0xFF2E7D32),
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
                     ),
-                    ],
-                  ),
+                  ],
                 ),
               ),
             ),
@@ -312,40 +393,6 @@ class _ResetPasswordState extends State<ResetPassword> {
       ),
     );
   }
-
-  Widget _buildEmailField() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.grey[300]!),
-      ),
-      child: TextFormField(
-        controller: _emailController,
-        keyboardType: TextInputType.emailAddress,
-        validator: (value) {
-          if (value == null || value.isEmpty) {
-            return 'Por favor ingresa tu email';
-          }
-          if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-            return 'Por favor ingresa un email válido';
-          }
-          return null;
-        },
-        decoration: InputDecoration(
-          hintText: 'Correo electrónico',
-          hintStyle: TextStyle(color: Colors.grey[500]),
-          prefixIcon: Icon(Icons.email, color: Colors.grey[600]),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 20,
-            vertical: 15,
-          ),
-        ),
-      ),
-    );
-  }
-
 }
 
 class SmoothWavePainter extends CustomPainter {
@@ -357,8 +404,6 @@ class SmoothWavePainter extends CustomPainter {
 
     final path = Path();
     path.moveTo(0, size.height * 0.8);
-
-    // Crear una curva suave
     path.quadraticBezierTo(
       size.width * 0.25,
       size.height * 0.4,
@@ -371,14 +416,13 @@ class SmoothWavePainter extends CustomPainter {
       size.width,
       size.height * 0.5,
     );
-
     path.lineTo(size.width, size.height);
     path.lineTo(0, size.height);
     path.close();
-
     canvas.drawPath(path, paint);
   }
 
   @override
   bool shouldRepaint(CustomPainter oldDelegate) => false;
 }
+

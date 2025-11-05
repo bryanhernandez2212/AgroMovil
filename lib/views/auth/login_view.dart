@@ -121,16 +121,13 @@ class _LoginPageState extends State<LoginPage> {
             ),
           ],
         ),
-        backgroundColor: Colors.red.shade600,
-        behavior: SnackBarBehavior.fixed,
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(0),
+          borderRadius: BorderRadius.circular(20),
         ),
-        duration: const Duration(seconds: 4),
-        animation: CurvedAnimation(
-          parent: kAlwaysCompleteAnimation,
-          curve: Curves.easeOut,
-        ),
+        margin: const EdgeInsets.all(16),
       ),
     );
   }
@@ -154,15 +151,12 @@ class _LoginPageState extends State<LoginPage> {
           ],
         ),
         backgroundColor: const Color(0xFF115213),
-        behavior: SnackBarBehavior.fixed,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(0),
+          borderRadius: BorderRadius.circular(20),
         ),
-        duration: const Duration(seconds: 3),
-        animation: CurvedAnimation(
-          parent: kAlwaysCompleteAnimation,
-          curve: Curves.easeOut,
-        ),
+        margin: const EdgeInsets.all(16),
       ),
     );
   }
@@ -172,6 +166,7 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
+      resizeToAvoidBottomInset: true,
       body: Stack(
         children: [
           Positioned(
@@ -199,8 +194,12 @@ class _LoginPageState extends State<LoginPage> {
             ),
           ),
 
-          Positioned(
-            top: MediaQuery.of(context).size.height * 0.25,
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+            top: MediaQuery.of(context).viewInsets.bottom > 0 
+                ? 50  // Cuando hay teclado, subir mucho más arriba
+                : MediaQuery.of(context).size.height * 0.25, // Posición normal
             left: 0,
             right: 0,
             bottom: 0,
