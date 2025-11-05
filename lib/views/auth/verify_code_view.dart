@@ -142,6 +142,7 @@ class _VerifyCodeViewState extends State<VerifyCodeView> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
+      resizeToAvoidBottomInset: true,
       body: Stack(
         children: [
           Positioned(
@@ -190,8 +191,12 @@ class _VerifyCodeViewState extends State<VerifyCodeView> {
             ),
           ),
 
-          Positioned(
-            top: MediaQuery.of(context).size.height * 0.50,
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+            top: MediaQuery.of(context).viewInsets.bottom > 0 
+                ? 50  // Cuando hay teclado, subir mucho más arriba
+                : MediaQuery.of(context).size.height * 0.50, // Posición normal
             left: 0,
             right: 0,
             bottom: 0,

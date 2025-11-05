@@ -2,27 +2,15 @@ import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 class AdService {
-  // ID de banner adaptativo para Android según la documentación oficial
-  static String get bannerAdUnitId {
-    // ID de prueba para banners adaptativos fijos en Android
-    // Usa este ID durante desarrollo y pruebas
-    return '';
-    
-  }
+  // ID de unidad de anuncios de prueba para banners
+  static const String bannerAdUnitId = 'ca-app-pub-3940256099942544/9214589741';
 
   // Inicializar el SDK de AdMob
   static Future<void> initialize() async {
     await MobileAds.instance.initialize();
     if (kDebugMode) {
-      print('✅ AdMob inicializado correctamente');
+      debugPrint('AdMob inicializado correctamente');
     }
-  }
-
-  // Obtener tamaño adaptativo del banner
-  static Future<AdSize?> getAnchoredAdaptiveBannerAdSize(double width) async {
-    return await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(
-      width.truncate(),
-    );
   }
 }
 

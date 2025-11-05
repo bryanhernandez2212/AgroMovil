@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
 import 'package:agromarket/controllers/auth_controller.dart';
 import 'package:agromarket/services/places_service.dart';
@@ -21,6 +22,7 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _obscureRepeatText = true;
   String _selectedRole = 'comprador';
   final List<String> _availableRoles = ['comprador', 'vendedor'];
+  bool _privacyAccepted = false;
   List<PlacePrediction> _placePredictions = [];
   bool _showPredictions = false;
   PlaceDetails? _selectedPlace;
@@ -91,18 +93,6 @@ class _RegisterPageState extends State<RegisterPage> {
       return;
     }
 
-    // Validaciones adicionales solo para vendedores
-    if (_selectedRole == 'vendedor') {
-      if (_empresaController.text.trim().isEmpty) {
-        _showErrorSnackBar('Por favor, ingresa el nombre de tu tienda');
-        return;
-      }
-      
-      if (_ubicacionController.text.trim().isEmpty || _selectedPlace == null) {
-        _showErrorSnackBar('Por favor, selecciona una ubicación válida');
-        return;
-      }
-    }
 
     final success = await authController.register(
       _nombreController.text.trim(),
@@ -195,10 +185,227 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
+  void _showPrivacyNotice() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.85,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header simple
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF2E7D32),
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(16),
+                      topRight: Radius.circular(16),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Aviso de Privacidad',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white, size: 24),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                    ],
+                  ),
+                ),
+                // Content simple
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'La aplicación AgroMarket, desarrollada por la Empresa, con domicilio en Ocosingo, Chiapas, es responsable del uso y protección de los datos personales de sus usuarios.',
+                          style: TextStyle(
+                            fontSize: 14,
+                            height: 1.6,
+                            color: Colors.grey[800],
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        _buildSimpleSection(
+                          'Datos que recopilamos',
+                          [
+                            'AgroMarket recaba los siguientes datos personales, según el tipo de usuario:',
+                            '',
+                            '• Compradores: nombre completo, correo electrónico, contraseña, datos bancarios y ubicación.',
+                            '',
+                            '• Vendedores: nombre completo, correo electrónico, contraseña, ubicación, datos bancarios y nombre del negocio.',
+                            '',
+                            'Estos datos son necesarios para garantizar el correcto funcionamiento de la plataforma y ofrecer los servicios disponibles dentro de la aplicación.',
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        _buildSimpleSection(
+                          'Finalidad del tratamiento',
+                          [
+                            'Los datos personales que recopilamos se utilizarán para:',
+                            '',
+                            '• Crear y administrar su cuenta de usuario (comprador o vendedor).',
+                            '• Facilitar las transacciones de compra y venta dentro de la plataforma.',
+                            '• Verificar la identidad de los usuarios y garantizar la seguridad de las operaciones.',
+                            '• Enviar notificaciones y actualizaciones relacionadas con sus actividades.',
+                            '• Mejorar la calidad y confiabilidad de los servicios ofrecidos.',
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        _buildSimpleSection(
+                          'Transferencia de datos personales',
+                          [
+                            'Sus datos personales podrán ser compartidos con proveedores tecnológicos que brindan servicios de alojamiento, mantenimiento, procesamiento de pagos y soporte técnico. Dichas transferencias se realizarán bajo estrictas medidas de confidencialidad y seguridad.',
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        _buildSimpleSection(
+                          'Derechos ARCO',
+                          [
+                            'Usted tiene derecho a acceder, rectificar, cancelar u oponerse al tratamiento de sus datos personales (Derechos ARCO). Para ejercer estos derechos, puede enviar una solicitud al correo electrónico:',
+                            '',
+                            'agromarket559@gmail.com',
+                          ],
+                          email: 'agromarket559@gmail.com',
+                        ),
+                        const SizedBox(height: 20),
+                        _buildSimpleSection(
+                          'Cambios al aviso de privacidad',
+                          [
+                            'AgroMarket se reserva el derecho de modificar o actualizar este aviso de privacidad en cualquier momento. Las actualizaciones se publicarán dentro de la aplicación y en el sitio web.',
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                // Footer simple
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(16),
+                      bottomRight: Radius.circular(16),
+                    ),
+                    border: Border(
+                      top: BorderSide(color: Colors.grey[200]!),
+                    ),
+                  ),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        setState(() {
+                          _privacyAccepted = true;
+                        });
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2E7D32),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'Aceptar',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSimpleSection(String title, List<String> content, {String? email}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF2E7D32),
+          ),
+        ),
+        const SizedBox(height: 12),
+        ...content.map((text) {
+          if (text.isEmpty) {
+            return const SizedBox(height: 8);
+          }
+          if (text == email) {
+            return Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: GestureDetector(
+                onTap: () {
+                  // Aquí podrías agregar funcionalidad para abrir el cliente de email
+                },
+                child: Text(
+                  text,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    height: 1.6,
+                    color: Color(0xFF2E7D32),
+                    fontWeight: FontWeight.w500,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              ),
+            );
+          }
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 14,
+                height: 1.6,
+                color: Colors.grey[800],
+              ),
+            ),
+          );
+        }).toList(),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
+      resizeToAvoidBottomInset: true,
       body: Stack(
         children: [
           // Fondo de hojas solo en la parte superior
@@ -251,8 +458,12 @@ class _RegisterPageState extends State<RegisterPage> {
           ),
 
           // Área blanca con contenido
-          Positioned(
-            top: MediaQuery.of(context).size.height * 0.30,
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+            top: MediaQuery.of(context).viewInsets.bottom > 0 
+                ? 50  // Cuando hay teclado, subir mucho más arriba
+                : MediaQuery.of(context).size.height * 0.30, // Posición normal
             left: 0,
             right: 0,
             bottom: 0,
@@ -273,6 +484,7 @@ class _RegisterPageState extends State<RegisterPage> {
               ),
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(30),
+                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -381,7 +593,63 @@ class _RegisterPageState extends State<RegisterPage> {
                       _buildLocationField(),
                     ],
                     
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 20),
+                    
+                    // Checkbox de aviso de privacidad
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Checkbox(
+                          value: _privacyAccepted,
+                          onChanged: (bool? value) {
+                            setState(() {
+                              _privacyAccepted = value ?? false;
+                            });
+                          },
+                          activeColor: const Color(0xFF2E7D32),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 12),
+                            child: RichText(
+                              text: TextSpan(
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFF666666),
+                                  height: 1.4,
+                                ),
+                                children: [
+                                  TextSpan(
+                                    text: 'He leído y acepto el ',
+                                    recognizer: TapGestureRecognizer()
+                                      ..onTap = () {
+                                        setState(() {
+                                          _privacyAccepted = !_privacyAccepted;
+                                        });
+                                      },
+                                  ),
+                                  TextSpan(
+                                    text: 'Aviso de Privacidad',
+                                    style: const TextStyle(
+                                      color: Color(0xFF2E7D32),
+                                      fontWeight: FontWeight.bold,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                    recognizer: TapGestureRecognizer()
+                                      ..onTap = _showPrivacyNotice,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    
+                    const SizedBox(height: 20),
                     
                     // Botón de registro
                     Consumer<AuthController>(

@@ -9,3 +9,4 @@ class ListProductView extends StatelessWidget {
     return const ListProductViewContent();
   }
 }
+

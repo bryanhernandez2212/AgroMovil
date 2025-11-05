@@ -93,8 +93,14 @@ class FirebaseService {
         case 'invalid-email':
           message = 'El email no es válido';
           break;
+        case 'operation-not-allowed':
+          message = 'Esta operación no está permitida';
+          break;
+        case 'network-request-failed':
+          message = 'Error de conexión. Verifica tu internet';
+          break;
         default:
-          message = 'Error de autenticación: ${e.message}';
+          message = 'Error al crear la cuenta. Inténtalo de nuevo';
       }
       
       print('Error en registro: $message');
@@ -175,8 +181,17 @@ class FirebaseService {
         case 'user-disabled':
           message = 'Usuario deshabilitado';
           break;
+        case 'too-many-requests':
+          message = 'Demasiados intentos fallidos. Intenta más tarde';
+          break;
+        case 'network-request-failed':
+          message = 'Error de conexión. Verifica tu internet';
+          break;
+        case 'invalid-credential':
+          message = 'Credenciales incorrectas. Verifica tu email y contraseña';
+          break;
         default:
-          message = 'Error de autenticación: ${e.message}';
+          message = 'Credenciales incorrectas. Verifica tu email y contraseña';
       }
       
       print('Error en login: $message');
@@ -299,8 +314,11 @@ class FirebaseService {
         case 'too-many-requests':
           message = 'Demasiados intentos. Intenta más tarde';
           break;
+        case 'network-request-failed':
+          message = 'Error de conexión. Verifica tu internet';
+          break;
         default:
-          message = 'Error: ${e.message}';
+          message = 'Error al enviar el email. Inténtalo de nuevo';
       }
       
       print('❌ Error enviando email de recuperación: $message');
@@ -473,8 +491,11 @@ class FirebaseService {
         case 'weak-password':
           message = 'La nueva contraseña es muy débil';
           break;
+        case 'network-request-failed':
+          message = 'Error de conexión. Verifica tu internet';
+          break;
         default:
-          message = 'Error: ${e.message}';
+          message = 'Error al cambiar la contraseña. Inténtalo de nuevo';
       }
       
       print('❌ Error cambiando contraseña: $message');
@@ -568,8 +589,14 @@ class FirebaseService {
         case 'requires-recent-login':
           message = 'Por seguridad, debes iniciar sesión nuevamente';
           break;
+        case 'network-request-failed':
+          message = 'Error de conexión. Verifica tu internet';
+          break;
+        case 'invalid-credential':
+          message = 'La contraseña actual es incorrecta';
+          break;
         default:
-          message = 'Error: ${e.message}';
+          message = 'Error al cambiar la contraseña. Inténtalo de nuevo';
       }
       
       print('Error cambiando contraseña: $message');

@@ -1,4 +1,3 @@
-import 'package:agromarket/views/vendor/list_product_view.dart';
 import 'package:agromarket/views/vendor/register_product_view.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -138,7 +137,6 @@ class _RoleBasedNavigationState extends State<RoleBasedNavigation> {
     switch (role) {
       case 'vendedor':
         return [
-          const ListProductView(), // Lista de productos del vendedor
           const RegisterProductView(), // Registrar producto
           const ProfileView(), // Perfil
         ];
