@@ -121,16 +121,13 @@ class _LoginPageState extends State<LoginPage> {
             ),
           ],
         ),
-        backgroundColor: Colors.red.shade600,
-        behavior: SnackBarBehavior.fixed,
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(0),
+          borderRadius: BorderRadius.circular(20),
         ),
-        duration: const Duration(seconds: 4),
-        animation: CurvedAnimation(
-          parent: kAlwaysCompleteAnimation,
-          curve: Curves.easeOut,
-        ),
+        margin: const EdgeInsets.all(16),
       ),
     );
   }
@@ -154,15 +151,12 @@ class _LoginPageState extends State<LoginPage> {
           ],
         ),
         backgroundColor: const Color(0xFF115213),
-        behavior: SnackBarBehavior.fixed,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(0),
+          borderRadius: BorderRadius.circular(20),
         ),
-        duration: const Duration(seconds: 3),
-        animation: CurvedAnimation(
-          parent: kAlwaysCompleteAnimation,
-          curve: Curves.easeOut,
-        ),
+        margin: const EdgeInsets.all(16),
       ),
     );
   }

@@ -38,8 +38,49 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+    
+    packaging {
+        resources {
+            // Excluir archivos duplicados que causan conflictos
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            pickFirsts += "**/libc++_shared.so"
+            pickFirsts += "**/libjsc.so"
+            // Resolver conflictos de clases duplicadas
+            pickFirsts += "**/androidx/activity/compose/R.class"
+            pickFirsts += "**/androidx/activity/compose/R\$*.class"
+        }
+    }
 }
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // MaterialComponents requerido para flutter_stripe
+    implementation("com.google.android.material:material:1.11.0")
+}
+
+// Configuración para resolver conflictos de dependencias duplicadas
+configurations.all {
+    resolutionStrategy {
+        // Forzar una única versión de androidx.activity para evitar duplicados
+        eachDependency {
+            if (requested.group == "androidx.activity") {
+                if (requested.name == "activity-compose" || requested.name == "activity-ktx") {
+                    useVersion("1.9.2")
+                    because("Resolver conflictos de dependencias duplicadas")
+                }
+            }
+        }
+        // Preferir la primera versión encontrada
+        force("androidx.activity:activity:1.9.2")
+        force("androidx.activity:activity-compose:1.9.2")
+        force("androidx.activity:activity-ktx:1.9.2")
+    }
+}
+
+// Suprimir advertencias de APIs deprecadas (no afectan la funcionalidad)
+tasks.withType<JavaCompile> {
+    options.compilerArgs.addAll(listOf("-Xlint:-options", "-Xlint:-deprecation"))
 }

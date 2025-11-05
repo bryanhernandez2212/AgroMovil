@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:agromarket/controllers/auth_controller.dart';
-import 'package:agromarket/views/auth/login_view.dart';
 import 'package:agromarket/views/about/about_view.dart';
 import 'package:agromarket/services/user_role_service.dart';
-import 'package:agromarket/estructure/product_estructure.dart';
+import 'package:agromarket/services/firebase_service.dart';
+import 'package:agromarket/services/places_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -19,21 +19,102 @@ class _ProfileViewState extends State<ProfileView> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _tiendaController = TextEditingController();
+  final TextEditingController _ubicacionController = TextEditingController();
   bool _isEditing = false;
   bool _isLoading = false;
+  List<PlacePrediction> _placePredictions = [];
+  bool _showPredictions = false;
+  PlaceDetails? _selectedPlace;
+  bool _isVendedor = false;
 
   @override
   void initState() {
     super.initState();
-    _loadUserData();
+    // Cargar datos después de que el frame esté listo
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadUserData();
+    });
   }
 
-  void _loadUserData() {
+  Future<void> _loadUserData() async {
     final authController = Provider.of<AuthController>(context, listen: false);
     if (authController.currentUser != null) {
       _nameController.text = authController.currentUser!.nombre;
       _emailController.text = authController.currentUser!.email;
+      
+      // Cargar datos adicionales desde Firestore
+      final userData = await FirebaseService.getCurrentUserData();
+      if (userData != null) {
+        // Verificar solo el modo de navegación actual (rol_activo)
+        // El rol_activo puede ser 'vendedor' o 'comprador'
+        final rolActivo = userData['rol_activo']?.toString().toLowerCase().trim() ?? 'comprador';
+        final wasVendedor = _isVendedor;
+        _isVendedor = rolActivo == 'vendedor';
+        
+        print('🔍 ProfileView - rol_activo raw: ${userData['rol_activo']}');
+        print('🔍 ProfileView - rol_activo procesado: $rolActivo');
+        print('🔍 ProfileView - _isVendedor: $_isVendedor');
+        print('🔍 ProfileView - ¿Mostrar campos? $_isVendedor');
+        
+        // Actualizar estado si cambió
+        if (mounted && wasVendedor != _isVendedor) {
+          setState(() {
+            // Forzar actualización del estado
+          });
+        }
+        
+        if (_isVendedor) {
+          // Cargar datos del vendedor
+          final nombreTienda = userData['nombre_tienda'] ?? '';
+          final ubicacion = userData['ubicacion'] ?? userData['ubicacion_formatted'] ?? '';
+          
+          _tiendaController.text = nombreTienda;
+          _ubicacionController.text = ubicacion;
+          
+          print('🔍 ProfileView - nombre_tienda: $nombreTienda');
+          print('🔍 ProfileView - ubicacion: $ubicacion');
+        } else {
+          // Limpiar campos solo si realmente no es vendedor
+          _tiendaController.clear();
+          _ubicacionController.clear();
+          _selectedPlace = null;
+        }
+        
+        // Forzar actualización del widget después de cargar datos
+        if (mounted) {
+          setState(() {
+            // Actualizar estado para reflejar los cambios
+          });
+        }
+      }
     }
+  }
+
+  Future<void> _searchPlaces(String query) async {
+    if (query.isEmpty || query.length < 3) {
+      setState(() {
+        _placePredictions = [];
+        _showPredictions = false;
+      });
+      return;
+    }
+
+    final predictions = await PlacesService.getPlacePredictions(query);
+    setState(() {
+      _placePredictions = predictions;
+      _showPredictions = predictions.isNotEmpty;
+    });
+  }
+
+  Future<void> _selectPlace(PlacePrediction prediction) async {
+    final details = await PlacesService.getPlaceDetails(prediction.placeId);
+    setState(() {
+      _selectedPlace = details;
+      _ubicacionController.text = prediction.description;
+      _showPredictions = false;
+      _placePredictions = [];
+    });
   }
 
   @override
@@ -42,26 +123,34 @@ class _ProfileViewState extends State<ProfileView> {
       builder: (context, authController, child) {
         return Scaffold(
           backgroundColor: const Color(0xFFF9F9F9),
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Color(0xFF115213)),
+              onPressed: () => Navigator.pop(context),
+            ),
+            title: const Text(
+              'Mi Perfil',
+              style: TextStyle(
+                color: Color(0xFF115213),
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
           body: SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 8),
                   
-                  // Header con título y botón de editar
+                  // Header con botón de editar
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      const Text(
-                        "Mi Perfil",
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF115213),
-                        ),
-                      ),
                       IconButton(
                         onPressed: _toggleEditMode,
                         icon: Icon(
@@ -194,8 +283,126 @@ class _ProfileViewState extends State<ProfileView> {
                 : "No disponible",
             enabled: false,
           ),
+          
+          // Campos adicionales para vendedores (solo cuando rol_activo es 'vendedor')
+          if (_isVendedor) ...[
+            const SizedBox(height: 20),
+            _buildInfoField(
+              label: "Nombre de tienda",
+              value: _tiendaController.text.isEmpty ? "No especificado" : _tiendaController.text,
+              controller: _tiendaController,
+              enabled: _isEditing,
+            ),
+            const SizedBox(height: 20),
+            _buildLocationField(),
+          ],
         ],
       ),
+    );
+  }
+
+  Widget _buildLocationField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Ubicación",
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF666666),
+          ),
+        ),
+        const SizedBox(height: 8),
+        if (_isEditing)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: _ubicacionController,
+                enabled: _isEditing,
+                decoration: InputDecoration(
+                  hintText: "Ubicación (empieza a escribir...)",
+                  filled: true,
+                  fillColor: const Color(0xFFF5F5F5),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFF115213), width: 2),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  prefixIcon: const Icon(Icons.location_on, color: Color(0xFF115213)),
+                ),
+                onChanged: (value) {
+                  _searchPlaces(value);
+                },
+                onTap: () {
+                  if (_ubicacionController.text.isNotEmpty) {
+                    _searchPlaces(_ubicacionController.text);
+                  }
+                },
+              ),
+              if (_showPredictions && _placePredictions.isNotEmpty)
+                Container(
+                  margin: const EdgeInsets.only(top: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey[300]!),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  constraints: const BoxConstraints(maxHeight: 200),
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: _placePredictions.length,
+                    itemBuilder: (context, index) {
+                      final prediction = _placePredictions[index];
+                      return ListTile(
+                        leading: const Icon(Icons.location_on, color: Color(0xFF115213)),
+                        title: Text(
+                          prediction.description,
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                        onTap: () {
+                          _selectPlace(prediction);
+                        },
+                      );
+                    },
+                  ),
+                ),
+            ],
+          )
+        else
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF5F5F5),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE0E0E0)),
+            ),
+            child: Text(
+              _ubicacionController.text.isEmpty ? "No especificado" : _ubicacionController.text,
+              style: const TextStyle(
+                fontSize: 16,
+                color: Color(0xFF333333),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -501,66 +708,56 @@ class _ProfileViewState extends State<ProfileView> {
                 ),
               ),
             ),
-            
-            const SizedBox(height: 12),
-            
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton.icon(
-                onPressed: _showLogoutDialog,
-                icon: const Icon(Icons.logout, size: 20),
-                label: const Text("Cerrar Sesión"),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFE8F5C8),
-                  foregroundColor: const Color(0xFF115213),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 2,
-                ),
-              ),
-            ),
-            
-            const SizedBox(height: 12),
-            
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: OutlinedButton.icon(
-                onPressed: _showDeleteDialog,
-                icon: const Icon(Icons.delete_outline, size: 20),
-                label: const Text("Eliminar Cuenta"),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.red,
-                  side: const BorderSide(color: Colors.red),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
           ],
         );
       },
     );
   }
 
-  void _switchRole(bool toSeller, AuthController authController) {
-    // Cambiar el rol en el servicio
-    if (toSeller) {
-      UserRoleService.setUserRole(UserRoleService.sellerRole);
-    } else {
-      UserRoleService.setUserRole(UserRoleService.buyerRole);
+  Future<void> _switchRole(bool toSeller, AuthController authController) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      // Actualizar rol_activo en Firestore
+      final newRolActivo = toSeller ? 'vendedor' : 'comprador';
+      print('🔄 ProfileView - Cambiando rol_activo a: $newRolActivo (toSeller: $toSeller)');
+      await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(user.uid)
+          .update({
+        'rol_activo': newRolActivo,
+        'updated_at': FieldValue.serverTimestamp(),
+      });
+      print('✅ ProfileView - rol_activo actualizado en Firestore');
+
+      // Cambiar el rol en el servicio local
+      if (toSeller) {
+        UserRoleService.setUserRole(UserRoleService.sellerRole);
+      } else {
+        UserRoleService.setUserRole(UserRoleService.buyerRole);
+      }
+
+      // Recargar datos del usuario
+      await authController.reloadUserData();
+      await _loadUserData();
+      
+      // Actualizar el estado local
+      setState(() {
+        _isVendedor = newRolActivo == 'vendedor';
+        _isLoading = false;
+        print('🔄 ProfileView - Estado actualizado: _isVendedor = $_isVendedor');
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      _showErrorSnackBar('Error al cambiar modo de navegación: ${e.toString()}');
     }
-    
-    // Navegar a la estructura con el nuevo rol
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const ProductEstructureView(),
-      ),
-    );
   }
 
   Future<void> _toggleRole(String role, bool enable, AuthController authController) async {
@@ -572,6 +769,10 @@ class _ProfileViewState extends State<ProfileView> {
         _isLoading = true;
       });
 
+      // Obtener datos actuales del usuario
+      final userData = await FirebaseService.getCurrentUserData();
+      final currentRolActivo = userData?['rol_activo'] ?? 'comprador';
+
       if (enable) {
         // Agregar el rol al array en Firestore
         await FirebaseFirestore.instance
@@ -581,6 +782,18 @@ class _ProfileViewState extends State<ProfileView> {
           'roles': FieldValue.arrayUnion([role]),
           'updated_at': FieldValue.serverTimestamp(),
         });
+        
+        // Si se activa el rol de vendedor y no está activo, actualizarlo
+        if (role == 'vendedor' && currentRolActivo != 'vendedor') {
+          await FirebaseFirestore.instance
+              .collection('usuarios')
+              .doc(user.uid)
+              .update({
+            'rol_activo': 'vendedor',
+            'updated_at': FieldValue.serverTimestamp(),
+          });
+        }
+        
         _showSuccessSnackBar('¡Rol activado exitosamente!');
       } else {
         // Remover el rol del array en Firestore
@@ -591,11 +804,24 @@ class _ProfileViewState extends State<ProfileView> {
           'roles': FieldValue.arrayRemove([role]),
           'updated_at': FieldValue.serverTimestamp(),
         });
+        
+        // Si se desactiva el rol de vendedor y estaba activo, cambiar a comprador
+        if (role == 'vendedor' && currentRolActivo == 'vendedor') {
+          await FirebaseFirestore.instance
+              .collection('usuarios')
+              .doc(user.uid)
+              .update({
+            'rol_activo': 'comprador',
+            'updated_at': FieldValue.serverTimestamp(),
+          });
+        }
+        
         _showSuccessSnackBar('¡Rol desactivado exitosamente!');
       }
 
       // Recargar datos del usuario
       await authController.reloadUserData();
+      await _loadUserData(); // Recargar también los campos locales
       
       setState(() {
         _isLoading = false;
@@ -637,23 +863,87 @@ class _ProfileViewState extends State<ProfileView> {
       return;
     }
 
+    // Validaciones adicionales para vendedores
+    if (_isVendedor) {
+      if (_tiendaController.text.trim().isEmpty) {
+        _showErrorSnackBar("El nombre de tienda no puede estar vacío");
+        return;
+      }
+      
+      if (_ubicacionController.text.trim().isEmpty) {
+        _showErrorSnackBar("La ubicación no puede estar vacía");
+        return;
+      }
+    }
+
     setState(() {
       _isLoading = true;
     });
 
     try {
-      // Aquí puedes agregar la lógica para actualizar el perfil
-      // final authController = Provider.of<AuthController>(context, listen: false);
-      // await authController.updateProfile(...)
+      final updateData = <String, dynamic>{
+        'nombre': _nameController.text.trim(),
+      };
+
+      // Agregar campos de vendedor si aplica
+      if (_isVendedor) {
+        final nombreTienda = _tiendaController.text.trim();
+        final ubicacion = _ubicacionController.text.trim();
+        
+        updateData['nombre_tienda'] = nombreTienda;
+        
+        // Si se seleccionó un nuevo lugar, usar sus datos
+        if (_selectedPlace != null) {
+          updateData['ubicacion'] = _selectedPlace!.formattedAddress;
+          updateData['ubicacion_formatted'] = _selectedPlace!.formattedAddress;
+          if (_selectedPlace!.lat != null && _selectedPlace!.lng != null) {
+            updateData['ubicacion_lat'] = _selectedPlace!.lat;
+            updateData['ubicacion_lng'] = _selectedPlace!.lng;
+          }
+          print('💾 ProfileView - Guardando nueva ubicación seleccionada: ${_selectedPlace!.formattedAddress}');
+        } else if (ubicacion.isNotEmpty) {
+          // Mantener la ubicación actual si no se seleccionó una nueva
+          updateData['ubicacion'] = ubicacion;
+          updateData['ubicacion_formatted'] = ubicacion;
+          print('💾 ProfileView - Guardando ubicación actual: $ubicacion');
+          // Nota: No actualizamos las coordenadas si no se seleccionó un nuevo lugar
+        } else {
+          print('⚠️ ProfileView - Ubicación vacía, no se actualizará');
+        }
+        
+        print('💾 ProfileView - nombre_tienda a guardar: $nombreTienda');
+      }
+
+      print('💾 ProfileView - Guardando datos: $updateData');
+      final success = await FirebaseService.updateUserData(updateData);
       
-      await Future.delayed(const Duration(seconds: 1)); // Simular llamada API
-      
-      setState(() {
-        _isEditing = false;
-        _isLoading = false;
-      });
-      
-      _showSuccessSnackBar("Perfil actualizado correctamente");
+      if (success) {
+        print('✅ ProfileView - Datos guardados exitosamente');
+        
+        // Recargar datos del usuario
+        final authController = Provider.of<AuthController>(context, listen: false);
+        await authController.reloadUserData();
+        
+        // Recargar datos locales y actualizar estado
+        await _loadUserData();
+        
+        // Asegurar que el estado se actualice correctamente
+        setState(() {
+          _isEditing = false;
+          _isLoading = false;
+          _selectedPlace = null; // Limpiar selección
+          
+          // Verificar que los datos se cargaron correctamente
+          print('💾 ProfileView - Después de guardar:');
+          print('   - _isVendedor: $_isVendedor');
+          print('   - nombre_tienda: ${_tiendaController.text}');
+          print('   - ubicacion: ${_ubicacionController.text}');
+        });
+        
+        _showSuccessSnackBar("Perfil actualizado correctamente");
+      } else {
+        throw Exception('Error al actualizar en Firestore');
+      }
     } catch (e) {
       setState(() {
         _isLoading = false;
@@ -662,64 +952,6 @@ class _ProfileViewState extends State<ProfileView> {
     }
   }
 
-  void _showLogoutDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Cerrar sesión'),
-        content: const Text('¿Estás seguro de que quieres cerrar sesión?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.of(context).pop();
-              final authController = Provider.of<AuthController>(context, listen: false);
-              await authController.logout();
-              if (mounted) {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LoginPage()),
-                  (route) => false,
-                );
-              }
-            },
-            child: const Text('Cerrar sesión'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showDeleteDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Eliminar cuenta'),
-        content: const Text(
-          '¿Estás seguro de que quieres eliminar tu cuenta? Esta acción no se puede deshacer.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              _showErrorSnackBar("Función de eliminación no implementada");
-            },
-            child: const Text(
-              'Eliminar',
-              style: TextStyle(color: Colors.red),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   void _showSuccessSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -727,6 +959,11 @@ class _ProfileViewState extends State<ProfileView> {
         content: Text(message),
         backgroundColor: const Color(0xFF115213),
         behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        margin: const EdgeInsets.all(16),
       ),
     );
   }
@@ -737,6 +974,11 @@ class _ProfileViewState extends State<ProfileView> {
         content: Text(message),
         backgroundColor: Colors.red,
         behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        margin: const EdgeInsets.all(16),
       ),
     );
   }
@@ -750,6 +992,8 @@ class _ProfileViewState extends State<ProfileView> {
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _tiendaController.dispose();
+    _ubicacionController.dispose();
     super.dispose();
   }
 }

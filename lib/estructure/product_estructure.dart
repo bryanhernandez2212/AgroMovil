@@ -1,4 +1,4 @@
-import 'package:agromarket/views/profile/profile_view.dart';
+import 'package:agromarket/views/profile/user_profile_menu_view.dart';
 import 'package:agromarket/views/vendor/list_product_view.dart';
 import 'package:agromarket/views/vendor/register_product_view.dart';
 import 'package:agromarket/views/buyer/buyer_home_view.dart';
@@ -41,12 +41,22 @@ class ProductEstructureView extends StatefulWidget {
 class _ProductEstructureViewState extends State<ProductEstructureView> {
   late int currentIndex;
   Widget? _currentContent;
+  String? _categoryFilter; // Filtro de categoría para la vista de productos
 
   @override
   void initState() {
     super.initState();
     currentIndex = widget.currentIndex;
     _currentContent = widget.content ?? _getContentForIndex(currentIndex);
+  }
+
+  // Método para navegar a productos con filtro de categoría
+  void navigateToProductsWithCategory(String category) {
+    setState(() {
+      _categoryFilter = category;
+      currentIndex = 1; // Índice de productos para compradores
+      _currentContent = BuyerListProductosView(categoryFilter: category);
+    });
   }
 
   @override
@@ -105,7 +115,7 @@ class _ProductEstructureViewState extends State<ProductEstructureView> {
             // Barra de búsqueda - solo para compradores en Home
             if (isBuyer && currentIndex == 0 && widget.showSearchBar)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                padding: const EdgeInsets.only(left: 20, right: 20, top: 8, bottom: 8),
                 child: Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -198,7 +208,7 @@ class _ProductEstructureViewState extends State<ProductEstructureView> {
       color: const Color(0xFF226602),
       buttonBackgroundColor: const Color(0xFF226602),
       animationCurve: Curves.easeInOut,
-      animationDuration: const Duration(milliseconds: 600),
+      animationDuration: const Duration(milliseconds: 300),
       items: _buildNavigationItems(),
       onTap: _onNavigationItemTapped,
     );
@@ -214,7 +224,7 @@ class _ProductEstructureViewState extends State<ProductEstructureView> {
         _buildNavItem(Icons.home_outlined, currentIndex == 0), 
         _buildNavItem(Icons.favorite_outline, currentIndex == 1), 
         _buildNavItem(Icons.shopping_cart_outlined, currentIndex == 2), 
-        _buildNavItem(Icons.person, currentIndex == 3),
+        _buildNavItem(Icons.menu, currentIndex == 3),
       ];
     } else {
       // Navegación para vendedores
@@ -222,7 +232,7 @@ class _ProductEstructureViewState extends State<ProductEstructureView> {
         _buildNavItem(Icons.home_outlined, currentIndex == 0), 
         _buildNavItem(Icons.add, currentIndex == 1), 
         _buildNavItem(Icons.add, currentIndex == 2), 
-        _buildNavItem(Icons.person, currentIndex == 3),
+        _buildNavItem(Icons.menu, currentIndex == 3),
       ];
     }
   }
@@ -231,6 +241,10 @@ class _ProductEstructureViewState extends State<ProductEstructureView> {
   void _onNavigationItemTapped(int index) {
     setState(() {
       currentIndex = index;
+      // Si navegamos manualmente a productos, limpiar el filtro
+      if (index == 1) {
+        _categoryFilter = null;
+      }
       _currentContent = _getContentForIndex(index);
     });
   }
@@ -239,17 +253,19 @@ class _ProductEstructureViewState extends State<ProductEstructureView> {
   Widget _getContentForIndex(int index) {
     final isBuyer = UserRoleService.isBuyer();
     
-    if (isBuyer) {
+      if (isBuyer) {
       // Contenido para compradores
       switch (index) {
         case 0:
-          return const BuyerHomeView();
+          return BuyerHomeView(
+            onCategoryTap: navigateToProductsWithCategory,
+          );
         case 1:
-          return const BuyerListProductosView();
+          return BuyerListProductosView(categoryFilter: _categoryFilter);
         case 2:
           return const BuyerCartView();
         case 3:
-          return const ProfileView();
+          return const UserProfileMenuView();
         default:
           return _buildEmptyContent();
       }
@@ -263,7 +279,7 @@ class _ProductEstructureViewState extends State<ProductEstructureView> {
         case 2:
           return const ListProductView();
         case 3:
-          return const ProfileView();
+          return const UserProfileMenuView();
         default:
           return _buildEmptyContent();
       }
@@ -275,28 +291,26 @@ class _ProductEstructureViewState extends State<ProductEstructureView> {
     final isBuyer = UserRoleService.isBuyer();
     
     if (isBuyer) {
-      // Títulos para compradores
       switch (index) {
         case 0:
-          return null; // Home no tiene título, usa el banner "AgroMarket"
+          return null; 
         case 1:
-          return 'Favoritos';
+          return null;
         case 2:
-          return 'Carrito de compras';
+          return null;
         case 3:
           return null; 
         default:
           return null;
       }
     } else {
-      // Títulos para vendedores
       switch (index) {
         case 0:
           return null; 
         case 1:
-          return null; // Sin título para registro de productos
+          return null; 
         case 2:
-          return 'Mis productos';
+          return null;
         case 3:
           return null; 
         default:

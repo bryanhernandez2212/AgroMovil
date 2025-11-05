@@ -8,8 +8,6 @@ class AdService {
     // Usa este ID durante desarrollo y pruebas
     return '';
     
-    // TODO: Reemplaza con tu ID real de producción cuando publiques la app
-    // return 'ca-app-pub-TU_ID_DE_ADMOB/TU_UNIDAD_DE_ANUNCIOS';
   }
 
   // Inicializar el SDK de AdMob

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:agromarket/controllers/auth_controller.dart';
+import 'package:agromarket/services/places_service.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -14,10 +15,15 @@ class _RegisterPageState extends State<RegisterPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _empresaController = TextEditingController();
+  final _ubicacionController = TextEditingController();
   bool _obscureText = true;
   bool _obscureRepeatText = true;
   String _selectedRole = 'comprador';
   final List<String> _availableRoles = ['comprador', 'vendedor'];
+  List<PlacePrediction> _placePredictions = [];
+  bool _showPredictions = false;
+  PlaceDetails? _selectedPlace;
 
   @override
   void dispose() {
@@ -25,7 +31,35 @@ class _RegisterPageState extends State<RegisterPage> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _empresaController.dispose();
+    _ubicacionController.dispose();
     super.dispose();
+  }
+
+  Future<void> _searchPlaces(String query) async {
+    if (query.isEmpty || query.length < 3) {
+      setState(() {
+        _placePredictions = [];
+        _showPredictions = false;
+      });
+      return;
+    }
+
+    final predictions = await PlacesService.getPlacePredictions(query);
+    setState(() {
+      _placePredictions = predictions;
+      _showPredictions = predictions.isNotEmpty;
+    });
+  }
+
+  Future<void> _selectPlace(PlacePrediction prediction) async {
+    final details = await PlacesService.getPlaceDetails(prediction.placeId);
+    setState(() {
+      _selectedPlace = details;
+      _ubicacionController.text = prediction.description;
+      _showPredictions = false;
+      _placePredictions = [];
+    });
   }
 
   Future<void> _register() async {
@@ -57,12 +91,36 @@ class _RegisterPageState extends State<RegisterPage> {
       return;
     }
 
+    // Validaciones adicionales solo para vendedores
+    if (_selectedRole == 'vendedor') {
+      if (_empresaController.text.trim().isEmpty) {
+        _showErrorSnackBar('Por favor, ingresa el nombre de tu tienda');
+        return;
+      }
+      
+      if (_ubicacionController.text.trim().isEmpty || _selectedPlace == null) {
+        _showErrorSnackBar('Por favor, selecciona una ubicación válida');
+        return;
+      }
+    }
 
     final success = await authController.register(
       _nombreController.text.trim(),
       _emailController.text.trim(),
       _passwordController.text,
       _selectedRole,
+      nombreEmpresa: _selectedRole == 'vendedor' 
+          ? _empresaController.text.trim() 
+          : null,
+      ubicacion: _selectedRole == 'vendedor' && _selectedPlace != null 
+          ? _selectedPlace!.formattedAddress 
+          : null,
+      ubicacionLat: _selectedRole == 'vendedor' && _selectedPlace != null 
+          ? _selectedPlace!.lat 
+          : null,
+      ubicacionLng: _selectedRole == 'vendedor' && _selectedPlace != null 
+          ? _selectedPlace!.lng 
+          : null,
     );
 
     if (success && mounted) {
@@ -90,16 +148,13 @@ class _RegisterPageState extends State<RegisterPage> {
             ),
           ],
         ),
-        backgroundColor: Colors.red.shade600,
-        behavior: SnackBarBehavior.fixed,
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(0),
+          borderRadius: BorderRadius.circular(20),
         ),
-        duration: const Duration(seconds: 4),
-        animation: CurvedAnimation(
-          parent: kAlwaysCompleteAnimation,
-          curve: Curves.easeOut,
-        ),
+        margin: const EdgeInsets.all(16),
       ),
     );
   }
@@ -123,15 +178,12 @@ class _RegisterPageState extends State<RegisterPage> {
           ],
         ),
         backgroundColor: const Color(0xFF115213),
-        behavior: SnackBarBehavior.fixed,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(0),
+          borderRadius: BorderRadius.circular(20),
         ),
-        duration: const Duration(seconds: 3),
-        animation: CurvedAnimation(
-          parent: kAlwaysCompleteAnimation,
-          curve: Curves.easeOut,
-        ),
+        margin: const EdgeInsets.all(16),
         action: SnackBarAction(
           label: 'Iniciar Sesión',
           textColor: Colors.white,
@@ -316,6 +368,19 @@ class _RegisterPageState extends State<RegisterPage> {
                     // Campo de selección de rol
                     _buildRoleSelector(),
                     
+                    // Campos adicionales solo para vendedores
+                    if (_selectedRole == 'vendedor') ...[
+                      const SizedBox(height: 20),
+                      _buildInputField(
+                        controller: _empresaController,
+                        hintText: 'Nombre de tienda',
+                        icon: Icons.business,
+                        keyboardType: TextInputType.text,
+                      ),
+                      const SizedBox(height: 20),
+                      _buildLocationField(),
+                    ],
+                    
                     const SizedBox(height: 30),
                     
                     // Botón de registro
@@ -485,6 +550,12 @@ class _RegisterPageState extends State<RegisterPage> {
           if (newValue != null) {
             setState(() {
               _selectedRole = newValue;
+              // Limpiar campos específicos si cambia el rol a uno que no los requiere
+              if (_selectedRole != 'vendedor') {
+                _empresaController.clear();
+                _ubicacionController.clear();
+                _selectedPlace = null;
+              }
             });
           }
         },
@@ -494,6 +565,73 @@ class _RegisterPageState extends State<RegisterPage> {
           color: Color(0xFF333333),
         ),
       ),
+    );
+  }
+
+  Widget _buildLocationField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.grey[100],
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(color: Colors.grey[300]!),
+          ),
+          child: TextField(
+            controller: _ubicacionController,
+            decoration: InputDecoration(
+              hintText: 'Ubicación (empieza a escribir...)',
+              hintStyle: TextStyle(color: Colors.grey[500]),
+              prefixIcon: Icon(Icons.location_on, color: Colors.grey[600]),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+            ),
+            onChanged: (value) {
+              _searchPlaces(value);
+            },
+            onTap: () {
+              if (_ubicacionController.text.isNotEmpty) {
+                _searchPlaces(_ubicacionController.text);
+              }
+            },
+          ),
+        ),
+        if (_showPredictions && _placePredictions.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(top: 5),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(15),
+              border: Border.all(color: Colors.grey[300]!),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            constraints: const BoxConstraints(maxHeight: 200),
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: _placePredictions.length,
+              itemBuilder: (context, index) {
+                final prediction = _placePredictions[index];
+                return ListTile(
+                  leading: const Icon(Icons.location_on, color: Color(0xFF115213)),
+                  title: Text(
+                    prediction.description,
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                  onTap: () {
+                    _selectPlace(prediction);
+                  },
+                );
+              },
+            ),
+          ),
+      ],
     );
   }
 

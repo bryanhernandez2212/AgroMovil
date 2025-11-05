@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:agromarket/views/auth/login_view.dart';
 import 'package:agromarket/estructure/product_estructure.dart';
 import 'package:agromarket/controllers/auth_controller.dart';
+import 'package:agromarket/controllers/cart_controller.dart';
 import 'package:agromarket/firebase_options.dart';
 import 'package:agromarket/services/ad_service.dart';
+import 'package:agromarket/config/stripe_config.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -14,6 +17,9 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  
+  // Inicializar Stripe con la clave pública
+  Stripe.publishableKey = StripeConfig.publishableKey;
   
   // Inicializar AdMob
   await AdService.initialize();
@@ -29,6 +35,7 @@ class AgroMarketApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthController()),
+        ChangeNotifierProvider(create: (_) => CartController()),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,

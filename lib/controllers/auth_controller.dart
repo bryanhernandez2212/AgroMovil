@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:agromarket/models/user_model.dart';
 import 'package:agromarket/services/firebase_service.dart';
+import 'package:agromarket/services/email_service.dart';
 import 'package:agromarket/services/microsoft_auth_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -9,11 +10,13 @@ class AuthController extends ChangeNotifier {
   bool _isLoggedIn = false;
   UserModel? _currentUser;
   String? _errorMessage;
+  String? _resetSessionToken;
 
   bool get isLoading => _isLoading;
   UserModel? get currentUser => _currentUser;
   String? get errorMessage => _errorMessage;
   bool get isLoggedIn => _isLoggedIn;
+  String? get resetSessionToken => _resetSessionToken;
 
   AuthController() {
     // Escuchar cambios de autenticación
@@ -67,7 +70,16 @@ class AuthController extends ChangeNotifier {
   }
 
   /// Registro con Firebase Auth
-  Future<bool> register(String nombre, String email, String password, String rol) async {
+  Future<bool> register(
+    String nombre,
+    String email,
+    String password,
+    String rol, {
+    String? nombreEmpresa,
+    String? ubicacion,
+    double? ubicacionLat,
+    double? ubicacionLng,
+  }) async {
     _setLoading(true);
     _clearError();
 
@@ -79,6 +91,10 @@ class AuthController extends ChangeNotifier {
         email: email,
         password: password,
         rol: rol,
+        nombreEmpresa: nombreEmpresa,
+        ubicacion: ubicacion,
+        ubicacionLat: ubicacionLat,
+        ubicacionLng: ubicacionLng,
       );
       
       print('📝 AuthController: Resultado del registro: $result');
@@ -233,6 +249,126 @@ class AuthController extends ChangeNotifier {
       }
     } catch (e) {
       print('AuthController: Error inesperado: $e');
+      _setError('Error inesperado: ${e.toString()}');
+      _setLoading(false);
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // ========== VERIFICACIÓN DE CÓDIGO ==========
+
+  /// Verificar código de recuperación de contraseña
+  Future<bool> verifyResetCode(String email, String code) async {
+    _setLoading(true);
+    _clearError();
+
+    try {
+      print('AuthController: Verificando código para $email');
+      
+      final result = await EmailService.verifyResetCode(
+        email: email,
+        code: code,
+      );
+      
+      print('AuthController: Resultado de verificación: $result');
+      
+      if (result['success']) {
+        _resetSessionToken = result['session_token'] as String?;
+        _setLoading(false);
+        notifyListeners();
+        return true;
+      } else {
+        _setError(result['message'] ?? 'Código incorrecto');
+        _setLoading(false);
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      print('AuthController: Error inesperado verificando código: $e');
+      _setError('Error inesperado: ${e.toString()}');
+      _setLoading(false);
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // ========== CAMBIO DE CONTRASEÑA ==========
+
+  /// Cambiar contraseña después de verificar código
+  Future<bool> resetPasswordWithCode(
+    String email,
+    String sessionToken,
+    String newPassword,
+  ) async {
+    _setLoading(true);
+    _clearError();
+
+    try {
+      print('AuthController: Cambiando contraseña con código verificado');
+      
+      final result = await FirebaseService.resetPasswordWithCode(
+        email: email,
+        sessionToken: sessionToken,
+        newPassword: newPassword,
+      );
+      
+      if (result['success']) {
+        // Si requiere un enlace de email, mostrar mensaje especial
+        if (result['requires_email_link'] == true) {
+          _setError(result['message'] ?? 'Revisa tu correo para cambiar la contraseña');
+          _setLoading(false);
+          notifyListeners();
+          return false; // Retornar false para mostrar el mensaje
+        }
+        _setLoading(false);
+        notifyListeners();
+        return true;
+      } else {
+        _setError(result['message'] ?? 'Error cambiando contraseña');
+        _setLoading(false);
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      print('AuthController: Error inesperado: $e');
+      _setError('Error inesperado: ${e.toString()}');
+      _setLoading(false);
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Cambiar contraseña del usuario autenticado (requiere contraseña actual)
+  Future<bool> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    _setLoading(true);
+    _clearError();
+
+    try {
+      print('AuthController: Cambiando contraseña');
+      
+      final result = await FirebaseService.changePassword(
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+      );
+      
+      print('AuthController: Resultado del cambio: $result');
+      
+      if (result['success']) {
+        _setLoading(false);
+        notifyListeners();
+        return true;
+      } else {
+        _setError(result['message'] ?? 'Error cambiando contraseña');
+        _setLoading(false);
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      print('AuthController: Error inesperado cambiando contraseña: $e');
       _setError('Error inesperado: ${e.toString()}');
       _setLoading(false);
       notifyListeners();

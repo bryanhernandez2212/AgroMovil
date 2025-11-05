@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:agromarket/models/product_model.dart';
 import 'package:agromarket/models/comment_model.dart';
+import 'package:agromarket/models/cart_item_model.dart';
 import 'package:agromarket/services/product_service.dart';
+import 'package:agromarket/controllers/cart_controller.dart';
+import 'package:agromarket/views/buyer/shipping_address_view.dart';
+import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class BuyerProductDetailView extends StatefulWidget {
@@ -163,6 +167,11 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
         const SnackBar(
           content: Text('Por favor escribe un comentario'),
           duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(20)),
+          ),
+          margin: EdgeInsets.all(16),
         ),
       );
       return;
@@ -174,6 +183,11 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
         const SnackBar(
           content: Text('Debes iniciar sesión para comentar'),
           duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(20)),
+          ),
+          margin: EdgeInsets.all(16),
         ),
       );
       return;
@@ -200,15 +214,14 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
         await _loadComments();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.white),
-                const SizedBox(width: 8),
-                const Text('Comentario agregado exitosamente'),
-              ],
-            ),
+            content: const Text('Comentario agregado exitosamente'),
             backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
             duration: const Duration(seconds: 2),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            margin: const EdgeInsets.all(16),
           ),
         );
       } else {
@@ -216,7 +229,12 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
           SnackBar(
             content: Text(result['message'] ?? 'Error al agregar comentario'),
             backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            margin: const EdgeInsets.all(16),
           ),
         );
       }
@@ -240,11 +258,192 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Stock disponible: $stock ${unit}'),
+            behavior: SnackBarBehavior.floating,
             duration: const Duration(seconds: 2),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            margin: const EdgeInsets.all(16),
           ),
         );
       }
     });
+  }
+
+  Future<void> _addToCart() async {
+    if (widget.product == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Error: No se pudo obtener la información del producto'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final cartController = Provider.of<CartController>(context, listen: false);
+    
+    // Mostrar loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF115213)),
+        ),
+      ),
+    );
+
+    try {
+      final result = await cartController.addToCart(widget.product!, quantity);
+      
+      // Cerrar loading
+      if (mounted) Navigator.pop(context);
+      
+      if (result['success']) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.white),
+                  const SizedBox(width: 8),
+                  Text('${widget.product!.nombre} agregado al carrito'),
+                ],
+              ),
+              backgroundColor: const Color(0xFF115213),
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              margin: const EdgeInsets.all(16),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message'] ?? 'Error al agregar al carrito'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              margin: const EdgeInsets.all(16),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      // Cerrar loading si hay error
+      if (mounted) Navigator.pop(context);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _buyNow() async {
+    if (widget.product == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Error: No se pudo obtener la información del producto'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(20)),
+          ),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+      return;
+    }
+
+    final cartController = Provider.of<CartController>(context, listen: false);
+    
+    // Mostrar loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF115213)),
+        ),
+      ),
+    );
+
+    try {
+      // Agregar producto al carrito
+      final result = await cartController.addToCart(widget.product!, quantity);
+      
+      // Cerrar loading
+      if (mounted) Navigator.pop(context);
+      
+      if (result['success']) {
+        // Recargar el carrito para obtener los items actualizados
+        await cartController.loadCart();
+        
+        if (mounted) {
+          // Navegar directamente a la dirección de envío
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ShippingAddressView(
+                cartItems: [CartItemModel.fromProduct(widget.product!, quantity)],
+                cartTotal: widget.product!.precio * quantity,
+              ),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message'] ?? 'Error al agregar al carrito'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              margin: const EdgeInsets.all(16),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      // Cerrar loading si hay error
+      if (mounted) Navigator.pop(context);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -480,12 +679,12 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                         // Botones de acción
                     _filledPillButton(
                       label: 'Comprar ahora',
-                      onTap: () {},
+                      onTap: _buyNow,
                         ),
                         const SizedBox(height: 12),
                         _primaryHollowButton(
                           label: 'Agregar al carrito',
-                          onTap: () {},
+                          onTap: _addToCart,
                         ),
                       ],
                     ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:agromarket/controllers/auth_controller.dart';
+import 'package:agromarket/views/auth/verify_code_view.dart';
 
 class ResetPassword extends StatefulWidget {
   const ResetPassword({super.key});
@@ -26,8 +27,16 @@ class _ResetPasswordState extends State<ResetPassword> {
       final success = await authController.sendPasswordResetEmail(_emailController.text.trim());
       
       if (success && mounted) {
-        _showSuccessSnackBar('Email de recuperación enviado. Revisa tu bandeja de entrada');
-        Navigator.pop(context);
+        _showSuccessSnackBar('Código de verificación enviado. Revisa tu bandeja de entrada');
+        // Navegar a la vista de verificación de código
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => VerifyCodeView(
+              email: _emailController.text.trim(),
+            ),
+          ),
+        );
       } else if (mounted) {
         _showErrorSnackBar(authController.errorMessage ?? 'Error al enviar el email. Inténtalo de nuevo');
       }
@@ -52,12 +61,13 @@ class _ResetPasswordState extends State<ResetPassword> {
             ),
           ],
         ),
-        backgroundColor: Colors.red.shade600,
-        behavior: SnackBarBehavior.fixed,
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(0),
+          borderRadius: BorderRadius.circular(20),
         ),
-        duration: const Duration(seconds: 4),
+        margin: const EdgeInsets.all(16),
         animation: CurvedAnimation(
           parent: kAlwaysCompleteAnimation,
           curve: Curves.easeOut,
@@ -85,11 +95,12 @@ class _ResetPasswordState extends State<ResetPassword> {
           ],
         ),
         backgroundColor: const Color(0xFF115213),
-        behavior: SnackBarBehavior.fixed,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(0),
+          borderRadius: BorderRadius.circular(20),
         ),
-        duration: const Duration(seconds: 3),
+        margin: const EdgeInsets.all(16),
         animation: CurvedAnimation(
           parent: kAlwaysCompleteAnimation,
           curve: Curves.easeOut,
