@@ -35,11 +35,6 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
       final screenWidth = MediaQuery.sizeOf(context).width.truncate();
       
       debugPrint('Ancho de pantalla para banner: $screenWidth');
-      
-      // Obtener el tamaño del anuncio adaptativo para la orientación actual
-      // Este método calcula automáticamente el tamaño óptimo basado en el ancho proporcionado
-      // IMPORTANTE: El tamaño que devuelve debe usarse directamente, pero el contenedor
-      // debe tener el ancho completo para que el banner se adapte horizontalmente
       final size = await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(
         screenWidth,
       );
@@ -121,15 +116,7 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
     // Solo mostrar el anuncio si está listo y cargado
     if (!_isBannerAdReady || _bannerAd == null) {
       return const SizedBox.shrink();
-    }
-
-    // EXPLICACIÓN DEL PROBLEMA Y SOLUCIÓN:
-    // El BannerAd se crea con un tamaño calculado por AdMob (ej: 360x50)
-    // Este tamaño puede ser MENOR que el ancho completo de la pantalla
-    // Para que el anuncio se adapte horizontalmente al 100% del ancho:
-    // 1. Usamos double.infinity para que el contenedor ocupe TODO el ancho disponible
-    // 2. El AdWidget dentro se ajustará al ancho del contenedor
-    
+    }    
     return SafeArea(
       bottom: false,
       child: SizedBox(
