@@ -156,6 +156,20 @@ class EmailService {
     }
   }
 
+  /// Convierte el método de pago a texto legible
+  static String _formatMetodoPago(String metodoPago) {
+    switch (metodoPago.toLowerCase()) {
+      case 'tarjeta':
+        return 'Tarjeta de crédito/débito';
+      case 'transferencia':
+        return 'Transferencia bancaria';
+      case 'efectivo':
+        return 'Efectivo';
+      default:
+        return metodoPago;
+    }
+  }
+
   /// Enviar comprobante de pago
   static Future<Map<String, dynamic>> sendReceiptEmail({
     required String email,
@@ -163,9 +177,23 @@ class EmailService {
     required double total,
     required List<Map<String, dynamic>> productos,
     String? userName,
+    double? subtotal,
+    double? envio,
+    double? impuestos,
+    String? ciudad,
+    String? telefono,
+    String? direccionEntrega,
+    String? metodoPago,
+    DateTime? fechaCompra,
   }) async {
     try {
       print('📧 Enviando comprobante a $email');
+      
+      // Formatear método de pago para que sea más legible
+      String? metodoPagoFormateado;
+      if (metodoPago != null) {
+        metodoPagoFormateado = _formatMetodoPago(metodoPago);
+      }
       
       final response = await http.post(
         Uri.parse('$backendUrl/send-receipt'),
@@ -178,6 +206,14 @@ class EmailService {
           'total': total,
           'productos': productos,
           if (userName != null) 'user_name': userName,
+          if (subtotal != null) 'subtotal': subtotal,
+          if (envio != null) 'envio': envio,
+          if (impuestos != null) 'impuestos': impuestos,
+          if (ciudad != null) 'ciudad': ciudad,
+          if (telefono != null) 'telefono': telefono,
+          if (direccionEntrega != null && direccionEntrega.isNotEmpty) 'direccion_entrega': direccionEntrega,
+          if (metodoPagoFormateado != null) 'metodo_pago': metodoPagoFormateado,
+          if (fechaCompra != null) 'fecha_compra': fechaCompra.toIso8601String(),
         }),
       );
 

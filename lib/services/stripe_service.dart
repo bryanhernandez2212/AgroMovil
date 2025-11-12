@@ -8,13 +8,19 @@ class StripeService {
   
   // Crear Payment Intent en el servidor
   static Future<Map<String, dynamic>> createPaymentIntent({
+    required String vendorId,
     required double amount,
     required String currency,
-    required Map<String, dynamic> orderData,
+    required int applicationFeeAmount,
+    String? orderId,
+    Map<String, dynamic>? orderData,
+    Map<String, dynamic>? metadata,
   }) async {
     try {
-      print('💳 Creando Payment Intent con Stripe...');
+      print('💳 Creando Payment Intent con Stripe Connect...');
+      print('   - Vendedor: $vendorId');
       print('   - Monto: \$${amount.toStringAsFixed(2)}');
+      print('   - Comisión (centavos): $applicationFeeAmount');
       
       final response = await http.post(
         Uri.parse('$backendUrl/create-payment-intent'), // Endpoint en tu backend
@@ -25,12 +31,14 @@ class StripeService {
           'amount': (amount * 100).toInt(), // Stripe usa centavos
           'currency': currency.toLowerCase(),
           'metadata': {
-            'order_id': orderData['order_id'] ?? '',
-            'user_id': orderData['user_id'] ?? '',
-            'user_email': orderData['user_email'] ?? '',
+            'order_id': orderData?['order_id'] ?? '',
+            'user_id': orderData?['user_id'] ?? '',
+            'user_email': orderData?['user_email'] ?? '',
           },
         }),
       );
+
+      print('🔎 Respuesta createPaymentIntent: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -41,7 +49,9 @@ class StripeService {
         }
         
         // Validar que tenemos el paymentIntentId
-        if (data['paymentIntentId'] == null) {
+        final paymentIntentId = data['paymentIntentId'];
+        if (paymentIntentId == null || paymentIntentId.toString().isEmpty) {
+          print('⚠️ El servidor no devolvió paymentIntentId en StripeService.');
           return {
             'success': false,
             'message': 'El servidor no devolvió un Payment Intent ID válido',
@@ -51,7 +61,7 @@ class StripeService {
         return {
           'success': true,
           'clientSecret': data['clientSecret'],
-          'paymentIntentId': data['paymentIntentId'],
+          'paymentIntentId': paymentIntentId,
         };
       } else {
         print('❌ Error del servidor: ${response.statusCode}');

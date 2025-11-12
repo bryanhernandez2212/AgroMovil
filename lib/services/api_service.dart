@@ -5,7 +5,7 @@ class ApiService {
   // Cambia esta IP por la IP de tu computadora donde corre el servidor
   // Para encontrarla, ejecuta: ifconfig (Mac/Linux) o ipconfig (Windows)
   // Asegúrate de que el dispositivo móvil y la computadora estén en la misma red WiFi
-  static const String baseUrl = 'http://192.168.1.70:8000/api';
+  static const String baseUrl = 'http://192.168.1.70:3000';
   
   static Map<String, String> get _headers => {
     'Content-Type': 'application/json',
@@ -103,6 +103,71 @@ class ApiService {
           'message': 'Error obteniendo usuarios: ${response.statusCode}',
         };
       }
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Error de conexión: ${e.toString()}',
+      };
+    }
+  }
+
+  /// Crear una cuenta conectada de Stripe para un vendedor
+  static Future<Map<String, dynamic>> createVendorAccount({
+    required String vendorId,
+    required String email,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/vendors/create-account'),
+        headers: _headers,
+        body: jsonEncode({
+          'vendorId': vendorId,
+          'email': email,
+        }),
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'data': data,
+        };
+      }
+
+      return {
+        'success': false,
+        'message': data['error'] ?? 'Error creando cuenta del vendedor',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Error de conexión: ${e.toString()}',
+      };
+    }
+  }
+
+  /// Obtener el estado de la cuenta conectada de un vendedor
+  static Future<Map<String, dynamic>> getVendorStatus(String vendorId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/vendors/status/$vendorId'),
+        headers: _headers,
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'data': data,
+        };
+      }
+
+      return {
+        'success': false,
+        'message': data['error'] ?? 'Error consultando estado del vendedor',
+      };
     } catch (e) {
       return {
         'success': false,

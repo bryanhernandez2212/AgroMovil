@@ -17,15 +17,35 @@ class BannerAdWidget extends StatefulWidget {
 class _BannerAdWidgetState extends State<BannerAdWidget> {
   BannerAd? _bannerAd;
   bool _isBannerAdReady = false;
+  Orientation? _lastOrientation;
 
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (mounted) {
-        _loadAd();
-      }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final currentOrientation = MediaQuery.of(context).orientation;
+    if (_lastOrientation != currentOrientation) {
+      _lastOrientation = currentOrientation;
+      _reloadAd();
+    }
+  }
+
+  void _reloadAd() {
+    if (!mounted) return;
+
+    _bannerAd?.dispose();
+    _bannerAd = null;
+
+    setState(() {
+      _isBannerAdReady = false;
     });
+
+    _loadAd();
   }
 
   void _loadAd() async {
@@ -33,8 +53,6 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
 
     try {
       final screenWidth = MediaQuery.sizeOf(context).width.truncate();
-      
-      debugPrint('Ancho de pantalla para banner: $screenWidth');
       final size = await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(
         screenWidth,
       );
@@ -54,7 +72,6 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
         size: size,
         listener: BannerAdListener(
           onAdLoaded: (ad) {
-            // Llamado cuando un anuncio se recibe exitosamente
             debugPrint(' Ad fue cargado exitosamente');
             if (mounted) {
               setState(() {
@@ -64,7 +81,6 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
             }
           },
           onAdFailedToLoad: (ad, err) {
-            // Llamado cuando falla una solicitud de anuncio
             debugPrint(' Ad falló al cargar con error: $err');
             ad.dispose();
             if (mounted) {
@@ -75,29 +91,23 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
             }
           },
           onAdOpened: (Ad ad) {
-            // Llamado cuando un anuncio abre una superposición que cubre la pantalla
             debugPrint('Ad fue abierto');
           },
           onAdClosed: (Ad ad) {
-            // Llamado cuando un anuncio elimina una superposición que cubre la pantalla
             debugPrint('Ad fue cerrado');
           },
           onAdImpression: (Ad ad) {
-            // Llamado cuando se registra una impresión en el anuncio
             debugPrint('Ad registró una impresión');
           },
           onAdClicked: (Ad ad) {
-            // Llamado cuando ocurre un evento de clic en el anuncio
             debugPrint('Ad fue clickeado');
           },
           onAdWillDismissScreen: (Ad ad) {
-            // Solo iOS. Llamado antes de descartar una vista de pantalla completa
             debugPrint('Ad será descartado');
           },
         ),
       );
 
-      // Cargar el anuncio
       await _bannerAd!.load();
     } catch (e) {
       debugPrint('Error al cargar banner: $e');
@@ -106,21 +116,20 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
 
   @override
   void dispose() {
-    // Descartar el anuncio cuando ya no sea necesario
     _bannerAd?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    // Solo mostrar el anuncio si está listo y cargado
     if (!_isBannerAdReady || _bannerAd == null) {
       return const SizedBox.shrink();
-    }    
+    }
+    
     return SafeArea(
       bottom: false,
       child: SizedBox(
-        width: double.infinity, // Ocupar TODO el ancho horizontal disponible
+        width: double.infinity, 
         height: _bannerAd!.size.height.toDouble(),
         child: AdWidget(ad: _bannerAd!),
       ),
