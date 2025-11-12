@@ -1,8 +1,20 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
+
+import 'package:agromarket/controllers/auth_controller.dart';
+import 'package:agromarket/models/chat_message_model.dart';
+import 'package:agromarket/services/chat_service.dart';
 
 class ChatConversationView extends StatefulWidget {
   final String chatId;
   final String userName;
+  final String otherUserId;
+  final String orderId;
   final String? userImage;
   final bool isOnline;
 
@@ -10,6 +22,8 @@ class ChatConversationView extends StatefulWidget {
     super.key,
     required this.chatId,
     required this.userName,
+    required this.otherUserId,
+    required this.orderId,
     this.userImage,
     this.isOnline = false,
   });
@@ -21,87 +35,146 @@ class ChatConversationView extends StatefulWidget {
 class _ChatConversationViewState extends State<ChatConversationView> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  List<Map<String, dynamic>> _messages = [];
+
+  StreamSubscription<List<ChatMessage>>? _messagesSubscription;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
+      _presenceSubscription;
+
+  List<ChatMessage> _messages = [];
   bool _isLoading = true;
+  bool _isSending = false;
+  bool _isSendingImage = false;
+  bool _isOtherUserOnline = false;
+  DateTime? _otherUserLastSeenAt;
+  String? _currentUserId;
+  String? _errorMessage;
+  late final bool _hasOrderId;
 
   @override
   void initState() {
     super.initState();
-    _loadMessages();
+    _isOtherUserOnline = widget.isOnline;
+    _hasOrderId = widget.orderId.isNotEmpty && widget.orderId != 'legacy';
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initialize();
+    });
   }
 
   @override
   void dispose() {
+    _messagesSubscription?.cancel();
+    _presenceSubscription?.cancel();
+    if (_currentUserId != null) {
+      ChatService.updatePresence(userId: _currentUserId!, isOnline: false);
+    }
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadMessages() async {
-    setState(() {
-      _isLoading = true;
+  Future<void> _initialize() async {
+    final authController = Provider.of<AuthController>(context, listen: false);
+    final currentUser = authController.currentUser;
+
+    if (currentUser == null) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Debes iniciar sesión para enviar mensajes.';
+      });
+      return;
+    }
+
+    _currentUserId = currentUser.id;
+
+    try {
+      if (_hasOrderId) {
+        await ChatService.ensureChat(
+          orderId: widget.orderId,
+          currentUserId: currentUser.id,
+          otherUserId: widget.otherUserId,
+          currentUserName: currentUser.nombre,
+          otherUserName: widget.userName,
+        );
+      }
+
+      await ChatService.updatePresence(
+        userId: currentUser.id,
+        isOnline: true,
+      );
+
+      _listenToMessages();
+      _listenToPresence();
+
+      await ChatService.markMessagesAsRead(
+        chatId: widget.chatId,
+        userId: currentUser.id,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'No se pudo cargar la conversación: $e';
+      });
+    }
+  }
+
+  void _listenToMessages() {
+    _messagesSubscription?.cancel();
+    _messagesSubscription =
+        ChatService.streamChatMessages(widget.chatId).listen(
+      (messages) {
+        if (!mounted) return;
+        setState(() {
+          _messages = messages;
+          _isLoading = false;
+          _errorMessage = null;
+        });
+        _scrollToBottom();
+        if (_currentUserId != null) {
+          ChatService.markMessagesAsRead(
+            chatId: widget.chatId,
+            userId: _currentUserId!,
+          );
+        }
+      },
+      onError: (error) {
+        if (!mounted) return;
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Error cargando mensajes: ${error.toString()}';
+        });
+      },
+    );
+  }
+
+  void _listenToPresence() {
+    _presenceSubscription?.cancel();
+    _presenceSubscription = FirebaseFirestore.instance
+        .collection('usuarios')
+        .doc(widget.otherUserId)
+        .snapshots()
+        .listen((snapshot) {
+      final data = snapshot.data();
+      if (data == null) return;
+
+      final isOnline = data['isOnline'] == true;
+      final lastSeenRaw = data['lastSeenAt'];
+      DateTime? lastSeen;
+      if (lastSeenRaw is Timestamp) {
+        lastSeen = lastSeenRaw.toDate();
+      } else if (lastSeenRaw is DateTime) {
+        lastSeen = lastSeenRaw;
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _isOtherUserOnline = isOnline;
+        _otherUserLastSeenAt = lastSeen;
+      });
     });
+  }
 
-    // TODO: Implementar carga de mensajes desde Firestore
-    // Por ahora, mostramos datos de ejemplo
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    setState(() {
-      _messages = [
-        {
-          'id': '1',
-          'text': 'Hola, tengo una pregunta sobre el producto',
-          'senderId': 'other',
-          'timestamp': DateTime.now().subtract(const Duration(hours: 2)),
-          'isRead': true,
-        },
-        {
-          'id': '2',
-          'text': '¡Hola! Claro, ¿en qué te puedo ayudar?',
-          'senderId': 'me',
-          'timestamp': DateTime.now().subtract(const Duration(hours: 2, minutes: 1)),
-          'isRead': true,
-        },
-        {
-          'id': '3',
-          'text': '¿El producto está disponible para entrega inmediata?',
-          'senderId': 'other',
-          'timestamp': DateTime.now().subtract(const Duration(hours: 1, minutes: 30)),
-          'isRead': true,
-        },
-        {
-          'id': '4',
-          'text': 'Sí, tenemos stock disponible. ¿Cuántas unidades necesitas?',
-          'senderId': 'me',
-          'timestamp': DateTime.now().subtract(const Duration(hours: 1, minutes: 25)),
-          'isRead': true,
-        },
-        {
-          'id': '5',
-          'text': 'Necesito 5 unidades',
-          'senderId': 'other',
-          'timestamp': DateTime.now().subtract(const Duration(minutes: 30)),
-          'isRead': true,
-        },
-        {
-          'id': '6',
-          'text': 'Perfecto, puedo preparar tu pedido. ¿Dónde realizo la entrega?',
-          'senderId': 'me',
-          'timestamp': DateTime.now().subtract(const Duration(minutes: 25)),
-          'isRead': true,
-        },
-        {
-          'id': '7',
-          'text': 'Gracias por la compra, ¿todo bien con el producto?',
-          'senderId': 'other',
-          'timestamp': DateTime.now().subtract(const Duration(minutes: 15)),
-          'isRead': false,
-        },
-      ];
-      _isLoading = false;
-    });
-
-    // Scroll al final después de cargar
+  void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
@@ -113,36 +186,140 @@ class _ChatConversationViewState extends State<ChatConversationView> {
     });
   }
 
-  void _sendMessage() async {
+  Future<void> _sendMessage() async {
     final text = _messageController.text.trim();
-    if (text.isEmpty) return;
-
-    // Agregar mensaje localmente
-    final newMessage = {
-      'id': DateTime.now().millisecondsSinceEpoch.toString(),
-      'text': text,
-      'senderId': 'me',
-      'timestamp': DateTime.now(),
-      'isRead': false,
-    };
+    if (text.isEmpty || _currentUserId == null || _isSending) return;
 
     setState(() {
-      _messages.add(newMessage);
+      _isSending = true;
     });
 
-    _messageController.clear();
-
-    // Scroll al final
-    if (_scrollController.hasClients) {
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
+    try {
+      await ChatService.sendMessage(
+        chatId: widget.chatId,
+        senderId: _currentUserId!,
+        text: text,
       );
-    }
 
-    // TODO: Enviar mensaje a Firestore
-    // await ChatService.sendMessage(widget.chatId, text);
+      _messageController.clear();
+      FocusScope.of(context).unfocus();
+      await ChatService.markMessagesAsRead(
+        chatId: widget.chatId,
+        userId: _currentUserId!,
+      );
+      _scrollToBottom();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No se pudo enviar el mensaje: $e'),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSending = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _pickAndSendImage() async {
+    if (_currentUserId == null || _isSendingImage) return;
+
+    final picker = ImagePicker();
+    try {
+      final XFile? pickedFile = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80,
+      );
+
+      if (pickedFile == null) {
+        return;
+      }
+
+      setState(() {
+        _isSendingImage = true;
+      });
+
+      await ChatService.sendImageMessage(
+        chatId: widget.chatId,
+        senderId: _currentUserId!,
+        imageFile: File(pickedFile.path),
+      );
+
+      _scrollToBottom();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No se pudo enviar la imagen: $e'),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSendingImage = false;
+        });
+      }
+    }
+  }
+
+  void _showImagePreview(String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: const EdgeInsets.all(12),
+        child: GestureDetector(
+          onTap: () => Navigator.of(context).pop(),
+          child: InteractiveViewer(
+            clipBehavior: Clip.none,
+            child: Image.network(
+              imageUrl,
+              fit: BoxFit.contain,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return SizedBox(
+                  width: 300,
+                  height: 300,
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      value: loadingProgress.expectedTotalBytes != null
+                          ? loadingProgress.cumulativeBytesLoaded /
+                              loadingProgress.expectedTotalBytes!
+                          : null,
+                      valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  ),
+                );
+              },
+              errorBuilder: (context, error, stackTrace) => const Center(
+                child: Icon(
+                  Icons.broken_image,
+                  color: Colors.white,
+                  size: 48,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   String _formatTime(DateTime timestamp) {
@@ -170,12 +347,35 @@ class _ChatConversationViewState extends State<ChatConversationView> {
   bool _shouldShowDateSeparator(int index) {
     if (index == 0) return true;
 
-    final currentDate = _messages[index]['timestamp'] as DateTime;
-    final previousDate = _messages[index - 1]['timestamp'] as DateTime;
+    final currentDate = _messages[index].createdAt;
+    final previousDate = _messages[index - 1].createdAt;
 
     return currentDate.day != previousDate.day ||
         currentDate.month != previousDate.month ||
         currentDate.year != previousDate.year;
+  }
+
+  String _presenceStatusText() {
+    if (_isOtherUserOnline) {
+      return 'En línea';
+    }
+    if (_otherUserLastSeenAt != null) {
+      final lastSeen = _otherUserLastSeenAt!;
+      final now = DateTime.now();
+      final diff = now.difference(lastSeen);
+
+      if (diff.inMinutes < 1) {
+        return 'Última vez hace un momento';
+      }
+      if (diff.inMinutes < 60) {
+        return 'Última vez hace ${diff.inMinutes} min';
+      }
+      if (diff.inHours < 24) {
+        return 'Última vez a las ${_formatTime(lastSeen)}';
+      }
+      return 'Última vez ${_formatDate(lastSeen)} a las ${_formatTime(lastSeen)}';
+    }
+    return 'Desconectado';
   }
 
   @override
@@ -194,13 +394,28 @@ class _ChatConversationViewState extends State<ChatConversationView> {
                     color: const Color(0xFF115213).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Icon(
-                    Icons.person,
-                    color: Color(0xFF115213),
-                    size: 20,
-                  ),
+                  child: widget.userImage != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
+                          child: Image.network(
+                            widget.userImage!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Icon(
+                                Icons.person,
+                                color: Color(0xFF115213),
+                                size: 20,
+                              );
+                            },
+                          ),
+                        )
+                      : const Icon(
+                          Icons.person,
+                          color: Color(0xFF115213),
+                          size: 20,
+                        ),
                 ),
-                if (widget.isOnline)
+                if (_isOtherUserOnline)
                   Positioned(
                     right: 0,
                     bottom: 0,
@@ -233,7 +448,7 @@ class _ChatConversationViewState extends State<ChatConversationView> {
                     ),
                   ),
                   Text(
-                    widget.isOnline ? 'En línea' : 'Desconectado',
+                    _presenceStatusText(),
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey[600],
@@ -253,175 +468,252 @@ class _ChatConversationViewState extends State<ChatConversationView> {
       ),
       body: Column(
         children: [
-          // Lista de mensajes
           Expanded(
             child: _isLoading
                 ? const Center(
                     child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF115213)),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Color(0xFF115213),
+                      ),
                     ),
                   )
-                : _messages.isEmpty
+                : _errorMessage != null
                     ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.chat_bubble_outline,
-                              size: 64,
-                              color: Colors.grey[400],
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          child: Text(
+                            _errorMessage!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              color: Colors.black54,
                             ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No hay mensajes',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Envía un mensaje para comenzar la conversación',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[500],
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                       )
-                    : ListView.builder(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _messages.length,
-                        itemBuilder: (context, index) {
-                          final message = _messages[index];
-                          final isMe = message['senderId'] == 'me';
-                          final text = message['text'] as String;
-                          final timestamp = message['timestamp'] as DateTime;
-                          final isRead = message['isRead'] as bool;
-
-                          return Column(
-                            children: [
-                              if (_shouldShowDateSeparator(index))
-                                Container(
-                                  margin: const EdgeInsets.symmetric(vertical: 16),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey[300],
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    _formatDate(timestamp),
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey[700],
-                                      fontWeight: FontWeight.w500,
-                                    ),
+                    : _messages.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.chat_bubble_outline,
+                                  size: 64,
+                                  color: Colors.grey[400],
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'No hay mensajes',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.grey[600],
                                   ),
                                 ),
-                              Row(
-                                mainAxisAlignment:
-                                    isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-                                crossAxisAlignment: CrossAxisAlignment.end,
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Envía un mensaje para comenzar la conversación',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey[500],
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
+                            controller: _scrollController,
+                            padding: const EdgeInsets.all(16),
+                            itemCount: _messages.length,
+                            itemBuilder: (context, index) {
+                              final message = _messages[index];
+                              final isMe = message.senderId == _currentUserId;
+                              final text = message.text ?? '';
+                              final isImage = message.type == 'image' && (message.imageUrl?.isNotEmpty ?? false);
+                              final timestamp = message.createdAt;
+                              final isReadByOther = message.isReadBy(widget.otherUserId);
+
+                              return Column(
                                 children: [
-                                  if (!isMe) ...[
+                                  if (_shouldShowDateSeparator(index))
                                     Container(
-                                      width: 32,
-                                      height: 32,
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF115213).withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
-                                      child: const Icon(
-                                        Icons.person,
-                                        color: Color(0xFF115213),
-                                        size: 18,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                  ],
-                                  Flexible(
-                                    child: Container(
-                                      constraints: BoxConstraints(
-                                        maxWidth: MediaQuery.of(context).size.width * 0.75,
+                                      margin: const EdgeInsets.symmetric(
+                                        vertical: 16,
                                       ),
                                       padding: const EdgeInsets.symmetric(
-                                        horizontal: 16,
-                                        vertical: 12,
+                                        horizontal: 12,
+                                        vertical: 6,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: isMe
-                                            ? const Color(0xFF115213)
-                                            : Colors.white,
-                                        borderRadius: BorderRadius.only(
-                                          topLeft: const Radius.circular(20),
-                                          topRight: const Radius.circular(20),
-                                          bottomLeft: Radius.circular(isMe ? 20 : 4),
-                                          bottomRight: Radius.circular(isMe ? 4 : 20),
-                                        ),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withOpacity(0.1),
-                                            blurRadius: 4,
-                                            offset: const Offset(0, 2),
-                                          ),
-                                        ],
+                                        color: Colors.grey[300],
+                                        borderRadius:
+                                            BorderRadius.circular(12),
                                       ),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            text,
-                                            style: TextStyle(
-                                              fontSize: 15,
-                                              color: isMe ? Colors.white : const Color(0xFF1A1A1A),
-                                              height: 1.4,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Text(
-                                                _formatTime(timestamp),
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  color: isMe
-                                                      ? Colors.white70
-                                                      : Colors.grey[600],
-                                                ),
-                                              ),
-                                              if (isMe) ...[
-                                                const SizedBox(width: 4),
-                                                Icon(
-                                                  isRead ? Icons.done_all : Icons.done,
-                                                  size: 14,
-                                                  color: isRead
-                                                      ? Colors.blue[300]
-                                                      : Colors.white70,
-                                                ),
-                                              ],
-                                            ],
-                                          ),
-                                        ],
+                                      child: Text(
+                                        _formatDate(timestamp),
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey[700],
+                                          fontWeight: FontWeight.w500,
+                                        ),
                                       ),
                                     ),
+                                  Row(
+                                    mainAxisAlignment: isMe
+                                        ? MainAxisAlignment.end
+                                        : MainAxisAlignment.start,
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      if (!isMe) ...[
+                                        Container(
+                                          width: 32,
+                                          height: 32,
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF115213)
+                                                .withOpacity(0.1),
+                                            borderRadius:
+                                                BorderRadius.circular(16),
+                                          ),
+                                          child: const Icon(
+                                            Icons.person,
+                                            color: Color(0xFF115213),
+                                            size: 18,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                      ],
+                                      Flexible(
+                                        child: Container(
+                                          constraints: BoxConstraints(
+                                            maxWidth: MediaQuery.of(context)
+                                                    .size
+                                                    .width *
+                                                0.75,
+                                          ),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 16,
+                                            vertical: 12,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: isMe
+                                                ? const Color(0xFF115213)
+                                                : Colors.white,
+                                            borderRadius: BorderRadius.only(
+                                              topLeft:
+                                                  const Radius.circular(20),
+                                              topRight:
+                                                  const Radius.circular(20),
+                                              bottomLeft: Radius.circular(
+                                                  isMe ? 20 : 4),
+                                              bottomRight: Radius.circular(
+                                                  isMe ? 4 : 20),
+                                            ),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black
+                                                    .withOpacity(0.1),
+                                                blurRadius: 4,
+                                                offset: const Offset(0, 2),
+                                              ),
+                                            ],
+                                          ),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              if (isImage) ...[
+                                                GestureDetector(
+                                                  onTap: () {
+                                                    if (message.imageUrl != null) {
+                                                      _showImagePreview(message.imageUrl!);
+                                                    }
+                                                  },
+                                                  child: ClipRRect(
+                                                    borderRadius: BorderRadius.circular(16),
+                                                    child: Image.network(
+                                                      message.imageUrl!,
+                                                      fit: BoxFit.cover,
+                                                      loadingBuilder: (context, child, loadingProgress) {
+                                                        if (loadingProgress == null) return child;
+                                                        return SizedBox(
+                                                          width: 200,
+                                                          height: 200,
+                                                          child: Center(
+                                                            child: CircularProgressIndicator(
+                                                              value: loadingProgress.expectedTotalBytes != null
+                                                                  ? loadingProgress.cumulativeBytesLoaded /
+                                                                      loadingProgress.expectedTotalBytes!
+                                                                  : null,
+                                                              valueColor: AlwaysStoppedAnimation<Color>(
+                                                                isMe ? Colors.white : const Color(0xFF115213),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        );
+                                                      },
+                                                      errorBuilder: (context, error, stackTrace) => Container(
+                                                        width: 200,
+                                                        height: 200,
+                                                        color: Colors.grey[300],
+                                                        child: Icon(
+                                                          Icons.broken_image,
+                                                          color: Colors.grey[600],
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 8),
+                                              ] else ...[
+                                                Text(
+                                                  text,
+                                                  style: TextStyle(
+                                                    fontSize: 15,
+                                                    color: isMe ? Colors.white : const Color(0xFF1A1A1A),
+                                                    height: 1.4,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 4),
+                                              ],
+                                              Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Text(
+                                                    _formatTime(timestamp),
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      color: isMe
+                                                          ? Colors.white70
+                                                          : Colors.grey[600],
+                                                    ),
+                                                  ),
+                                                  if (isMe) ...[
+                                                    const SizedBox(width: 4),
+                                                    Icon(
+                                                      isReadByOther
+                                                          ? Icons.done_all
+                                                          : Icons.done,
+                                                      size: 14,
+                                                      color: isReadByOther
+                                                          ? Colors.blue[300]
+                                                          : Colors.white70,
+                                                    ),
+                                                  ],
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      if (isMe) const SizedBox(width: 8),
+                                    ],
                                   ),
-                                  if (isMe) const SizedBox(width: 8),
+                                  const SizedBox(height: 8),
                                 ],
-                              ),
-                              const SizedBox(height: 8),
-                            ],
-                          );
-                        },
-                      ),
+                              );
+                            },
+                          ),
           ),
-
-          // Campo de texto y botón de enviar
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
             decoration: BoxDecoration(
@@ -437,6 +729,26 @@ class _ChatConversationViewState extends State<ChatConversationView> {
             child: SafeArea(
               child: Row(
                 children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      icon: _isSendingImage
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF115213)),
+                              ),
+                            )
+                          : const Icon(Icons.image_outlined, color: Color(0xFF115213)),
+                      onPressed: _isSendingImage ? null : _pickAndSendImage,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Container(
                       decoration: BoxDecoration(
@@ -456,7 +768,11 @@ class _ChatConversationViewState extends State<ChatConversationView> {
                         ),
                         maxLines: null,
                         textCapitalization: TextCapitalization.sentences,
-                        onSubmitted: (_) => _sendMessage(),
+                        onSubmitted: (_) {
+                          if (!_isSending) {
+                            _sendMessage();
+                          }
+                        },
                       ),
                     ),
                   ),
@@ -467,8 +783,19 @@ class _ChatConversationViewState extends State<ChatConversationView> {
                       shape: BoxShape.circle,
                     ),
                     child: IconButton(
-                      icon: const Icon(Icons.send, color: Colors.white),
-                      onPressed: _sendMessage,
+                      icon: _isSending
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
+                              ),
+                            )
+                          : const Icon(Icons.send, color: Colors.white),
+                      onPressed: _isSending ? null : _sendMessage,
                     ),
                   ),
                 ],
@@ -480,4 +807,3 @@ class _ChatConversationViewState extends State<ChatConversationView> {
     );
   }
 }
-

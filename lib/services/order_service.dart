@@ -30,6 +30,12 @@ class OrderService {
       final orderData = order.toJson();
       orderData['fecha_compra'] = FieldValue.serverTimestamp();
       orderData['fecha_creacion'] = order.fechaCreacion.toIso8601String();
+      final vendors = order.productos
+          .map((producto) => producto.vendedorId)
+          .where((id) => id.isNotEmpty)
+          .toSet()
+          .toList();
+      orderData['vendors'] = vendors;
 
       // Asegurar que formatted siempre esté presente y tenga el formato correcto
       if (!orderData.containsKey('formatted') || orderData['formatted'] == null || orderData['formatted'].toString().isEmpty) {
@@ -106,6 +112,7 @@ class OrderService {
         estadoPedido: order.estadoPedido,
         metodoPago: order.metodoPago,
         paymentIntentId: order.paymentIntentId,
+        vendorIds: vendors,
         fechaCompra: order.fechaCompra,
         fechaCreacion: order.fechaCreacion,
         fechaActualizacionEstado: order.fechaActualizacionEstado,
@@ -125,6 +132,75 @@ class OrderService {
         'success': false,
         'message': 'Error guardando orden: ${e.toString()}',
       };
+    }
+  }
+
+  static Future<List<OrderModel>> getVendorOrders() async {
+    try {
+      final User? user = _auth.currentUser;
+      if (user == null) {
+        print('⚠️ OrderService: Vendedor no autenticado');
+        return [];
+      }
+
+      print('📦 OrderService: Obteniendo ventas para vendedor: ${user.uid}');
+
+      QuerySnapshot snapshot;
+      try {
+        snapshot = await _firestore
+            .collection('compras')
+            .where('vendors', arrayContains: user.uid)
+            .orderBy('fecha_compra', descending: true)
+            .get();
+      } catch (e) {
+        print('⚠️ OrderService: Error con ordenamiento de ventas, intentando sin orden: $e');
+        snapshot = await _firestore
+            .collection('compras')
+            .where('vendors', arrayContains: user.uid)
+            .get();
+      }
+
+      print('📦 OrderService: Se encontraron ${snapshot.docs.length} ventas');
+
+      final docs = snapshot.docs.toList();
+      if (docs.length > 1) {
+        docs.sort((a, b) {
+          final dataA = a.data() as Map<String, dynamic>;
+          final dataB = b.data() as Map<String, dynamic>;
+          final timestampA = dataA['fecha_compra'];
+          final timestampB = dataB['fecha_compra'];
+
+          DateTime toDate(dynamic ts) {
+            if (ts is Timestamp) return ts.toDate();
+            if (ts is String) return DateTime.tryParse(ts) ?? DateTime.now();
+            return DateTime.now();
+          }
+
+          final dateA = timestampA == null ? DateTime.fromMillisecondsSinceEpoch(0) : toDate(timestampA);
+          final dateB = timestampB == null ? DateTime.fromMillisecondsSinceEpoch(0) : toDate(timestampB);
+          return dateB.compareTo(dateA);
+        });
+      }
+
+      final orders = <OrderModel>[];
+      for (final doc in docs) {
+        try {
+          final data = doc.data() as Map<String, dynamic>;
+          data['id'] = doc.id;
+          final order = OrderModel.fromJson(data);
+          orders.add(order);
+        } catch (e, stackTrace) {
+          print('❌ OrderService: Error procesando venta ${doc.id}: $e');
+          print('Stack trace: $stackTrace');
+        }
+      }
+
+      print('✅ OrderService: Total de ventas procesadas: ${orders.length}');
+      return orders;
+    } catch (e, stackTrace) {
+      print('❌ OrderService: Error obteniendo ventas: $e');
+      print('Stack trace: $stackTrace');
+      return [];
     }
   }
 
@@ -246,6 +322,7 @@ extension OrderModelExtension on OrderModel {
       estadoPedido: estadoPedido,
       metodoPago: metodoPago,
       paymentIntentId: paymentIntentId,
+      vendorIds: vendorIds,
       fechaCompra: fechaCompra,
       fechaCreacion: fechaCreacion,
       fechaActualizacionEstado: fechaActualizacionEstado,

@@ -78,6 +78,7 @@ class OrderModel {
   final String estadoPedido;
   final String metodoPago;
   final String? paymentIntentId;
+  final List<String> vendorIds;
   final DateTime fechaCompra;
   final DateTime fechaCreacion;
   final DateTime? fechaActualizacionEstado;
@@ -100,6 +101,7 @@ class OrderModel {
     required this.estadoPedido,
     required this.metodoPago,
     this.paymentIntentId,
+    this.vendorIds = const [],
     required this.fechaCompra,
     required this.fechaCreacion,
     this.fechaActualizacionEstado,
@@ -135,6 +137,9 @@ class OrderModel {
       estadoPedido: json['estado_pedido'] ?? 'preparando',
       metodoPago: json['metodo_pago'] ?? 'tarjeta',
       paymentIntentId: json['payment_intent_id'],
+      vendorIds: json['vendors'] != null
+          ? List<String>.from(json['vendors'].map((e) => e.toString()))
+          : <String>[],
       fechaCompra: json['fecha_compra'] != null
           ? (json['fecha_compra'] is Timestamp
               ? (json['fecha_compra'] as Timestamp).toDate()
@@ -170,6 +175,7 @@ class OrderModel {
       'estado_pedido': estadoPedido,
       'metodo_pago': metodoPago,
       if (paymentIntentId != null) 'payment_intent_id': paymentIntentId,
+      if (vendorIds.isNotEmpty) 'vendors': vendorIds,
       'fecha_compra': fechaCompra.toIso8601String(),
       'fecha_creacion': fechaCreacion.toIso8601String(),
       if (fechaActualizacionEstado != null)
@@ -215,6 +221,11 @@ class OrderModel {
       estadoPedido: 'preparando',
       metodoPago: metodoPago,
       paymentIntentId: paymentIntentId,
+      vendorIds: productos
+          .map((item) => item.vendedorId)
+          .where((id) => id.isNotEmpty)
+          .toSet()
+          .toList(),
       fechaCompra: DateTime.now(),
       fechaCreacion: DateTime.now(),
       productos: productos,
@@ -239,6 +250,7 @@ class OrderModel {
     String? estadoPedido,
     String? metodoPago,
     String? paymentIntentId,
+    List<String>? vendorIds,
     DateTime? fechaCompra,
     DateTime? fechaCreacion,
     DateTime? fechaActualizacionEstado,
@@ -261,6 +273,7 @@ class OrderModel {
       estadoPedido: estadoPedido ?? this.estadoPedido,
       metodoPago: metodoPago ?? this.metodoPago,
       paymentIntentId: paymentIntentId ?? this.paymentIntentId,
+      vendorIds: vendorIds ?? this.vendorIds,
       fechaCompra: fechaCompra ?? this.fechaCompra,
       fechaCreacion: fechaCreacion ?? this.fechaCreacion,
       fechaActualizacionEstado: fechaActualizacionEstado ?? this.fechaActualizacionEstado,

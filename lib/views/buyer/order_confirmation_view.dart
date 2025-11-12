@@ -1,5 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import 'package:agromarket/models/order_model.dart';
+import 'package:agromarket/controllers/auth_controller.dart';
+import 'package:agromarket/services/chat_service.dart';
+import 'package:agromarket/views/profile/chat_conversation_view.dart';
 
 class OrderConfirmationView extends StatelessWidget {
   final OrderModel order;
@@ -35,6 +41,15 @@ class OrderConfirmationView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final authController = Provider.of<AuthController>(context);
+    final currentUser = authController.currentUser;
+    final firstProduct = order.productos.isNotEmpty ? order.productos.first : null;
+    final bool isSellerContext = currentUser != null &&
+        firstProduct != null &&
+        (currentUser.rolActivo.toLowerCase() == 'vendedor' ||
+            currentUser.id == firstProduct.vendedorId);
+    final contactButtonLabel = isSellerContext ? 'Contactar comprador' : 'Contactar vendedor';
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -197,23 +212,9 @@ class OrderConfirmationView extends StatelessWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: () {
-                        // TODO: Implementar funcionalidad de mensaje al vendedor
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Text('Funcionalidad de mensajería próximamente'),
-                            backgroundColor: const Color(0xFF115213),
-                            behavior: SnackBarBehavior.floating,
-                            duration: const Duration(seconds: 2),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            margin: const EdgeInsets.all(16),
-                          ),
-                        );
-                      },
+                      onPressed: () => _contactCounterpart(context),
                       icon: const Icon(Icons.message, size: 20),
-                      label: const Text('Contactar vendedor'),
+                      label: Text(contactButtonLabel),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF115213),
                         foregroundColor: Colors.white,
@@ -357,6 +358,139 @@ class OrderConfirmationView extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _contactCounterpart(BuildContext context) async {
+    final authController = Provider.of<AuthController>(context, listen: false);
+    final currentUser = authController.currentUser;
+
+    if (currentUser == null) {
+      _showSnackBar(
+        context,
+        'Debes iniciar sesión para contactar al vendedor.',
+        isError: true,
+      );
+      return;
+    }
+
+    if (order.productos.isEmpty) {
+      _showSnackBar(
+        context,
+        'No encontramos información vinculada al pedido.',
+        isError: true,
+      );
+      return;
+    }
+
+    final firstProduct = order.productos.first;
+    final bool isSellerContext =
+        currentUser.rolActivo.toLowerCase() == 'vendedor' ||
+            currentUser.id == firstProduct.vendedorId;
+
+    final String targetUserId;
+    final String fallbackName;
+
+    if (isSellerContext) {
+      targetUserId = order.usuarioId;
+      fallbackName = order.usuarioNombre.isNotEmpty ? order.usuarioNombre : 'Comprador';
+    } else {
+      targetUserId = firstProduct.vendedorId;
+      fallbackName = 'Vendedor';
+    }
+
+    if (targetUserId.isEmpty) {
+      _showSnackBar(
+        context,
+        'No encontramos información del usuario para este pedido.',
+        isError: true,
+      );
+      return;
+    }
+
+    if (order.id.isEmpty) {
+      _showSnackBar(
+        context,
+        'Este pedido no tiene un identificador válido.',
+        isError: true,
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF115213)),
+        ),
+      ),
+    );
+
+    try {
+      final targetDoc = await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(targetUserId)
+          .get();
+
+      final targetData = targetDoc.data() ?? <String, dynamic>{};
+      final targetName = targetData['nombre']?.toString() ??
+          targetData['nombre_tienda']?.toString() ??
+          fallbackName;
+      final targetPhoto = targetData['photoUrl']?.toString();
+
+      final chatId = await ChatService.ensureChat(
+        orderId: order.id,
+        currentUserId: currentUser.id,
+        otherUserId: targetUserId,
+        currentUserName: currentUser.nombre,
+        otherUserName: targetName,
+      );
+
+      if (context.mounted) {
+        Navigator.of(context, rootNavigator: true).pop(); // cerrar diálogo
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ChatConversationView(
+              chatId: chatId,
+              userName: targetName,
+              otherUserId: targetUserId,
+              orderId: order.id,
+              userImage: targetPhoto,
+              isOnline: targetData['isOnline'] == true,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        _showSnackBar(
+          context,
+          'No se pudo iniciar la conversación: ${e.toString()}',
+          isError: true,
+        );
+      }
+    }
+  }
+
+  void _showSnackBar(
+    BuildContext context,
+    String message, {
+    bool isError = false,
+  }) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.redAccent : const Color(0xFF115213),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        margin: const EdgeInsets.all(16),
       ),
     );
   }

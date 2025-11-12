@@ -7,6 +7,7 @@ import 'package:agromarket/views/profile/notifications_view.dart';
 import 'package:agromarket/views/profile/chat_view.dart';
 import 'package:agromarket/services/user_role_service.dart';
 import 'package:agromarket/views/buyer/my_orders_view.dart';
+import 'package:agromarket/views/vendor/seller_orders_view.dart';
 import 'package:agromarket/views/auth/login_view.dart';
 
 class UserProfileMenuView extends StatelessWidget {
@@ -145,17 +146,10 @@ class UserProfileMenuView extends StatelessWidget {
                       title: isVendedor ? 'Ventas' : 'Mis compras',
                       onTap: () {
                         if (isVendedor) {
-                          // TODO: Implementar vista de ventas para vendedores
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: const Text('Ventas próximamente'),
-                              backgroundColor: const Color(0xFF115213),
-                              behavior: SnackBarBehavior.floating,
-                              duration: const Duration(seconds: 2),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              margin: const EdgeInsets.all(16),
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const SellerOrdersView(),
                             ),
                           );
                         } else {
