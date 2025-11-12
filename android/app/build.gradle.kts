@@ -45,9 +45,14 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
             pickFirsts += "**/libc++_shared.so"
             pickFirsts += "**/libjsc.so"
-            // Resolver conflictos de clases duplicadas
+            // Resolver conflictos de clases duplicadas de androidx.activity.compose
             pickFirsts += "**/androidx/activity/compose/R.class"
             pickFirsts += "**/androidx/activity/compose/R\$*.class"
+            pickFirsts += "**/META-INF/androidx.activity.activity-compose.kotlin_module"
+            pickFirsts += "**/META-INF/androidx.activity.activity-ktx.kotlin_module"
+            // Excluir módulos duplicados
+            excludes += "META-INF/androidx.activity.activity-compose.kotlin_module"
+            excludes += "META-INF/androidx.activity.activity-ktx.kotlin_module"
         }
     }
 }
@@ -67,9 +72,9 @@ configurations.all {
         // Forzar una única versión de androidx.activity para evitar duplicados
         eachDependency {
             if (requested.group == "androidx.activity") {
-                if (requested.name == "activity-compose" || requested.name == "activity-ktx") {
+                if (requested.name == "activity-compose" || requested.name == "activity-ktx" || requested.name == "activity") {
                     useVersion("1.9.2")
-                    because("Resolver conflictos de dependencias duplicadas")
+                    because("Resolver conflictos de dependencias duplicadas de androidx.activity")
                 }
             }
         }

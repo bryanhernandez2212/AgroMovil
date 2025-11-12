@@ -8,6 +8,7 @@ class UserModel {
   final DateTime? fechaRegistro;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final String? fotoPerfil;
 
   UserModel({
     required this.id,
@@ -19,6 +20,7 @@ class UserModel {
     this.fechaRegistro,
     this.createdAt,
     this.updatedAt,
+    this.fotoPerfil,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -40,6 +42,7 @@ class UserModel {
       updatedAt: json['updated_at'] != null 
           ? DateTime.tryParse(json['updated_at'].toString())
           : null,
+      fotoPerfil: json['foto_perfil'] as String?,
     );
   }
 
@@ -54,6 +57,7 @@ class UserModel {
       if (fechaRegistro != null) 'fecha_registro': fechaRegistro!.toIso8601String(),
       if (createdAt != null) 'created_at': createdAt!.toIso8601String(),
       if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
+      if (fotoPerfil != null) 'foto_perfil': fotoPerfil,
     };
   }
 
