@@ -9,9 +9,38 @@ import 'package:agromarket/services/user_role_service.dart';
 import 'package:agromarket/views/buyer/my_orders_view.dart';
 import 'package:agromarket/views/vendor/seller_orders_view.dart';
 import 'package:agromarket/views/auth/login_view.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-class UserProfileMenuView extends StatelessWidget {
+class UserProfileMenuView extends StatefulWidget {
   const UserProfileMenuView({super.key});
+
+  @override
+  State<UserProfileMenuView> createState() => _UserProfileMenuViewState();
+}
+
+class _UserProfileMenuViewState extends State<UserProfileMenuView> {
+  bool _statusRequested = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authController = Provider.of<AuthController>(context, listen: false);
+      final user = authController.currentUser;
+      if (user != null && UserRoleService.isSeller()) {
+        _statusRequested = true;
+      }
+    });
+  }
+
+  Future<void> _openWebDashboard() async {
+    final authController = Provider.of<AuthController>(context, listen: false);
+    final user = authController.currentUser;
+    if (user == null) return;
+
+    final uri = Uri.parse('https://dashboard.stripe.com/login');
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -20,8 +49,14 @@ class UserProfileMenuView extends StatelessWidget {
     final userModel = authController.currentUser;
     final isVendedor = UserRoleService.isSeller();
 
-    return SingleChildScrollView(
-      child: Column(
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+
+    return SafeArea(
+      top: false,
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        padding: EdgeInsets.only(bottom: bottomInset + 32),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
               // Header con foto, nombre e ícono de perfil
@@ -54,23 +89,34 @@ class UserProfileMenuView extends StatelessWidget {
                           ),
                         ],
                       ),
-                      child: user?.photoURL != null
-                          ? ClipOval(
-                              child: Image.network(
-                                user!.photoURL!,
+                      child: ClipOval(
+                        child: userModel?.fotoPerfil != null
+                            ? Image.network(
+                                userModel!.fotoPerfil!,
                                 fit: BoxFit.cover,
+                                width: 70,
+                                height: 70,
+                                loadingBuilder: (context, child, loadingProgress) {
+                                  if (loadingProgress == null) return child;
+                                  return const Center(
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  );
+                                },
                                 errorBuilder: (context, error, stackTrace) => const Icon(
                                   Icons.person,
                                   size: 40,
                                   color: Colors.white,
                                 ),
+                              )
+                            : const Icon(
+                                Icons.person,
+                                size: 40,
+                                color: Colors.white,
                               ),
-                            )
-                          : const Icon(
-                              Icons.person,
-                              size: 40,
-                              color: Colors.white,
-                            ),
+                      ),
                     ),
                     const SizedBox(width: 16),
                     // Nombre del usuario
@@ -120,6 +166,66 @@ class UserProfileMenuView extends StatelessWidget {
               ),
               
               const SizedBox(height: 24),
+
+              if (isVendedor && _statusRequested)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF4E5),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFFFC107).withOpacity(0.6)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: const [
+                            Icon(Icons.warning_amber_rounded, color: Color(0xFFB45309)),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Configura tus pagos',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFFB45309),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Completa Stripe Connect para publicar productos y recibir compras.',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF92400E),
+                            height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            ElevatedButton.icon(
+                              onPressed: _openWebDashboard,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFB45309),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                              icon: const Icon(Icons.open_in_new),
+                              label: const Text('Abrir portal web'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               
               // Botones de opciones
               Padding(
@@ -227,7 +333,9 @@ class UserProfileMenuView extends StatelessWidget {
               ),
             ],
           ),
-        );
+        ),
+      
+    );
   }
 
   Widget _buildMenuButton(

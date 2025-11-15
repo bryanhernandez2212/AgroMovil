@@ -5,32 +5,27 @@ import 'package:agromarket/views/buyer/buyer_home_view.dart';
 import 'package:agromarket/views/buyer/buyer_cart_view.dart';
 import 'package:agromarket/views/buyer/buyer_list_productos.dart';
 import 'package:agromarket/services/user_role_service.dart';
-import 'package:agromarket/widgets/banner_ad_widget.dart';
+import 'package:agromarket/widgets/banner_ad_widget.dart'; // Temporalmente deshabilitado
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:agromarket/controllers/auth_controller.dart';
 
 class ProductEstructureView extends StatefulWidget {
   final Widget? content;
-  final String searchHint;
   final String? title; // 
   final VoidCallback? onProfileTap;
   final VoidCallback? onProductsTap;
   final VoidCallback? onCartTap;
-  final Function(String)? onSearchChanged;
-
-  final bool showSearchBar;
   final int currentIndex;
 
   const ProductEstructureView({
     super.key,
     this.content,
     this.title, 
-    this.searchHint = "Buscar...",
     this.onProfileTap,
     this.onProductsTap,
     this.onCartTap,
-    this.onSearchChanged,
-    this.showSearchBar = true,
     this.currentIndex = 0, // inicializa en home
   });
 
@@ -100,43 +95,53 @@ class _ProductEstructureViewState extends State<ProductEstructureView> {
             
             // Banner "AgroMarket" - solo para compradores en Home
             if (isBuyer && currentIndex == 0)
-              const Padding(
-                padding: EdgeInsets.only(top: 16, left: 20, right: 20),
-                child: Text(
-                  'AgroMarket',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF115213),
-                  ),
-                ),
-              ),
-            
-            // Barra de búsqueda - solo para compradores en Home
-            if (isBuyer && currentIndex == 0 && widget.showSearchBar)
               Padding(
-                padding: const EdgeInsets.only(left: 20, right: 20, top: 8, bottom: 8),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Material(
-                    elevation: 4,
-                    borderRadius: BorderRadius.circular(30),
-                    shadowColor: Colors.black26,
-                    child: TextField(
-                      decoration: InputDecoration(
-                        prefixIcon: const Icon(Icons.search, color: Color(0xFF115213)),
-                        hintText: 'Buscar productos...',
-                        hintStyle: const TextStyle(color: Colors.grey, fontSize: 16),
-                        filled: true,
-                        fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                        enabledBorder: _buildInputBorder(const Color(0xFF115213), 1),
-                        focusedBorder: _buildInputBorder(const Color(0xFF115213), 2),
-                      ),
-                      onChanged: widget.onSearchChanged,
-                    ),
-                  ),
+                padding: const EdgeInsets.only(top: 16, left: 20, right: 20),
+                child: Consumer<AuthController>(
+                  builder: (context, authController, _) {
+                    final userName = authController.currentUser?.nombre;
+                    final displayName = (userName != null && userName.trim().isNotEmpty)
+                        ? userName.trim()
+                        : 'Usuario';
+
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        const Text(
+                          'AgroMarket',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF115213),
+                          ),
+                        ),
+                        const Spacer(),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text(
+                              'Bienvenido',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF6B7280),
+                              ),
+                            ),
+                            Text(
+                              displayName,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF1B4332),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ],
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
             
@@ -355,14 +360,6 @@ class _ProductEstructureViewState extends State<ProductEstructureView> {
       icon,
       size: 28,
       color: isSelected ? Colors.white : const Color.fromARGB(255, 255, 255, 255),
-    );
-  }
-
-  /// Construye el borde del input de búsqueda
-  OutlineInputBorder _buildInputBorder(Color color, double width) {
-    return OutlineInputBorder(
-      borderRadius: BorderRadius.circular(30),
-      borderSide: BorderSide(color: color, width: width),
     );
   }
 }

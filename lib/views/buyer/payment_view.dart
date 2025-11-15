@@ -7,6 +7,7 @@ import 'package:agromarket/services/order_service.dart';
 import 'package:agromarket/services/cart_service.dart';
 import 'package:agromarket/services/stripe_service.dart';
 import 'package:agromarket/services/stock_service.dart';
+import 'package:agromarket/services/email_service.dart';
 import 'package:agromarket/views/buyer/order_confirmation_view.dart';
 
 class PaymentView extends StatefulWidget {
@@ -107,6 +108,54 @@ class _PaymentViewState extends State<PaymentView> {
       }
 
       print('✅ Stock validado correctamente');
+ 
+      final sellerIds = widget.cartItems.map((item) => item.sellerId).toSet();
+      if (sellerIds.isEmpty) {
+        if (mounted) {
+          setState(() {
+            _isProcessing = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No se pudo identificar al vendedor de los productos.'),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+              duration: Duration(seconds: 2),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.all(Radius.circular(20)),
+              ),
+              margin: EdgeInsets.all(16),
+            ),
+          );
+        }
+        return;
+      }
+
+      if (sellerIds.length > 1) {
+        if (mounted) {
+          setState(() {
+            _isProcessing = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Por ahora solo puedes pagar productos de un vendedor a la vez.'),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+              duration: Duration(seconds: 2),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.all(Radius.circular(20)),
+              ),
+              margin: EdgeInsets.all(16),
+            ),
+          );
+        }
+        return;
+      }
+
+      final vendorId = sellerIds.first;
+      final commissionPercent = 0.10; // 10% de comisión para la plataforma
+      final applicationFeeAmount = (_subtotal * commissionPercent * 100).round();
+      final provisionalOrderId = 'tmp_${DateTime.now().millisecondsSinceEpoch}';
 
       final orderItems = widget.cartItems.map((cartItem) {
         return OrderItem(
@@ -127,11 +176,27 @@ class _PaymentViewState extends State<PaymentView> {
       if (_selectedPaymentMethod == 'tarjeta') {
         // Paso 1: Crear Payment Intent en el servidor
         final paymentResult = await StripeService.createPaymentIntent(
+          vendorId: vendorId,
           amount: _total,
           currency: 'mxn',
+          applicationFeeAmount: applicationFeeAmount,
+          orderId: provisionalOrderId,
           orderData: {
+            'usuario_id': user.uid,
+            'usuario_email': user.email ?? '',
+            'usuario_nombre': userName,
+            'total': _total,
+            'subtotal': _subtotal,
+            'envio': _envio,
+            'impuestos': _impuestos,
+            'metodo_pago': 'tarjeta',
+            'productos': orderItems.map((item) => item.toJson()).toList(),
+          },
+          metadata: {
+            'order_id': provisionalOrderId,
             'user_id': user.uid,
             'user_email': user.email ?? '',
+            'vendor_id': vendorId,
           },
         );
 
@@ -269,9 +334,44 @@ class _PaymentViewState extends State<PaymentView> {
             print('⚠️ Advertencia: Error registrando confirmación de pago en servidor');
             print('   - El pago fue procesado, pero puede haber un problema al registrar la asociación');
           }
+        }
 
-          // Envío de correos deshabilitado por ahora
-          // El comprobante se muestra en la pantalla de confirmación
+        // Enviar correo de confirmación/factura
+        try {
+          final productosParaEmail = orderItems.map((item) {
+            return {
+              'nombre': item.nombre,
+              'cantidad': item.cantidad,
+              'precio_unitario': item.precioUnitario,
+              'precio_total': item.precioTotal,
+              'unidad': item.unidad,
+            };
+          }).toList();
+
+          final emailResult = await EmailService.sendReceiptEmail(
+            email: user.email ?? '',
+            orderId: orderId,
+            total: order.total,
+            productos: productosParaEmail,
+            userName: userName,
+            subtotal: order.subtotal,
+            envio: order.envio,
+            impuestos: order.impuestos,
+            ciudad: order.ciudad,
+            telefono: order.telefono,
+            direccionEntrega: order.direccionEntrega,
+            metodoPago: order.metodoPago,
+            fechaCompra: order.fechaCompra,
+          );
+
+          if (emailResult['success']) {
+            print('✅ Correo de confirmación enviado exitosamente');
+          } else {
+            print('⚠️ Advertencia: No se pudo enviar el correo de confirmación: ${emailResult['message']}');
+          }
+        } catch (e) {
+          print('⚠️ Error enviando correo de confirmación: $e');
+          // No fallar el proceso si el correo no se puede enviar
         }
 
         await CartService.clearCart();
