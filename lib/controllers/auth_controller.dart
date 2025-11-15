@@ -3,6 +3,7 @@ import 'package:agromarket/models/user_model.dart';
 import 'package:agromarket/services/firebase_service.dart';
 import 'package:agromarket/services/email_service.dart';
 import 'package:agromarket/services/microsoft_auth_service.dart';
+import 'package:agromarket/services/notification_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class AuthController extends ChangeNotifier {
@@ -51,6 +52,7 @@ class AuthController extends ChangeNotifier {
       if (result['success']) {
         _currentUser = UserModel.fromJson(result['user']);
         _isLoggedIn = true;
+        await NotificationService.registerDeviceToken(_currentUser!.id);
         _setLoading(false);
         notifyListeners();
         return true;
@@ -102,6 +104,7 @@ class AuthController extends ChangeNotifier {
       if (result['success']) {
         _currentUser = UserModel.fromJson(result['user']);
         _isLoggedIn = true;
+        await NotificationService.registerDeviceToken(_currentUser!.id);
         
         // Enviar email de verificación automáticamente
         print('📧 Enviando email de verificación automáticamente...');
@@ -157,6 +160,7 @@ class AuthController extends ChangeNotifier {
           _currentUser = UserModel.fromJson(registerResult['user']);
           print('✅ AuthController: Usuario Microsoft registrado en Firebase: ${_currentUser!.nombre}');
           print('🆔 ID del usuario: ${_currentUser!.id}');
+          await NotificationService.registerDeviceToken(_currentUser!.id);
           
           // Limpiar errores
           _clearError();
@@ -395,6 +399,7 @@ class AuthController extends ChangeNotifier {
         print('🎭 AuthController: Roles: ${_currentUser!.roles}');
         print('✅ AuthController: Activo: ${_currentUser!.activo}');
         _isLoggedIn = true;
+        await NotificationService.registerDeviceToken(_currentUser!.id);
         notifyListeners();
       } else {
         print('❌ AuthController: No se encontraron datos del usuario');
@@ -407,6 +412,9 @@ class AuthController extends ChangeNotifier {
   /// Logout
   Future<void> logout() async {
     try {
+      if (_currentUser != null) {
+        await NotificationService.unregisterDeviceToken(_currentUser!.id);
+      }
       await FirebaseService.signOut();
       _currentUser = null;
       _isLoggedIn = false;

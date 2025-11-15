@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:agromarket/services/api_service.dart';
 
 class StripeService {
-  // Usar la misma baseUrl que ApiService
   static String get backendUrl => ApiService.baseUrl;
   
   // Crear Payment Intent en el servidor
@@ -17,8 +16,7 @@ class StripeService {
     Map<String, dynamic>? metadata,
   }) async {
     try {
-      print('💳 Creando Payment Intent con Stripe Connect...');
-      print('   - Vendedor: $vendorId');
+      print(' Creando Payment Intent con Stripe...');
       print('   - Monto: \$${amount.toStringAsFixed(2)}');
       print('   - Comisión (centavos): $applicationFeeAmount');
       
@@ -42,7 +40,7 @@ class StripeService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print('✅ Payment Intent creado exitosamente');
+        print(' Payment Intent creado exitosamente');
         print('   - Payment Intent ID: ${data['paymentIntentId']}');
         if (data['clientSecret'] != null) {
           print('   - Client Secret: ${data['clientSecret'].toString().substring(0, 20)}...');
@@ -64,8 +62,8 @@ class StripeService {
           'paymentIntentId': paymentIntentId,
         };
       } else {
-        print('❌ Error del servidor: ${response.statusCode}');
-        print('📄 Cuerpo de la respuesta: ${response.body}');
+        print(' Error del servidor: ${response.statusCode}');
+        print(' Cuerpo de la respuesta: ${response.body}');
         try {
           final errorData = jsonDecode(response.body);
           return {
@@ -80,7 +78,7 @@ class StripeService {
         }
       }
     } catch (e) {
-      print('❌ Error creando Payment Intent: $e');
+      print(' Error creando Payment Intent: $e');
       return {
         'success': false,
         'message': 'Error de conexión: ${e.toString()}',
@@ -98,7 +96,7 @@ class StripeService {
     String? email,
   }) async {
     try {
-      print('💳 Creando Payment Method con tarjeta...');
+      print(' Creando Payment Method con tarjeta...');
       
       final response = await http.post(
         Uri.parse('$backendUrl/create-payment-method'),
@@ -117,14 +115,14 @@ class StripeService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print('✅ Payment Method creado: ${data['paymentMethodId']}');
+        print(' Payment Method creado: ${data['paymentMethodId']}');
         return {
           'success': true,
           'paymentMethodId': data['paymentMethodId'],
         };
       } else {
-        print('❌ Error del servidor: ${response.statusCode}');
-        print('📄 Cuerpo de la respuesta: ${response.body}');
+        print(' Error del servidor: ${response.statusCode}');
+        print(' Cuerpo de la respuesta: ${response.body}');
         try {
           final errorData = jsonDecode(response.body);
           return {
@@ -139,7 +137,7 @@ class StripeService {
         }
       }
     } catch (e) {
-      print('❌ Error creando Payment Method: $e');
+      print(' Error creando Payment Method: $e');
       return {
         'success': false,
         'message': 'Error de conexión: ${e.toString()}',
@@ -153,7 +151,7 @@ class StripeService {
     required String paymentMethodId,
   }) async {
     try {
-      print('💳 Confirmando pago con Payment Method...');
+      print(' Confirmando pago con Payment Method...');
       print('   - Payment Intent ID: $paymentIntentId');
       print('   - Payment Method ID: $paymentMethodId');
       
@@ -170,7 +168,7 @@ class StripeService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print('✅ Pago confirmado exitosamente');
+        print(' Pago confirmado exitosamente');
         print('   - Estado: ${data['status'] ?? 'confirmado'}');
         return {
           'success': true,
@@ -178,8 +176,8 @@ class StripeService {
           'status': data['status'],
         };
       } else {
-        print('❌ Error confirmando pago: ${response.statusCode}');
-        print('📄 Cuerpo de la respuesta: ${response.body}');
+        print(' Error confirmando pago: ${response.statusCode}');
+        print(' Cuerpo de la respuesta: ${response.body}');
         try {
           final errorData = jsonDecode(response.body);
           return {
@@ -194,7 +192,7 @@ class StripeService {
         }
       }
     } catch (e) {
-      print('❌ Error confirmando pago: $e');
+      print(' Error confirmando pago: $e');
       return {
         'success': false,
         'message': 'Error de conexión: ${e.toString()}',
@@ -208,7 +206,7 @@ class StripeService {
     required String orderId,
   }) async {
     try {
-      print('✅ Confirmando pago con Payment Intent ID: $paymentIntentId');
+      print(' Confirmando pago con Payment Intent ID: $paymentIntentId');
       
       final response = await http.post(
         Uri.parse('$backendUrl/confirm-payment'), // Endpoint en tu backend
@@ -223,13 +221,13 @@ class StripeService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print('✅ Pago confirmado exitosamente');
+        print(' Pago confirmado exitosamente');
         return {
           'success': true,
           'message': data['message'] ?? 'Pago confirmado',
         };
       } else {
-        print('❌ Error confirmando pago: ${response.statusCode}');
+        print(' Error confirmando pago: ${response.statusCode}');
         final errorData = jsonDecode(response.body);
         return {
           'success': false,
@@ -237,7 +235,7 @@ class StripeService {
         };
       }
     } catch (e) {
-      print('❌ Error confirmando pago: $e');
+      print(' Error confirmando pago: $e');
       return {
         'success': false,
         'message': 'Error de conexión: ${e.toString()}',
@@ -253,7 +251,7 @@ class StripeService {
     required List<Map<String, dynamic>> productos,
   }) async {
     try {
-      print('📧 Enviando comprobante por correo a $userEmail...');
+      print(' Enviando comprobante por correo a $userEmail...');
       
       final response = await http.post(
         Uri.parse('$backendUrl/send-receipt'), // Endpoint en tu backend
@@ -270,13 +268,13 @@ class StripeService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print('✅ Comprobante enviado exitosamente');
+        print(' Comprobante enviado exitosamente');
         return {
           'success': true,
           'message': data['message'] ?? 'Comprobante enviado',
         };
       } else {
-        print('❌ Error enviando comprobante: ${response.statusCode}');
+        print(' Error enviando comprobante: ${response.statusCode}');
         final errorData = jsonDecode(response.body);
         return {
           'success': false,
@@ -284,7 +282,7 @@ class StripeService {
         };
       }
     } catch (e) {
-      print('❌ Error enviando comprobante: $e');
+      print(' Error enviando comprobante: $e');
       return {
         'success': false,
         'message': 'Error de conexión: ${e.toString()}',
