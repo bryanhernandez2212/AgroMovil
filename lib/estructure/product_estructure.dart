@@ -100,11 +100,11 @@ class _ProductEstructureViewState extends State<ProductEstructureView> {
             
             // Banner "AgroMarket" - solo para compradores en Home
             if (isBuyer && currentIndex == 0)
-              Padding(
-                padding: const EdgeInsets.only(top: 16, left: 20, right: 20),
+              const Padding(
+                padding: EdgeInsets.only(top: 16, left: 20, right: 20),
                 child: Text(
                   'AgroMarket',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF115213),

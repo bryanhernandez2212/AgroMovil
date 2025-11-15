@@ -145,55 +145,88 @@ class OrderService {
 
       print('📦 OrderService: Obteniendo ventas para vendedor: ${user.uid}');
 
-      QuerySnapshot snapshot;
-      try {
-        snapshot = await _firestore
-            .collection('compras')
-            .where('vendors', arrayContains: user.uid)
-            .orderBy('fecha_compra', descending: true)
-            .get();
-      } catch (e) {
-        print('⚠️ OrderService: Error con ordenamiento de ventas, intentando sin orden: $e');
-        snapshot = await _firestore
-            .collection('compras')
-            .where('vendors', arrayContains: user.uid)
-            .get();
-      }
+      final snapshot = await _firestore.collection('compras').get();
 
-      print('📦 OrderService: Se encontraron ${snapshot.docs.length} ventas');
-
-      final docs = snapshot.docs.toList();
-      if (docs.length > 1) {
-        docs.sort((a, b) {
-          final dataA = a.data() as Map<String, dynamic>;
-          final dataB = b.data() as Map<String, dynamic>;
-          final timestampA = dataA['fecha_compra'];
-          final timestampB = dataB['fecha_compra'];
-
-          DateTime toDate(dynamic ts) {
-            if (ts is Timestamp) return ts.toDate();
-            if (ts is String) return DateTime.tryParse(ts) ?? DateTime.now();
-            return DateTime.now();
-          }
-
-          final dateA = timestampA == null ? DateTime.fromMillisecondsSinceEpoch(0) : toDate(timestampA);
-          final dateB = timestampB == null ? DateTime.fromMillisecondsSinceEpoch(0) : toDate(timestampB);
-          return dateB.compareTo(dateA);
-        });
-      }
+      print('📦 OrderService: Se encontraron ${snapshot.docs.length} compras');
 
       final orders = <OrderModel>[];
-      for (final doc in docs) {
+
+      for (final doc in snapshot.docs) {
         try {
-          final data = doc.data() as Map<String, dynamic>;
+          final data = doc.data();
           data['id'] = doc.id;
+
+          final estadoCompra = (data['estado'] ?? 'pendiente').toString().toLowerCase();
+          if (estadoCompra != 'pagado' && estadoCompra != 'pendiente') {
+            continue;
+          } 
+
+          final productosRaw = <Map<String, dynamic>>[];
+          final productosData = data['productos'] as List<dynamic>? ?? [];
+          for (final item in productosData) {
+            if (item is Map<String, dynamic>) {
+              productosRaw.add(Map<String, dynamic>.from(item));
+            }
+          }
+
+          for (var producto in productosRaw) {
+            final vendedorActual = producto['vendedor_id']?.toString() ?? '';
+            if (vendedorActual.isNotEmpty) continue;
+
+            final productoId = producto['producto_id']?.toString();
+            if (productoId == null || productoId.isEmpty) continue;
+
+            try {
+              final productoDoc = await _firestore.collection('productos').doc(productoId).get();
+              if (productoDoc.exists) {
+                final productoData = productoDoc.data() ?? <String, dynamic>{};
+                final vendedorId = productoData['vendedor_id']?.toString() ??
+                    productoData['vendedorId']?.toString() ??
+                    '';
+                if (vendedorId.isNotEmpty) {
+                  producto['vendedor_id'] = vendedorId;
+                }
+              }
+            } catch (error) {
+              print('⚠️ OrderService: Error obteniendo vendedor de producto $productoId: $error');
+            }
+          }
+
+          data['productos'] = productosRaw;
+
           final order = OrderModel.fromJson(data);
-          orders.add(order);
+
+          final vendorProducts = order.productos
+              .where((item) => item.vendedorId == user.uid)
+              .toList();
+
+          if (vendorProducts.isEmpty) {
+            continue;
+          }
+
+          final vendorSubtotal = vendorProducts.fold<double>(
+            0.0,
+            (sum, item) => sum + item.precioTotal,
+          );
+          final vendorImpuestos = vendorSubtotal * 0.10;
+          final vendorTotal = vendorSubtotal + vendorImpuestos;
+
+          final vendorOrder = order.copyWith(
+            productos: vendorProducts,
+            subtotal: vendorSubtotal,
+            impuestos: vendorImpuestos,
+            envio: 0.0,
+            total: vendorTotal,
+          );
+
+          orders.add(vendorOrder);
         } catch (e, stackTrace) {
           print('❌ OrderService: Error procesando venta ${doc.id}: $e');
           print('Stack trace: $stackTrace');
         }
       }
+
+      orders.sort((a, b) => b.fechaCompra.compareTo(a.fechaCompra));
 
       print('✅ OrderService: Total de ventas procesadas: ${orders.length}');
       return orders;

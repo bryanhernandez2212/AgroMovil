@@ -7,13 +7,35 @@ import 'package:agromarket/controllers/auth_controller.dart';
 import 'package:agromarket/services/chat_service.dart';
 import 'package:agromarket/views/profile/chat_conversation_view.dart';
 
-class OrderConfirmationView extends StatelessWidget {
+class OrderConfirmationView extends StatefulWidget {
   final OrderModel order;
 
   const OrderConfirmationView({
     super.key,
     required this.order,
   });
+
+  @override
+  State<OrderConfirmationView> createState() => _OrderConfirmationViewState();
+}
+
+class _OrderConfirmationViewState extends State<OrderConfirmationView> {
+  static const List<String> _statusSequence = [
+    'preparando',
+    'enviado',
+    'recibido',
+    'devolucion',
+  ];
+
+  late String _orderStatus;
+  bool _isUpdatingStatus = false;
+  bool _shouldRefreshOnPop = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _orderStatus = widget.order.estadoPedido;
+  }
 
   String _formatDate(DateTime date) {
     final day = date.day.toString().padLeft(2, '0');
@@ -32,8 +54,10 @@ class OrderConfirmationView extends StatelessWidget {
         return '0xFFFF9800';
       case 'enviado':
         return '0xFF2196F3';
-      case 'entregado':
+      case 'recibido':
         return '0xFF4CAF50';
+      case 'devolucion':
+        return '0xFFF44336';
       default:
         return '0xFF757575';
     }
@@ -43,193 +67,203 @@ class OrderConfirmationView extends StatelessWidget {
   Widget build(BuildContext context) {
     final authController = Provider.of<AuthController>(context);
     final currentUser = authController.currentUser;
-    final firstProduct = order.productos.isNotEmpty ? order.productos.first : null;
-    final bool isSellerContext = currentUser != null &&
+    final firstProduct = widget.order.productos.isNotEmpty ? widget.order.productos.first : null;
+
+    String? sellerUserId;
+    if (currentUser != null &&
         firstProduct != null &&
         (currentUser.rolActivo.toLowerCase() == 'vendedor' ||
-            currentUser.id == firstProduct.vendedorId);
+            currentUser.id == firstProduct.vendedorId)) {
+      sellerUserId = currentUser.id;
+    }
+    final bool isSellerContext = sellerUserId != null;
     final contactButtonLabel = isSellerContext ? 'Contactar comprador' : 'Contactar vendedor';
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
+    return WillPopScope(
+      onWillPop: () async {
+        Navigator.of(context).pop(_shouldRefreshOnPop);
+        return false;
+      },
+      child: Scaffold(
         backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF115213)),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Detalles del pedido',
-          style: TextStyle(
-            color: Color(0xFF115213),
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Color(0xFF115213)),
+            onPressed: () => Navigator.of(context).pop(_shouldRefreshOnPop),
+          ),
+          title: const Text(
+            'Detalles del pedido',
+            style: TextStyle(
+              color: Color(0xFF115213),
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header con ID y estado
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.grey[50],
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey[300]!),
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'ID del pedido',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
-                              ),
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey[300]!),
+                  ),
+                  child: Wrap(
+                    spacing: 16,
+                    runSpacing: 12,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'ID del pedido',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              order.id,
+                          ),
+                          const SizedBox(height: 4),
+                          SizedBox(
+                            width: MediaQuery.of(context).size.width * 0.6,
+                            child: Text(
+                              widget.order.id,
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
                                 color: Color(0xFF1A1A1A),
                               ),
-                            ),
-                          ],
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Color(int.parse(_getStatusColor(order.estadoPedido))).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            order.estadoPedido.toUpperCase(),
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: Color(int.parse(_getStatusColor(order.estadoPedido))),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
+                        ],
+                      ),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: sellerUserId != null
+                            ? _buildStatusDropdown(sellerUserId)
+                            : Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: Color(int.parse(_getStatusColor(_orderStatus))).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  _orderStatus.toUpperCase(),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(int.parse(_getStatusColor(_orderStatus))),
+                                  ),
+                                ),
+                              ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                _buildSectionTitle('Información del pedido'),
+                const SizedBox(height: 12),
+                _buildInfoCard([
+                  _buildInfoRow('Fecha de compra', _formatDate(widget.order.fechaCompra)),
+                  _buildInfoRow('Estado del pago', widget.order.estado),
+                  _buildInfoRow('Estado del pedido', _orderStatus),
+                  _buildInfoRow('Método de pago', widget.order.metodoPago == 'tarjeta' ? 'Tarjeta' : widget.order.metodoPago),
+                  if (widget.order.paymentIntentId != null)
+                    _buildInfoRow('ID de pago', widget.order.paymentIntentId!),
+                ]),
+                const SizedBox(height: 24),
+
+                _buildSectionTitle('Dirección de envío'),
+                const SizedBox(height: 12),
+                _buildInfoCard([
+                _buildInfoRow('Destino', widget.order.ciudad.isNotEmpty ? widget.order.ciudad : 'No especificado'),
+                  if (widget.order.telefono.isNotEmpty)
+                    _buildInfoRow('Teléfono', widget.order.telefono),
+                ]),
+                const SizedBox(height: 24),
+
+                _buildSectionTitle('Productos (${widget.order.productos.length})'),
+                const SizedBox(height: 12),
+                ...widget.order.productos.map((producto) => _buildProductCard(producto)),
+                const SizedBox(height: 24),
+
+                _buildSectionTitle('Resumen'),
+                const SizedBox(height: 12),
+                _buildInfoCard([
+                  _buildInfoRow('Subtotal', '\$${widget.order.subtotal.toStringAsFixed(2)}'),
+                  _buildInfoRow('Envío', '\$${widget.order.envio.toStringAsFixed(2)}'),
+                  _buildInfoRow('Impuestos (10%)', '\$${widget.order.impuestos.toStringAsFixed(2)}'),
+                  const Divider(height: 24),
+                  _buildInfoRow(
+                    'Total',
+                    '\$${widget.order.total.toStringAsFixed(2)}',
+                    isTotal: true,
+                  ),
+                ]),
+                const SizedBox(height: 32),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: const Text('Funcionalidad de devolución próximamente'),
+                              backgroundColor: const Color(0xFF115213),
+                              behavior: SnackBarBehavior.floating,
+                              duration: const Duration(seconds: 2),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              margin: const EdgeInsets.all(16),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.assignment_return, size: 20),
+                        label: const Text('Devolución'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF115213),
+                          side: const BorderSide(color: Color(0xFF115213)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
-                      ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => _contactCounterpart(context),
+                        icon: const Icon(Icons.message, size: 20),
+                        label: Text(contactButtonLabel),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF115213),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 0,
+                        ),
+                      ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 24),
-
-              // Información del pedido
-              _buildSectionTitle('Información del pedido'),
-              const SizedBox(height: 12),
-              _buildInfoCard([
-                _buildInfoRow('Fecha de compra', _formatDate(order.fechaCompra)),
-                _buildInfoRow('Estado del pago', order.estado),
-                _buildInfoRow('Estado del pedido', order.estadoPedido),
-                _buildInfoRow('Método de pago', order.metodoPago == 'tarjeta' ? 'Tarjeta' : order.metodoPago),
-                if (order.paymentIntentId != null)
-                  _buildInfoRow('ID de pago', order.paymentIntentId!),
-              ]),
-              const SizedBox(height: 24),
-
-              // Dirección de envío
-              _buildSectionTitle('Dirección de envío'),
-              const SizedBox(height: 12),
-              _buildInfoCard([
-                _buildInfoRow('Destino', order.ciudad.isNotEmpty ? order.ciudad : 'No especificado'),
-                if (order.telefono.isNotEmpty)
-                  _buildInfoRow('Teléfono', order.telefono),
-                if (order.direccionEntrega != null && order.direccionEntrega!.isNotEmpty)
-                  _buildInfoRow('Dirección', order.direccionEntrega!),
-              ]),
-              const SizedBox(height: 24),
-
-              // Productos
-              _buildSectionTitle('Productos (${order.productos.length})'),
-              const SizedBox(height: 12),
-              ...order.productos.map((producto) => _buildProductCard(producto)),
-              const SizedBox(height: 24),
-
-              // Resumen de precios
-              _buildSectionTitle('Resumen'),
-              const SizedBox(height: 12),
-              _buildInfoCard([
-                _buildInfoRow('Subtotal', '\$${order.subtotal.toStringAsFixed(2)}'),
-                _buildInfoRow('Envío', '\$${order.envio.toStringAsFixed(2)}'),
-                _buildInfoRow('Impuestos (10%)', '\$${order.impuestos.toStringAsFixed(2)}'),
-                const Divider(height: 24),
-                _buildInfoRow(
-                  'Total',
-                  '\$${order.total.toStringAsFixed(2)}',
-                  isTotal: true,
-                ),
-              ]),
-              const SizedBox(height: 32),
-
-              // Botones de acción
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        // TODO: Implementar funcionalidad de devolución
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Text('Funcionalidad de devolución próximamente'),
-                            backgroundColor: const Color(0xFF115213),
-                            behavior: SnackBarBehavior.floating,
-                            duration: const Duration(seconds: 2),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            margin: const EdgeInsets.all(16),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.assignment_return, size: 20),
-                      label: const Text('Devolución'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF115213),
-                        side: const BorderSide(color: Color(0xFF115213)),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () => _contactCounterpart(context),
-                      icon: const Icon(Icons.message, size: 20),
-                      label: Text(contactButtonLabel),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF115213),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 0,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: MediaQuery.of(context).padding.bottom + 20),
-            ],
+                SizedBox(height: MediaQuery.of(context).padding.bottom + 20),
+              ],
+            ),
           ),
         ),
       ),
@@ -362,6 +396,156 @@ class OrderConfirmationView extends StatelessWidget {
     );
   }
 
+  Widget _buildStatusDropdown(String currentUserId) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Color(int.parse(_getStatusColor(_orderStatus))).withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: Color(int.parse(_getStatusColor(_orderStatus))),
+        ),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _orderStatus,
+          icon: _isUpdatingStatus
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.arrow_drop_down),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: Color(int.parse(_getStatusColor(_orderStatus))),
+          ),
+          onChanged: _isUpdatingStatus
+              ? null
+              : (value) {
+                  if (value == null || value == _orderStatus) return;
+                  _updateOrderStatus(value, currentUserId);
+                },
+          items: _statusSequence
+              .map(
+                (status) => DropdownMenuItem(
+                  value: status,
+                  child: Text(status.toUpperCase()),
+                ),
+              )
+              .toList(),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _updateOrderStatus(String newStatus, String currentUserId) async {
+    final currentIndex = _statusSequence.indexOf(_orderStatus);
+    final newIndex = _statusSequence.indexOf(newStatus);
+
+    if (newIndex == -1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Estado no válido: $newStatus'),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+      return;
+    }
+
+    if (newIndex < currentIndex) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('No puedes regresar a un estado anterior.'),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isUpdatingStatus = true;
+    });
+
+    try {
+      final docRef = FirebaseFirestore.instance.collection('compras').doc(widget.order.id);
+      final snapshot = await docRef.get();
+
+      if (!snapshot.exists) {
+        throw Exception('El pedido no existe');
+      }
+
+      final data = snapshot.data() ?? <String, dynamic>{};
+      final productos = List<Map<String, dynamic>>.from(
+        (data['productos'] as List<dynamic>? ?? [])
+            .whereType<Map>()
+            .map((producto) {
+          final map = Map<String, dynamic>.from(producto);
+          final vendedorId = map['vendedor_id']?.toString() ?? '';
+          if (vendedorId == currentUserId) {
+            map['estado_pedido'] = newStatus;
+            map['fecha_actualizacion_estado'] = DateTime.now().toIso8601String();
+          }
+          return map;
+        }),
+      );
+
+      await docRef.update({
+        'estado_pedido': newStatus,
+        'fecha_actualizacion_estado': FieldValue.serverTimestamp(),
+        'productos': productos,
+      });
+
+      setState(() {
+        _orderStatus = newStatus;
+        _shouldRefreshOnPop = true;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Estado actualizado a ${newStatus.toUpperCase()}'),
+          backgroundColor: const Color(0xFF115213),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al actualizar el estado: $e'),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+    } finally {
+      setState(() {
+        _isUpdatingStatus = false;
+      });
+    }
+  }
+
   Future<void> _contactCounterpart(BuildContext context) async {
     final authController = Provider.of<AuthController>(context, listen: false);
     final currentUser = authController.currentUser;
@@ -375,7 +559,7 @@ class OrderConfirmationView extends StatelessWidget {
       return;
     }
 
-    if (order.productos.isEmpty) {
+    if (widget.order.productos.isEmpty) {
       _showSnackBar(
         context,
         'No encontramos información vinculada al pedido.',
@@ -384,7 +568,7 @@ class OrderConfirmationView extends StatelessWidget {
       return;
     }
 
-    final firstProduct = order.productos.first;
+    final firstProduct = widget.order.productos.first;
     final bool isSellerContext =
         currentUser.rolActivo.toLowerCase() == 'vendedor' ||
             currentUser.id == firstProduct.vendedorId;
@@ -393,8 +577,8 @@ class OrderConfirmationView extends StatelessWidget {
     final String fallbackName;
 
     if (isSellerContext) {
-      targetUserId = order.usuarioId;
-      fallbackName = order.usuarioNombre.isNotEmpty ? order.usuarioNombre : 'Comprador';
+      targetUserId = widget.order.usuarioId;
+      fallbackName = widget.order.usuarioNombre.isNotEmpty ? widget.order.usuarioNombre : 'Comprador';
     } else {
       targetUserId = firstProduct.vendedorId;
       fallbackName = 'Vendedor';
@@ -409,7 +593,7 @@ class OrderConfirmationView extends StatelessWidget {
       return;
     }
 
-    if (order.id.isEmpty) {
+    if (widget.order.id.isEmpty) {
       _showSnackBar(
         context,
         'Este pedido no tiene un identificador válido.',
@@ -441,7 +625,7 @@ class OrderConfirmationView extends StatelessWidget {
       final targetPhoto = targetData['photoUrl']?.toString();
 
       final chatId = await ChatService.ensureChat(
-        orderId: order.id,
+        orderId: widget.order.id,
         currentUserId: currentUser.id,
         otherUserId: targetUserId,
         currentUserName: currentUser.nombre,
@@ -449,7 +633,7 @@ class OrderConfirmationView extends StatelessWidget {
       );
 
       if (context.mounted) {
-        Navigator.of(context, rootNavigator: true).pop(); // cerrar diálogo
+        Navigator.of(context, rootNavigator: true).pop();
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -457,7 +641,7 @@ class OrderConfirmationView extends StatelessWidget {
               chatId: chatId,
               userName: targetName,
               otherUserId: targetUserId,
-              orderId: order.id,
+              orderId: widget.order.id,
               userImage: targetPhoto,
               isOnline: targetData['isOnline'] == true,
             ),
