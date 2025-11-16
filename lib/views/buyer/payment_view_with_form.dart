@@ -90,19 +90,6 @@ class _PaymentViewState extends State<PaymentView> {
         return;
       }
 
-      final orderItems = widget.cartItems.map((cartItem) {
-        return OrderItem(
-          productoId: cartItem.productId,
-          nombre: cartItem.productName,
-          imagen: cartItem.productImage,
-          precioUnitario: cartItem.unitPrice,
-          precioTotal: cartItem.totalPrice,
-          cantidad: cartItem.quantity,
-          unidad: cartItem.unit,
-          vendedorId: cartItem.sellerId,
-        );
-      }).toList();
-
       final sellerIds = widget.cartItems.map((item) => item.sellerId).toSet();
       if (sellerIds.isEmpty) {
         if (mounted) {
@@ -123,40 +110,31 @@ class _PaymentViewState extends State<PaymentView> {
         return;
       }
 
-      if (sellerIds.length > 1) {
-        if (mounted) {
-          setState(() {
-            _isProcessing = false;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Por ahora solo puedes pagar productos de un vendedor a la vez.'),
-              backgroundColor: Colors.red,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.all(Radius.circular(12)),
-              ),
-            ),
-          );
+      // Agrupar productos por vendedor
+      final Map<String, List<CartItemModel>> itemsByVendor = {};
+      for (var item in widget.cartItems) {
+        if (!itemsByVendor.containsKey(item.sellerId)) {
+          itemsByVendor[item.sellerId] = [];
         }
-        return;
+        itemsByVendor[item.sellerId]!.add(item);
       }
 
-      final vendorId = sellerIds.first;
-      final commissionPercent = 0.10; // 10% de comisión de la plataforma
-      final applicationFeeAmount = (_subtotal * commissionPercent * 100).round();
-      final provisionalOrderId = 'tmp_${DateTime.now().millisecondsSinceEpoch}';
-
       String userName = user.displayName ?? user.email?.split('@').first ?? 'Usuario';
-      String? paymentIntentId;
+      final commissionPercent = 0.10; // 10% de comisión de la plataforma
+      final List<Map<String, dynamic>> processedOrders = [];
+      bool allPaymentsSuccessful = true;
+      String? lastError;
+      String? mainPaymentIntentId;
 
-      if (_selectedPaymentMethod == 'tarjeta') {
+      // Si hay múltiples vendedores, procesar el pago una sola vez con el total combinado
+      if (sellerIds.length > 1 && _selectedPaymentMethod == 'tarjeta') {
+        // Crear un PaymentIntent simple (sin Connect) para el total combinado
         final paymentResult = await StripeService.createPaymentIntent(
-          vendorId: vendorId,
+          vendorId: '', // Vacío para PaymentIntent simple
           amount: _total,
           currency: 'mxn',
-          applicationFeeAmount: applicationFeeAmount,
-          orderId: provisionalOrderId,
+          applicationFeeAmount: 0, // Sin comisión en el PaymentIntent principal
+          orderId: 'tmp_${DateTime.now().millisecondsSinceEpoch}',
           orderData: {
             'usuario_id': user.uid,
             'usuario_email': user.email ?? '',
@@ -166,13 +144,12 @@ class _PaymentViewState extends State<PaymentView> {
             'envio': _envio,
             'impuestos': _impuestos,
             'metodo_pago': 'tarjeta',
-            'productos': orderItems.map((item) => item.toJson()).toList(),
+            'multiple_vendors': true,
           },
           metadata: {
-            'order_id': provisionalOrderId,
             'user_id': user.uid,
             'user_email': user.email ?? '',
-            'vendor_id': vendorId,
+            'multiple_vendors': 'true',
           },
         );
 
@@ -196,6 +173,9 @@ class _PaymentViewState extends State<PaymentView> {
         }
 
         try {
+          // Procesar el pago UNA SOLA VEZ
+          print('💳 Procesando pago para múltiples vendedores...');
+          
           final expiryParts = _expiryDateController.text.split('/');
           final expiryMonth = int.parse(expiryParts[0]);
           final expiryYear = 2000 + int.parse(expiryParts[1]);
@@ -255,10 +235,10 @@ class _PaymentViewState extends State<PaymentView> {
             return;
           }
 
-          paymentIntentId = paymentResult['paymentIntentId'];
+          mainPaymentIntentId = paymentResult['paymentIntentId'];
 
           final serverConfirmResult = await StripeService.confirmPayment(
-            paymentIntentId: paymentIntentId!,
+            paymentIntentId: mainPaymentIntentId!,
             orderId: '',
           );
 
@@ -285,23 +265,141 @@ class _PaymentViewState extends State<PaymentView> {
         }
       }
 
-      final order = OrderModel.fromCart(
-        usuarioId: user.uid,
-        usuarioNombre: userName,
-        usuarioEmail: user.email ?? '',
-        ciudad: widget.ciudad,
-        telefono: widget.telefono,
-        metodoPago: _selectedPaymentMethod,
-        productos: orderItems,
-        envio: _envio,
-        paymentIntentId: paymentIntentId,
-      );
+      // Procesar cada grupo de vendedor por separado
+      for (var vendorId in sellerIds) {
+        final vendorItems = itemsByVendor[vendorId]!;
+        final vendorSubtotal = vendorItems.fold(0.0, (sum, item) => sum + item.totalPrice);
+        final vendorEnvio = _envio / sellerIds.length; // Dividir envío entre vendedores
+        final vendorImpuestos = vendorSubtotal * 0.10;
+        final vendorTotal = vendorSubtotal + vendorEnvio + vendorImpuestos;
+        final applicationFeeAmount = (vendorSubtotal * commissionPercent * 100).round();
+        final provisionalOrderId = sellerIds.length > 1 
+            ? 'tmp_${DateTime.now().millisecondsSinceEpoch}_${vendorId}'
+            : 'tmp_${DateTime.now().millisecondsSinceEpoch}';
 
-      final result = await OrderService.saveOrder(order);
+        final orderItems = vendorItems.map((cartItem) {
+          return OrderItem(
+            productoId: cartItem.productId,
+            nombre: cartItem.productName,
+            imagen: cartItem.productImage,
+            precioUnitario: cartItem.unitPrice,
+            precioTotal: cartItem.totalPrice,
+            cantidad: cartItem.quantity,
+            unidad: cartItem.unit,
+            vendedorId: cartItem.sellerId,
+          );
+        }).toList();
 
-      if (!mounted) return;
+        String? paymentIntentId;
 
-      if (result['success']) {
+        // Si hay un solo vendedor, procesar el pago normalmente con Connect
+        if (_selectedPaymentMethod == 'tarjeta' && sellerIds.length == 1) {
+          final paymentResult = await StripeService.createPaymentIntent(
+            vendorId: vendorId,
+            amount: vendorTotal,
+            currency: 'mxn',
+            applicationFeeAmount: applicationFeeAmount,
+            orderId: provisionalOrderId,
+            orderData: {
+              'usuario_id': user.uid,
+              'usuario_email': user.email ?? '',
+              'usuario_nombre': userName,
+              'total': vendorTotal,
+              'subtotal': vendorSubtotal,
+              'envio': vendorEnvio,
+              'impuestos': vendorImpuestos,
+              'metodo_pago': 'tarjeta',
+              'productos': orderItems.map((item) => item.toJson()).toList(),
+            },
+            metadata: {
+              'order_id': provisionalOrderId,
+              'user_id': user.uid,
+              'user_email': user.email ?? '',
+              'vendor_id': vendorId,
+            },
+          );
+
+          if (!paymentResult['success']) {
+            allPaymentsSuccessful = false;
+            lastError = paymentResult['message'] ?? 'Error creando Payment Intent';
+            break;
+          }
+
+          try {
+            final expiryParts = _expiryDateController.text.split('/');
+            final expiryMonth = int.parse(expiryParts[0]);
+            final expiryYear = 2000 + int.parse(expiryParts[1]);
+            final cardNumber = _cardNumberController.text.replaceAll(' ', '');
+            
+            final paymentMethodResult = await StripeService.createPaymentMethod(
+              cardNumber: cardNumber,
+              expiryMonth: expiryMonth,
+              expiryYear: expiryYear,
+              cvc: _cvvController.text,
+              cardHolderName: _cardHolderNameController.text,
+              email: _sendEmailReceipt ? user.email : null,
+            );
+
+            if (!paymentMethodResult['success']) {
+              allPaymentsSuccessful = false;
+              lastError = paymentMethodResult['message'] ?? 'Error creando Payment Method';
+              break;
+            }
+
+            final paymentMethodId = paymentMethodResult['paymentMethodId'] as String;
+
+            final confirmResult = await StripeService.confirmPaymentWithMethod(
+              paymentIntentId: paymentResult['paymentIntentId'] as String,
+              paymentMethodId: paymentMethodId,
+            );
+
+            if (!confirmResult['success']) {
+              allPaymentsSuccessful = false;
+              lastError = confirmResult['message'] ?? 'Error confirmando el pago';
+              break;
+            }
+
+            paymentIntentId = paymentResult['paymentIntentId'];
+
+            final serverConfirmResult = await StripeService.confirmPayment(
+              paymentIntentId: paymentIntentId!,
+              orderId: '',
+            );
+
+            if (!serverConfirmResult['success']) {
+              print('⚠️ Advertencia: Error confirmando pago en servidor');
+            }
+          } catch (e) {
+            allPaymentsSuccessful = false;
+            lastError = 'Error inesperado: ${e.toString()}';
+            break;
+          }
+        } else if (_selectedPaymentMethod == 'tarjeta' && sellerIds.length > 1) {
+          // Si hay múltiples vendedores, usar el PaymentIntent principal ya procesado
+          paymentIntentId = mainPaymentIntentId;
+        }
+
+        // Crear orden para este vendedor
+        final order = OrderModel.fromCart(
+          usuarioId: user.uid,
+          usuarioNombre: userName,
+          usuarioEmail: user.email ?? '',
+          ciudad: widget.ciudad,
+          telefono: widget.telefono,
+          metodoPago: _selectedPaymentMethod,
+          productos: orderItems,
+          envio: vendorEnvio,
+          paymentIntentId: paymentIntentId,
+        );
+
+        final result = await OrderService.saveOrder(order);
+
+        if (!result['success']) {
+          allPaymentsSuccessful = false;
+          lastError = result['message'] ?? 'Error al guardar la orden';
+          break;
+        }
+
         final savedOrder = result['order'] as OrderModel? ?? order.copyWith(id: result['orderId']);
         final orderId = result['orderId'] as String;
 
@@ -312,71 +410,22 @@ class _PaymentViewState extends State<PaymentView> {
           );
         }
 
-        // Enviar correo de confirmación/factura para todos los métodos de pago
-        try {
-          final productosParaEmail = orderItems.map((item) {
-            return {
-              'nombre': item.nombre,
-              'cantidad': item.cantidad,
-              'precio_unitario': item.precioUnitario,
-              'precio_total': item.precioTotal,
-              'unidad': item.unidad,
-            };
-          }).toList();
+        processedOrders.add({
+          'order': savedOrder,
+          'orderId': orderId,
+          'orderItems': orderItems,
+        });
+      }
 
-          // Obtener nombre del usuario
-          String? userName;
-          try {
-            final userData = await FirebaseService.getCurrentUserData();
-            userName = userData?['nombre'] as String?;
-          } catch (e) {
-            print('⚠️ No se pudo obtener el nombre del usuario: $e');
-          }
+      if (!mounted) return;
 
-          final emailResult = await EmailService.sendReceiptEmail(
-            email: user.email ?? '',
-            orderId: orderId,
-            total: order.total,
-            productos: productosParaEmail,
-            userName: userName,
-            subtotal: order.subtotal,
-            envio: order.envio,
-            impuestos: order.impuestos,
-            ciudad: order.ciudad,
-            telefono: order.telefono,
-            direccionEntrega: order.direccionEntrega,
-            metodoPago: order.metodoPago,
-            fechaCompra: order.fechaCompra,
-          );
-
-          if (emailResult['success']) {
-            print('✅ Correo de confirmación enviado exitosamente');
-          } else {
-            print('⚠️ Advertencia: No se pudo enviar el correo de confirmación: ${emailResult['message']}');
-          }
-        } catch (e) {
-          print('⚠️ Error enviando correo de confirmación: $e');
-          // No fallar el proceso si el correo no se puede enviar
-        }
-
-        await CartService.clearCart();
-
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(
-            builder: (context) => OrderConfirmationView(
-              order: savedOrder,
-            ),
-          ),
-          (route) => route.isFirst,
-        );
-      } else {
+      if (!allPaymentsSuccessful) {
         setState(() {
           _isProcessing = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result['message'] ?? 'Error al procesar el pago'),
+            content: Text(lastError ?? 'Error al procesar el pago'),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
@@ -384,7 +433,82 @@ class _PaymentViewState extends State<PaymentView> {
             ),
           ),
         );
+        return;
       }
+
+      // Enviar correo de confirmación con todas las órdenes
+      try {
+        final allProductosParaEmail = <Map<String, dynamic>>[];
+        double totalGeneral = 0;
+        double subtotalGeneral = 0;
+        double envioGeneral = 0;
+        double impuestosGeneral = 0;
+
+        for (var orderData in processedOrders) {
+          final orderItems = orderData['orderItems'] as List<OrderItem>;
+          for (var item in orderItems) {
+            allProductosParaEmail.add({
+              'nombre': item.nombre,
+              'cantidad': item.cantidad,
+              'precio_unitario': item.precioUnitario,
+              'precio_total': item.precioTotal,
+              'unidad': item.unidad,
+            });
+          }
+          final order = orderData['order'] as OrderModel;
+          totalGeneral += order.total;
+          subtotalGeneral += order.subtotal;
+          envioGeneral += order.envio;
+          impuestosGeneral += order.impuestos;
+        }
+
+        // Obtener nombre del usuario
+        String? userNameForEmail;
+        try {
+          final userData = await FirebaseService.getCurrentUserData();
+          userNameForEmail = userData?['nombre'] as String?;
+        } catch (e) {
+          print('⚠️ No se pudo obtener el nombre del usuario: $e');
+        }
+
+        final emailResult = await EmailService.sendReceiptEmail(
+          email: user.email ?? '',
+          orderId: processedOrders.map((o) => o['orderId'] as String).join(', '),
+          total: totalGeneral,
+          productos: allProductosParaEmail,
+          userName: userNameForEmail ?? userName,
+          subtotal: subtotalGeneral,
+          envio: envioGeneral,
+          impuestos: impuestosGeneral,
+          ciudad: widget.ciudad,
+          telefono: widget.telefono,
+          metodoPago: _selectedPaymentMethod,
+          fechaCompra: DateTime.now(),
+        );
+
+        if (emailResult['success']) {
+          print('✅ Correo de confirmación enviado exitosamente');
+        } else {
+          print('⚠️ Advertencia: No se pudo enviar el correo de confirmación: ${emailResult['message']}');
+        }
+      } catch (e) {
+        print('⚠️ Error enviando correo de confirmación: $e');
+        // No fallar el proceso si el correo no se puede enviar
+      }
+
+      await CartService.clearCart();
+
+      // Navegar a la confirmación con la primera orden
+      final firstOrder = processedOrders.first['order'] as OrderModel;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(
+          builder: (context) => OrderConfirmationView(
+            order: firstOrder,
+          ),
+        ),
+        (route) => route.isFirst,
+      );
     } catch (e) {
       print('Error procesando pago: $e');
       if (mounted) {

@@ -131,56 +131,31 @@ class _PaymentViewState extends State<PaymentView> {
         return;
       }
 
-      if (sellerIds.length > 1) {
-        if (mounted) {
-          setState(() {
-            _isProcessing = false;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Por ahora solo puedes pagar productos de un vendedor a la vez.'),
-              backgroundColor: Colors.red,
-              behavior: SnackBarBehavior.floating,
-              duration: Duration(seconds: 2),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.all(Radius.circular(20)),
-              ),
-              margin: EdgeInsets.all(16),
-            ),
-          );
+      // Agrupar productos por vendedor
+      final Map<String, List<CartItemModel>> itemsByVendor = {};
+      for (var item in widget.cartItems) {
+        if (!itemsByVendor.containsKey(item.sellerId)) {
+          itemsByVendor[item.sellerId] = [];
         }
-        return;
+        itemsByVendor[item.sellerId]!.add(item);
       }
 
-      final vendorId = sellerIds.first;
-      final commissionPercent = 0.10; // 10% de comisión para la plataforma
-      final applicationFeeAmount = (_subtotal * commissionPercent * 100).round();
-      final provisionalOrderId = 'tmp_${DateTime.now().millisecondsSinceEpoch}';
-
-      final orderItems = widget.cartItems.map((cartItem) {
-        return OrderItem(
-          productoId: cartItem.productId,
-          nombre: cartItem.productName,
-          imagen: cartItem.productImage,
-          precioUnitario: cartItem.unitPrice,
-          precioTotal: cartItem.totalPrice,
-          cantidad: cartItem.quantity,
-          unidad: cartItem.unit,
-          vendedorId: cartItem.sellerId,
-        );
-      }).toList();
-
       String userName = user.displayName ?? user.email?.split('@').first ?? 'Usuario';
-      String? paymentIntentId;
+      final commissionPercent = 0.10; // 10% de comisión para la plataforma
+      final List<Map<String, dynamic>> processedOrders = [];
+      bool allPaymentsSuccessful = true;
+      String? lastError;
+      String? mainPaymentIntentId;
 
-      if (_selectedPaymentMethod == 'tarjeta') {
-        // Paso 1: Crear Payment Intent en el servidor
+      // Si hay múltiples vendedores, procesar el pago una sola vez con el total combinado
+      if (sellerIds.length > 1 && _selectedPaymentMethod == 'tarjeta') {
+        // Crear un PaymentIntent simple (sin Connect) para el total combinado
         final paymentResult = await StripeService.createPaymentIntent(
-          vendorId: vendorId,
+          vendorId: '', // Vacío para PaymentIntent simple
           amount: _total,
           currency: 'mxn',
-          applicationFeeAmount: applicationFeeAmount,
-          orderId: provisionalOrderId,
+          applicationFeeAmount: 0, // Sin comisión en el PaymentIntent principal
+          orderId: 'tmp_${DateTime.now().millisecondsSinceEpoch}',
           orderData: {
             'usuario_id': user.uid,
             'usuario_email': user.email ?? '',
@@ -190,13 +165,12 @@ class _PaymentViewState extends State<PaymentView> {
             'envio': _envio,
             'impuestos': _impuestos,
             'metodo_pago': 'tarjeta',
-            'productos': orderItems.map((item) => item.toJson()).toList(),
+            'multiple_vendors': true,
           },
           metadata: {
-            'order_id': provisionalOrderId,
             'user_id': user.uid,
             'user_email': user.email ?? '',
-            'vendor_id': vendorId,
+            'multiple_vendors': 'true',
           },
         );
 
@@ -222,12 +196,11 @@ class _PaymentViewState extends State<PaymentView> {
         }
 
         try {
-          // Paso 2: Usar Payment Sheet de Stripe (método seguro y recomendado)
-          print('💳 Iniciando Payment Sheet...');
+          // Presentar Payment Sheet UNA SOLA VEZ
+          print('💳 Iniciando Payment Sheet para múltiples vendedores...');
           
           final clientSecret = paymentResult['clientSecret'] as String;
           
-          // Inicializar Payment Sheet
           await Stripe.instance.initPaymentSheet(
             paymentSheetParameters: SetupPaymentSheetParameters(
               paymentIntentClientSecret: clientSecret,
@@ -241,16 +214,13 @@ class _PaymentViewState extends State<PaymentView> {
             ),
           );
           
-          // Presentar Payment Sheet
           await Stripe.instance.presentPaymentSheet();
           
           print('✅ Payment Sheet completado exitosamente');
           
-          // Guardar el Payment Intent ID para asociarlo con la orden
-          paymentIntentId = paymentResult['paymentIntentId'] as String;
+          mainPaymentIntentId = paymentResult['paymentIntentId'] as String;
         } on StripeException catch (e) {
           print('❌ Error de Stripe: ${e.error.code} - ${e.error.message}');
-          print('❌ Tipo de error: ${e.error.type}');
           if (mounted) {
             setState(() {
               _isProcessing = false;
@@ -301,97 +271,168 @@ class _PaymentViewState extends State<PaymentView> {
         }
       }
 
-      final order = OrderModel.fromCart(
-        usuarioId: user.uid,
-        usuarioNombre: userName,
-        usuarioEmail: user.email ?? '',
-        ciudad: widget.ciudad,
-        telefono: widget.telefono,
-        direccionEntrega: widget.direccionEntrega,
-        metodoPago: _selectedPaymentMethod,
-        productos: orderItems,
-        envio: _envio,
-        paymentIntentId: paymentIntentId,
-      );
+      // Procesar cada grupo de vendedor por separado
+      for (var vendorId in sellerIds) {
+        final vendorItems = itemsByVendor[vendorId]!;
+        final vendorSubtotal = vendorItems.fold(0.0, (sum, item) => sum + item.totalPrice);
+        final vendorEnvio = _envio / sellerIds.length; // Dividir envío entre vendedores
+        final vendorImpuestos = vendorSubtotal * 0.10;
+        final vendorTotal = vendorSubtotal + vendorEnvio + vendorImpuestos;
+        final applicationFeeAmount = (vendorSubtotal * commissionPercent * 100).round();
+        final provisionalOrderId = sellerIds.length > 1 
+            ? 'tmp_${DateTime.now().millisecondsSinceEpoch}_${vendorId}'
+            : 'tmp_${DateTime.now().millisecondsSinceEpoch}';
 
-      final result = await OrderService.saveOrder(order);
+        final orderItems = vendorItems.map((cartItem) {
+          return OrderItem(
+            productoId: cartItem.productId,
+            nombre: cartItem.productName,
+            imagen: cartItem.productImage,
+            precioUnitario: cartItem.unitPrice,
+            precioTotal: cartItem.totalPrice,
+            cantidad: cartItem.quantity,
+            unidad: cartItem.unit,
+            vendedorId: cartItem.sellerId,
+          );
+        }).toList();
 
-      if (!mounted) return;
+        String? paymentIntentId;
 
-      if (result['success']) {
+        // Si hay un solo vendedor, procesar el pago normalmente con Connect
+        if (_selectedPaymentMethod == 'tarjeta' && sellerIds.length == 1) {
+          // Paso 1: Crear Payment Intent en el servidor
+          final paymentResult = await StripeService.createPaymentIntent(
+            vendorId: vendorId,
+            amount: vendorTotal,
+            currency: 'mxn',
+            applicationFeeAmount: applicationFeeAmount,
+            orderId: provisionalOrderId,
+            orderData: {
+              'usuario_id': user.uid,
+              'usuario_email': user.email ?? '',
+              'usuario_nombre': userName,
+              'total': vendorTotal,
+              'subtotal': vendorSubtotal,
+              'envio': vendorEnvio,
+              'impuestos': vendorImpuestos,
+              'metodo_pago': 'tarjeta',
+              'productos': orderItems.map((item) => item.toJson()).toList(),
+            },
+            metadata: {
+              'order_id': provisionalOrderId,
+              'user_id': user.uid,
+              'user_email': user.email ?? '',
+              'vendor_id': vendorId,
+            },
+          );
+
+          if (!paymentResult['success']) {
+            allPaymentsSuccessful = false;
+            lastError = paymentResult['message'] ?? 'Error creando Payment Intent';
+            break;
+          }
+
+          try {
+            // Paso 2: Usar Payment Sheet de Stripe
+            print('💳 Iniciando Payment Sheet para vendedor $vendorId...');
+            
+            final clientSecret = paymentResult['clientSecret'] as String;
+            
+            // Inicializar Payment Sheet
+            await Stripe.instance.initPaymentSheet(
+              paymentSheetParameters: SetupPaymentSheetParameters(
+                paymentIntentClientSecret: clientSecret,
+                merchantDisplayName: 'AgroMarket',
+                billingDetails: BillingDetails(
+                  name: _cardHolderNameController.text.isNotEmpty 
+                      ? _cardHolderNameController.text 
+                      : user.displayName ?? user.email?.split('@').first ?? 'Cliente',
+                  email: user.email,
+                ),
+              ),
+            );
+            
+            // Presentar Payment Sheet
+            await Stripe.instance.presentPaymentSheet();
+            
+            print('✅ Payment Sheet completado exitosamente para vendedor $vendorId');
+            
+            // Guardar el Payment Intent ID para asociarlo con la orden
+            paymentIntentId = paymentResult['paymentIntentId'] as String;
+          } on StripeException catch (e) {
+            print('❌ Error de Stripe: ${e.error.code} - ${e.error.message}');
+            allPaymentsSuccessful = false;
+            if (e.error.code == FailureCode.Canceled) {
+              lastError = 'Pago cancelado';
+            } else {
+              lastError = e.error.message ?? 'Error procesando el pago';
+            }
+            break;
+          } catch (e, stackTrace) {
+            print('❌ Error inesperado en pago: $e');
+            print('❌ Stack trace: $stackTrace');
+            allPaymentsSuccessful = false;
+            lastError = 'Error inesperado: ${e.toString()}';
+            break;
+          }
+        } else if (_selectedPaymentMethod == 'tarjeta' && sellerIds.length > 1) {
+          // Si hay múltiples vendedores, usar el PaymentIntent principal ya procesado
+          paymentIntentId = mainPaymentIntentId;
+        }
+
+        // Crear orden para este vendedor
+        final order = OrderModel.fromCart(
+          usuarioId: user.uid,
+          usuarioNombre: userName,
+          usuarioEmail: user.email ?? '',
+          ciudad: widget.ciudad,
+          telefono: widget.telefono,
+          direccionEntrega: widget.direccionEntrega,
+          metodoPago: _selectedPaymentMethod,
+          productos: orderItems,
+          envio: vendorEnvio,
+          paymentIntentId: paymentIntentId,
+        );
+
+        final result = await OrderService.saveOrder(order);
+
+        if (!result['success']) {
+          allPaymentsSuccessful = false;
+          lastError = result['message'] ?? 'Error al guardar la orden';
+          break;
+        }
+
         final savedOrder = result['order'] as OrderModel? ?? order.copyWith(id: result['orderId']);
         final orderId = result['orderId'] as String;
 
         // Si el pago es con tarjeta, registrar la confirmación en el servidor
         if (_selectedPaymentMethod == 'tarjeta' && paymentIntentId != null) {
-          // Confirmar que el pago se asoció correctamente con la orden
           final confirmPaymentResult = await StripeService.confirmPayment(
             paymentIntentId: paymentIntentId,
             orderId: orderId,
           );
 
           if (!confirmPaymentResult['success']) {
-            print('⚠️ Advertencia: Error registrando confirmación de pago en servidor');
-            print('   - El pago fue procesado, pero puede haber un problema al registrar la asociación');
+            print('⚠️ Advertencia: Error registrando confirmación de pago en servidor para orden $orderId');
           }
         }
 
-        // Enviar correo de confirmación/factura
-        try {
-          final productosParaEmail = orderItems.map((item) {
-            return {
-              'nombre': item.nombre,
-              'cantidad': item.cantidad,
-              'precio_unitario': item.precioUnitario,
-              'precio_total': item.precioTotal,
-              'unidad': item.unidad,
-            };
-          }).toList();
+        processedOrders.add({
+          'order': savedOrder,
+          'orderId': orderId,
+          'orderItems': orderItems,
+        });
+      }
 
-          final emailResult = await EmailService.sendReceiptEmail(
-            email: user.email ?? '',
-            orderId: orderId,
-            total: order.total,
-            productos: productosParaEmail,
-            userName: userName,
-            subtotal: order.subtotal,
-            envio: order.envio,
-            impuestos: order.impuestos,
-            ciudad: order.ciudad,
-            telefono: order.telefono,
-            direccionEntrega: order.direccionEntrega,
-            metodoPago: order.metodoPago,
-            fechaCompra: order.fechaCompra,
-          );
+      if (!mounted) return;
 
-          if (emailResult['success']) {
-            print('✅ Correo de confirmación enviado exitosamente');
-          } else {
-            print('⚠️ Advertencia: No se pudo enviar el correo de confirmación: ${emailResult['message']}');
-          }
-        } catch (e) {
-          print('⚠️ Error enviando correo de confirmación: $e');
-          // No fallar el proceso si el correo no se puede enviar
-        }
-
-        await CartService.clearCart();
-
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(
-            builder: (context) => OrderConfirmationView(
-              order: savedOrder,
-            ),
-          ),
-          (route) => route.isFirst,
-        );
-      } else {
+      if (!allPaymentsSuccessful) {
         setState(() {
           _isProcessing = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result['message'] ?? 'Error al procesar el pago'),
+            content: Text(lastError ?? 'Error al procesar el pago'),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
             duration: const Duration(seconds: 2),
@@ -401,7 +442,74 @@ class _PaymentViewState extends State<PaymentView> {
             margin: const EdgeInsets.all(16),
           ),
         );
+        return;
       }
+
+      // Enviar correo de confirmación con todas las órdenes
+      try {
+        final allProductosParaEmail = <Map<String, dynamic>>[];
+        double totalGeneral = 0;
+        double subtotalGeneral = 0;
+        double envioGeneral = 0;
+        double impuestosGeneral = 0;
+
+        for (var orderData in processedOrders) {
+          final orderItems = orderData['orderItems'] as List<OrderItem>;
+          for (var item in orderItems) {
+            allProductosParaEmail.add({
+              'nombre': item.nombre,
+              'cantidad': item.cantidad,
+              'precio_unitario': item.precioUnitario,
+              'precio_total': item.precioTotal,
+              'unidad': item.unidad,
+            });
+          }
+          final order = orderData['order'] as OrderModel;
+          totalGeneral += order.total;
+          subtotalGeneral += order.subtotal;
+          envioGeneral += order.envio;
+          impuestosGeneral += order.impuestos;
+        }
+
+        final emailResult = await EmailService.sendReceiptEmail(
+          email: user.email ?? '',
+          orderId: processedOrders.map((o) => o['orderId'] as String).join(', '),
+          total: totalGeneral,
+          productos: allProductosParaEmail,
+          userName: userName,
+          subtotal: subtotalGeneral,
+          envio: envioGeneral,
+          impuestos: impuestosGeneral,
+          ciudad: widget.ciudad,
+          telefono: widget.telefono,
+          direccionEntrega: widget.direccionEntrega,
+          metodoPago: _selectedPaymentMethod,
+          fechaCompra: DateTime.now(),
+        );
+
+        if (emailResult['success']) {
+          print('✅ Correo de confirmación enviado exitosamente');
+        } else {
+          print('⚠️ Advertencia: No se pudo enviar el correo de confirmación: ${emailResult['message']}');
+        }
+      } catch (e) {
+        print('⚠️ Error enviando correo de confirmación: $e');
+        // No fallar el proceso si el correo no se puede enviar
+      }
+
+      await CartService.clearCart();
+
+      // Navegar a la confirmación con la primera orden (o crear una vista que muestre todas)
+      final firstOrder = processedOrders.first['order'] as OrderModel;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(
+          builder: (context) => OrderConfirmationView(
+            order: firstOrder,
+          ),
+        ),
+        (route) => route.isFirst,
+      );
     } catch (e) {
       print('Error procesando pago: $e');
       if (mounted) {
