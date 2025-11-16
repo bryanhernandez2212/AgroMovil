@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:agromarket/models/cart_item_model.dart';
 import 'package:agromarket/models/order_model.dart';
 import 'package:agromarket/services/order_service.dart';
 import 'package:agromarket/services/cart_service.dart';
 import 'package:agromarket/services/stripe_service.dart';
+import 'package:agromarket/services/email_service.dart';
+import 'package:agromarket/services/firebase_service.dart';
 import 'package:agromarket/views/buyer/order_confirmation_view.dart';
 
 class PaymentView extends StatefulWidget {
@@ -102,16 +103,76 @@ class _PaymentViewState extends State<PaymentView> {
         );
       }).toList();
 
+      final sellerIds = widget.cartItems.map((item) => item.sellerId).toSet();
+      if (sellerIds.isEmpty) {
+        if (mounted) {
+          setState(() {
+            _isProcessing = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No se encontró el vendedor de los productos.'),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.all(Radius.circular(12)),
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
+      if (sellerIds.length > 1) {
+        if (mounted) {
+          setState(() {
+            _isProcessing = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Por ahora solo puedes pagar productos de un vendedor a la vez.'),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.all(Radius.circular(12)),
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
+      final vendorId = sellerIds.first;
+      final commissionPercent = 0.10; // 10% de comisión de la plataforma
+      final applicationFeeAmount = (_subtotal * commissionPercent * 100).round();
+      final provisionalOrderId = 'tmp_${DateTime.now().millisecondsSinceEpoch}';
+
       String userName = user.displayName ?? user.email?.split('@').first ?? 'Usuario';
       String? paymentIntentId;
 
       if (_selectedPaymentMethod == 'tarjeta') {
         final paymentResult = await StripeService.createPaymentIntent(
+          vendorId: vendorId,
           amount: _total,
           currency: 'mxn',
+          applicationFeeAmount: applicationFeeAmount,
+          orderId: provisionalOrderId,
           orderData: {
+            'usuario_id': user.uid,
+            'usuario_email': user.email ?? '',
+            'usuario_nombre': userName,
+            'total': _total,
+            'subtotal': _subtotal,
+            'envio': _envio,
+            'impuestos': _impuestos,
+            'metodo_pago': 'tarjeta',
+            'productos': orderItems.map((item) => item.toJson()).toList(),
+          },
+          metadata: {
+            'order_id': provisionalOrderId,
             'user_id': user.uid,
             'user_email': user.email ?? '',
+            'vendor_id': vendorId,
           },
         );
 
@@ -249,26 +310,53 @@ class _PaymentViewState extends State<PaymentView> {
             paymentIntentId: paymentIntentId,
             orderId: orderId,
           );
+        }
 
+        // Enviar correo de confirmación/factura para todos los métodos de pago
+        try {
           final productosParaEmail = orderItems.map((item) {
             return {
               'nombre': item.nombre,
               'cantidad': item.cantidad,
               'precio_unitario': item.precioUnitario,
               'precio_total': item.precioTotal,
+              'unidad': item.unidad,
             };
           }).toList();
 
-          final emailResult = await StripeService.sendReceiptEmail(
+          // Obtener nombre del usuario
+          String? userName;
+          try {
+            final userData = await FirebaseService.getCurrentUserData();
+            userName = userData?['nombre'] as String?;
+          } catch (e) {
+            print('⚠️ No se pudo obtener el nombre del usuario: $e');
+          }
+
+          final emailResult = await EmailService.sendReceiptEmail(
+            email: user.email ?? '',
             orderId: orderId,
-            userEmail: user.email ?? '',
-            total: _total,
+            total: order.total,
             productos: productosParaEmail,
+            userName: userName,
+            subtotal: order.subtotal,
+            envio: order.envio,
+            impuestos: order.impuestos,
+            ciudad: order.ciudad,
+            telefono: order.telefono,
+            direccionEntrega: order.direccionEntrega,
+            metodoPago: order.metodoPago,
+            fechaCompra: order.fechaCompra,
           );
 
-          if (!emailResult['success']) {
-            print('⚠️ Advertencia: No se pudo enviar el comprobante por correo');
+          if (emailResult['success']) {
+            print('✅ Correo de confirmación enviado exitosamente');
+          } else {
+            print('⚠️ Advertencia: No se pudo enviar el correo de confirmación: ${emailResult['message']}');
           }
+        } catch (e) {
+          print('⚠️ Error enviando correo de confirmación: $e');
+          // No fallar el proceso si el correo no se puede enviar
         }
 
         await CartService.clearCart();

@@ -73,6 +73,7 @@ class FirebaseService {
             'rol_activo': rol,
             'roles': [rol],
             'fecha_registro': FieldValue.serverTimestamp(),
+            'foto_perfil': null,
           }
         };
       } else {
@@ -152,6 +153,7 @@ class FirebaseService {
               'rol_activo': userData['rol_activo'] ?? 'comprador',
               'roles': userData['roles'] ?? ['comprador'],
               'fecha_registro': userData['fecha_registro'],
+              if (userData['foto_perfil'] != null) 'foto_perfil': userData['foto_perfil'],
             }
           };
         } else {
@@ -666,6 +668,7 @@ class FirebaseService {
           'fecha_registro': data['fecha_registro'],
           'created_at': data['created_at'],
           'updated_at': data['updated_at'],
+          if (data['foto_perfil'] != null) 'foto_perfil': data['foto_perfil'],
         };
         
         // Agregar campos de vendedor si existen
@@ -776,6 +779,7 @@ class FirebaseService {
             'rol_activo': userData['rol_activo'] ?? 'comprador',
             'roles': userData['roles'] ?? ['comprador'],
             'fecha_registro': userData['fecha_registro'],
+            if (userData['foto_perfil'] != null) 'foto_perfil': userData['foto_perfil'],
           }
         };
       }
@@ -803,15 +807,16 @@ class FirebaseService {
       return {
         'success': true,
         'message': 'Usuario de Microsoft registrado exitosamente',
-        'user': {
-          'id': userId,
-          'nombre': nombre,
-          'email': email,
-          'activo': true,
-          'rol_activo': 'comprador',
-          'roles': ['comprador'],
-          'fecha_registro': FieldValue.serverTimestamp(),
-        }
+          'user': {
+            'id': userId,
+            'nombre': nombre,
+            'email': email,
+            'activo': true,
+            'rol_activo': 'comprador',
+            'roles': ['comprador'],
+            'fecha_registro': FieldValue.serverTimestamp(),
+            'foto_perfil': null,
+          }
       };
     } catch (e) {
       print('❌ Error registrando usuario de Microsoft: $e');

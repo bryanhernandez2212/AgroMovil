@@ -10,28 +10,32 @@ import 'package:agromarket/estructure/product_estructure.dart';
 
 class RegisterProductViewContent extends StatefulWidget {
   final ProductModel? productToEdit;
-  
+
   const RegisterProductViewContent({super.key, this.productToEdit});
 
   @override
-  State<RegisterProductViewContent> createState() => _RegisterProductViewContentState();
+  State<RegisterProductViewContent> createState() =>
+      _RegisterProductViewContentState();
 }
 
-class _RegisterProductViewContentState extends State<RegisterProductViewContent> with TickerProviderStateMixin {
+class _RegisterProductViewContentState extends State<RegisterProductViewContent>
+    with TickerProviderStateMixin {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _priceController = TextEditingController();
   final TextEditingController _stockController = TextEditingController();
   final TextEditingController _categoryController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _unitController = TextEditingController();
-  
+  final ScrollController _scrollController = ScrollController();
+
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
-  
+
   // Variables para manejo de imágenes y estado
   List<File> _selectedImages = []; // Lista de imágenes seleccionadas (hasta 5)
-  List<String> _existingImageUrls = []; // URLs de imágenes existentes si se está editando
+  List<String> _existingImageUrls =
+      []; // URLs de imágenes existentes si se está editando
   String? _selectedCategory;
   String? _selectedUnit;
   bool _isLoadingAllow = false;
@@ -46,7 +50,7 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
       duration: const Duration(milliseconds: 1000),
       vsync: this,
     );
-    
+
     _fadeAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
@@ -54,7 +58,7 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
       parent: _animationController,
       curve: Curves.easeInOut,
     ));
-    
+
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, 0.3),
       end: Offset.zero,
@@ -62,10 +66,10 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
       parent: _animationController,
       curve: Curves.easeOutCubic,
     ));
-    
+
     _animationController.forward();
     _loadInitialData();
-    
+
     // Si hay un producto para editar, precargar los datos
     if (widget.productToEdit != null) {
       _loadProductData(widget.productToEdit!);
@@ -81,10 +85,10 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
     _selectedCategory = product.categoria;
     _selectedUnit = product.unidad;
     // Cargar imágenes existentes (array o imagen única)
-    _existingImageUrls = product.imagenes.isNotEmpty 
+    _existingImageUrls = product.imagenes.isNotEmpty
         ? List<String>.from(product.imagenes)
         : (product.imagenUrl.isNotEmpty ? [product.imagenUrl] : []);
-    
+
     setState(() {});
   }
 
@@ -93,13 +97,13 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
     try {
       _categories = await ProductService.getCategories();
       _units = ProductService.getUnits();
-      
+
       // Establecer valores por defecto solo si no hay producto para editar
       if (widget.productToEdit == null) {
         if (_categories.isNotEmpty) _selectedCategory = _categories.first;
         if (_units.isNotEmpty) _selectedUnit = _units.first;
       }
-      
+
       setState(() {}); // Actualizar la UI con los datos cargados
     } catch (e) {
       print('Error cargando datos iniciales: $e');
@@ -133,34 +137,80 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
         return;
       }
 
-      final ImagePicker picker = ImagePicker();
-      final List<XFile> images = await picker.pickMultiImage(
-        maxWidth: 1024,
-        maxHeight: 1024,
-        imageQuality: 85,
+      // Mostrar diálogo para elegir fuente
+      final ImageSource? source = await showDialog<ImageSource>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Agregar imagen'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt, color: Color(0xFF115213)),
+                title: const Text('Tomar foto'),
+                onTap: () => Navigator.pop(context, ImageSource.camera),
+              ),
+              ListTile(
+                leading:
+                    const Icon(Icons.photo_library, color: Color(0xFF115213)),
+                title: const Text('Elegir de galería'),
+                onTap: () => Navigator.pop(context, ImageSource.gallery),
+              ),
+            ],
+          ),
+        ),
       );
-      
+
+      if (source == null) return;
+
+      final ImagePicker picker = ImagePicker();
+      List<XFile> images = [];
+
+      if (source == ImageSource.camera) {
+        // Tomar una foto con la cámara
+        final XFile? image = await picker.pickImage(
+          source: ImageSource.camera,
+          maxWidth: 1024,
+          maxHeight: 1024,
+          imageQuality: 85,
+        );
+        if (image != null) {
+          images = [image];
+        }
+      } else {
+        // Seleccionar múltiples imágenes de la galería
+        images = await picker.pickMultiImage(
+          maxWidth: 1024,
+          maxHeight: 1024,
+          imageQuality: 85,
+        );
+      }
+
       if (images.isNotEmpty) {
-        int remainingSlots = 5 - _selectedImages.length - _existingImageUrls.length;
-        int imagesToAdd = images.length > remainingSlots ? remainingSlots : images.length;
-        
+        int remainingSlots =
+            5 - _selectedImages.length - _existingImageUrls.length;
+        int imagesToAdd =
+            images.length > remainingSlots ? remainingSlots : images.length;
+
         setState(() {
           for (int i = 0; i < imagesToAdd; i++) {
             _selectedImages.add(File(images[i].path));
           }
         });
-        
+
         if (images.length > remainingSlots) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Solo se agregaron $remainingSlots imágenes (máximo 5 permitidas)'),
+              content: Text(
+                  'Solo se agregaron $imagesToAdd imágenes (máximo 5 permitidas)'),
               duration: const Duration(seconds: 2),
             ),
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('${images.length} imagen(es) seleccionada(s) exitosamente'),
+              content:
+                  Text('${images.length} imagen(es) agregada(s) exitosamente'),
               duration: const Duration(seconds: 2),
             ),
           );
@@ -203,37 +253,36 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
     );
   }
 
-
   // Método para guardar producto
   Future<void> _saveProduct() async {
     print('=== INICIANDO PROCESO DE GUARDADO ===');
-    
+
     // Validar campos requeridos
     if (_nameController.text.trim().isEmpty) {
       _showErrorDialog('Por favor ingresa el nombre del producto');
       return;
     }
-    
+
     if (_priceController.text.trim().isEmpty) {
       _showErrorDialog('Por favor ingresa el precio del producto');
       return;
     }
-    
+
     if (_stockController.text.trim().isEmpty) {
       _showErrorDialog('Por favor ingresa el stock del producto');
       return;
     }
-    
+
     if (_descriptionController.text.trim().isEmpty) {
       _showErrorDialog('Por favor ingresa la descripción del producto');
       return;
     }
-    
+
     if (_selectedCategory == null) {
       _showErrorDialog('Por favor selecciona una categoría');
       return;
     }
-    
+
     if (_selectedUnit == null) {
       _showErrorDialog('Por favor selecciona una unidad');
       return;
@@ -255,15 +304,17 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
       final User? user = FirebaseAuth.instance.currentUser;
       print('Usuario obtenido: ${user?.uid}');
       print('Email del usuario: ${user?.email}');
-      
+
       if (user == null) {
-        _showErrorDialog('Usuario no autenticado. Por favor, inicia sesión nuevamente.');
+        _showErrorDialog(
+            'Usuario no autenticado. Por favor, inicia sesión nuevamente.');
         return;
       }
 
       String productId = widget.productToEdit?.id ?? '';
-      List<String> allImageUrls = List<String>.from(_existingImageUrls); // URLs existentes
-      
+      List<String> allImageUrls =
+          List<String>.from(_existingImageUrls); // URLs existentes
+
       // Si hay nuevas imágenes para subir
       if (_selectedImages.isNotEmpty) {
         // Si es producto nuevo, primero crear el documento para obtener el ID
@@ -276,20 +327,24 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
             precio: double.parse(_priceController.text.trim()),
             stock: int.parse(_stockController.text.trim()),
             unidad: _selectedUnit!,
-            imagenUrl: allImageUrls.isNotEmpty ? allImageUrls.first : '', // Usar existente si hay
+            imagenUrl: allImageUrls.isNotEmpty
+                ? allImageUrls.first
+                : '', // Usar existente si hay
             imagenes: allImageUrls, // Mantener existentes
             vendedorEmail: user.email ?? '',
             vendedorId: user.uid,
             vendedorNombre: user.displayName ?? 'Usuario',
           );
-          
+
           // Crear documento temporal
-          final docRef = await FirebaseFirestore.instance.collection('productos').add(tempProduct.toJson());
+          final docRef = await FirebaseFirestore.instance
+              .collection('productos')
+              .add(tempProduct.toJson());
           productId = docRef.id;
           await docRef.update({'id': productId});
           print('Documento creado con ID: $productId');
         }
-        
+
         // Subir nuevas imágenes
         print('Subiendo ${_selectedImages.length} imagen(es)...');
         final imagesResult = await ProductService.uploadProductImages(
@@ -297,17 +352,23 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
           _nameController.text.trim(),
           productId,
         );
-        
+
         if (imagesResult['success']) {
-          List<String> newImageUrls = List<String>.from(imagesResult['imageUrls']);
+          List<String> newImageUrls =
+              List<String>.from(imagesResult['imageUrls']);
           allImageUrls.addAll(newImageUrls);
-          print('Imágenes subidas exitosamente. Total URLs: ${allImageUrls.length}');
+          print(
+              'Imágenes subidas exitosamente. Total URLs: ${allImageUrls.length}');
         } else {
           // Si falló la subida de imágenes nuevas y es producto nuevo, eliminar documento temporal
           if (widget.productToEdit == null && productId.isNotEmpty) {
-            await FirebaseFirestore.instance.collection('productos').doc(productId).delete();
+            await FirebaseFirestore.instance
+                .collection('productos')
+                .doc(productId)
+                .delete();
           }
-          _showErrorDialog('Error subiendo imágenes: ${imagesResult['message']}');
+          _showErrorDialog(
+              'Error subiendo imágenes: ${imagesResult['message']}');
           return;
         }
       }
@@ -321,7 +382,9 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
         precio: double.parse(_priceController.text.trim()),
         stock: int.parse(_stockController.text.trim()),
         unidad: _selectedUnit!,
-        imagenUrl: allImageUrls.isNotEmpty ? allImageUrls.first : '', // Primera como principal
+        imagenUrl: allImageUrls.isNotEmpty
+            ? allImageUrls.first
+            : '', // Primera como principal
         imagenes: allImageUrls, // Array completo
         vendedorEmail: user.email ?? '',
         vendedorId: user.uid,
@@ -337,22 +400,33 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
       if (widget.productToEdit != null) {
         // Actualizar producto existente
         print('Actualizando producto con ID: ${widget.productToEdit!.id}');
-        result = await ProductService.updateProduct(widget.productToEdit!.id, product);
+        result = await ProductService.updateProduct(
+            widget.productToEdit!.id, product);
       } else {
         // Actualizar el documento con las imágenes
         print('Actualizando documento con URLs de imágenes...');
-        await FirebaseFirestore.instance.collection('productos').doc(productId).update(product.toJson());
-        result = {'success': true, 'message': 'Producto guardado exitosamente', 'productId': productId};
+        await FirebaseFirestore.instance
+            .collection('productos')
+            .doc(productId)
+            .update(product.toJson());
+        result = {
+          'success': true,
+          'message': 'Producto guardado exitosamente',
+          'productId': productId
+        };
       }
-      
+
       print('Resultado: $result');
-      
+
       if (result['success']) {
-        print(widget.productToEdit != null ? 'Producto actualizado exitosamente' : 'Producto guardado exitosamente');
+        print(widget.productToEdit != null
+            ? 'Producto actualizado exitosamente'
+            : 'Producto guardado exitosamente');
         _showSuccessDialog();
       } else {
         print('Error: ${result['message']}');
-        _showErrorDialog('Error ${widget.productToEdit != null ? 'actualizando' : 'guardando'} producto: ${result['message']}');
+        _showErrorDialog(
+            'Error ${widget.productToEdit != null ? 'actualizando' : 'guardando'} producto: ${result['message']}');
       }
     } catch (e) {
       print('Error en el proceso de guardado: $e');
@@ -390,15 +464,15 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
       barrierDismissible: false, // Evita que se cierre tocando fuera
       builder: (context) => AlertDialog(
         title: const Text('Éxito'),
-        content: Text(widget.productToEdit != null 
-            ? 'Producto actualizado exitosamente' 
+        content: Text(widget.productToEdit != null
+            ? 'Producto actualizado exitosamente'
             : 'Producto guardado exitosamente'),
         actions: [
           TextButton(
             onPressed: () {
               // Cerrar el diálogo
               Navigator.of(context).pop();
-              
+
               // Si se está editando, regresar con resultado true para recargar la lista
               if (widget.productToEdit != null) {
                 Navigator.of(context).pop(true);
@@ -407,7 +481,8 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
                 // El índice 2 corresponde a "Mis productos" en la estructura
                 Navigator.of(context).pushReplacement(
                   MaterialPageRoute(
-                    builder: (context) => const ProductEstructureView(currentIndex: 2),
+                    builder: (context) =>
+                        const ProductEstructureView(currentIndex: 2),
                   ),
                 );
               }
@@ -419,10 +494,11 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
     );
   }
 
-
-
   @override
   Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    final keyboardHeight = mediaQuery.viewInsets.bottom;
+
     return VendorGuard(
       child: Scaffold(
         resizeToAvoidBottomInset: true,
@@ -1074,8 +1150,8 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
       ),
     );
   }
-  
-    // Método para crear dropdown fields con diseño simple
+
+  // Método para crear dropdown fields con diseño simple
   Widget _buildDropdownField({
     required String label,
     required String? value,
@@ -1160,7 +1236,7 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
 // Mantener la clase original para compatibilidad
 class RegisterProductView extends StatelessWidget {
   final ProductModel? productToEdit;
-  
+
   const RegisterProductView({super.key, this.productToEdit});
 
   @override
@@ -1168,3 +1244,4 @@ class RegisterProductView extends StatelessWidget {
     return RegisterProductViewContent(productToEdit: productToEdit);
   }
 }
+

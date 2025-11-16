@@ -7,6 +7,9 @@ import 'package:agromarket/services/firebase_service.dart';
 import 'package:agromarket/services/places_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 
 class ProfileView extends StatefulWidget {
   const ProfileView({super.key});
@@ -27,6 +30,9 @@ class _ProfileViewState extends State<ProfileView> {
   bool _showPredictions = false;
   PlaceDetails? _selectedPlace;
   bool _isVendedor = false;
+  File? _selectedImageFile;
+  String? _profileImageUrl;
+  final ImagePicker _imagePicker = ImagePicker();
 
   @override
   void initState() {
@@ -46,6 +52,12 @@ class _ProfileViewState extends State<ProfileView> {
       // Cargar datos adicionales desde Firestore
       final userData = await FirebaseService.getCurrentUserData();
       if (userData != null) {
+        // Cargar foto de perfil si existe
+        if (userData['foto_perfil'] != null) {
+          setState(() {
+            _profileImageUrl = userData['foto_perfil'] as String;
+          });
+        }
         // Verificar solo el modo de navegación actual (rol_activo)
         // El rol_activo puede ser 'vendedor' o 'comprador'
         final rolActivo = userData['rol_activo']?.toString().toLowerCase().trim() ?? 'comprador';
@@ -117,6 +129,76 @@ class _ProfileViewState extends State<ProfileView> {
     });
   }
 
+  Future<void> _pickProfileImage() async {
+    try {
+      // Mostrar diálogo para elegir fuente
+      final ImageSource? source = await showDialog<ImageSource>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Seleccionar imagen'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt, color: Color(0xFF115213)),
+                title: const Text('Tomar foto'),
+                onTap: () => Navigator.pop(context, ImageSource.camera),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library, color: Color(0xFF115213)),
+                title: const Text('Elegir de galería'),
+                onTap: () => Navigator.pop(context, ImageSource.gallery),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      if (source == null) return;
+
+      final XFile? image = await _imagePicker.pickImage(
+        source: source,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        setState(() {
+          _selectedImageFile = File(image.path);
+        });
+      }
+    } catch (e) {
+      _showErrorSnackBar('Error al seleccionar imagen: $e');
+    }
+  }
+
+  Future<String?> _uploadProfileImage() async {
+    if (_selectedImageFile == null) return null;
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return null;
+
+      final storage = FirebaseStorage.instance;
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = 'profile_${user.uid}_$timestamp.jpg';
+      final storageRef = storage.ref().child('perfiles/$fileName');
+
+      print('📤 Subiendo foto de perfil...');
+      final uploadTask = storageRef.putFile(_selectedImageFile!);
+      final snapshot = await uploadTask;
+      
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+      print('✅ Foto de perfil subida exitosamente: $downloadUrl');
+      
+      return downloadUrl;
+    } catch (e) {
+      print('❌ Error subiendo foto de perfil: $e');
+      throw Exception('Error al subir la imagen: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<AuthController>(
@@ -165,42 +247,77 @@ class _ProfileViewState extends State<ProfileView> {
                   Center(
                     child: Stack(
                       children: [
-                        Container(
-                          width: 120,
-                          height: 120,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF115213),
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                spreadRadius: 2,
-                                blurRadius: 8,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.person,
-                            size: 60,
-                            color: Colors.white,
+                        GestureDetector(
+                          onTap: _isEditing ? _pickProfileImage : null,
+                          child: Container(
+                            width: 120,
+                            height: 120,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF115213),
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  spreadRadius: 2,
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: ClipOval(
+                              child: _selectedImageFile != null
+                                  ? Image.file(
+                                      _selectedImageFile!,
+                                      fit: BoxFit.cover,
+                                      width: 120,
+                                      height: 120,
+                                    )
+                                  : _profileImageUrl != null
+                                      ? Image.network(
+                                          _profileImageUrl!,
+                                          fit: BoxFit.cover,
+                                          width: 120,
+                                          height: 120,
+                                          loadingBuilder: (context, child, loadingProgress) {
+                                            if (loadingProgress == null) return child;
+                                            return const Center(
+                                              child: CircularProgressIndicator(
+                                                color: Colors.white,
+                                              ),
+                                            );
+                                          },
+                                          errorBuilder: (context, error, stackTrace) => const Icon(
+                                            Icons.person,
+                                            size: 60,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : const Icon(
+                                          Icons.person,
+                                          size: 60,
+                                          color: Colors.white,
+                                        ),
+                            ),
                           ),
                         ),
                         if (_isEditing)
                           Positioned(
                             bottom: 0,
                             right: 0,
-                            child: Container(
-                              width: 36,
-                              height: 36,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFF115213),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.camera_alt,
-                                color: Colors.white,
-                                size: 20,
+                            child: GestureDetector(
+                              onTap: _pickProfileImage,
+                              child: Container(
+                                width: 36,
+                                height: 36,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF115213),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.camera_alt,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
                               ),
                             ),
                           ),
@@ -838,6 +955,7 @@ class _ProfileViewState extends State<ProfileView> {
     setState(() {
       _isEditing = !_isEditing;
       if (!_isEditing) {
+        _selectedImageFile = null; // Limpiar imagen seleccionada si se cancela
         _loadUserData(); // Recargar datos originales
       }
     });
@@ -846,6 +964,7 @@ class _ProfileViewState extends State<ProfileView> {
   void _cancelEdit() {
     setState(() {
       _isEditing = false;
+      _selectedImageFile = null; // Limpiar imagen seleccionada
       _loadUserData(); // Recargar datos originales
     });
   }
@@ -881,8 +1000,21 @@ class _ProfileViewState extends State<ProfileView> {
     });
 
     try {
+      // Subir foto de perfil si se seleccionó una nueva
+      String? newProfileImageUrl;
+      if (_selectedImageFile != null) {
+        newProfileImageUrl = await _uploadProfileImage();
+        if (newProfileImageUrl != null) {
+          setState(() {
+            _profileImageUrl = newProfileImageUrl;
+            _selectedImageFile = null; // Limpiar archivo temporal
+          });
+        }
+      }
+
       final updateData = <String, dynamic>{
         'nombre': _nameController.text.trim(),
+        if (newProfileImageUrl != null) 'foto_perfil': newProfileImageUrl,
       };
 
       // Agregar campos de vendedor si aplica
