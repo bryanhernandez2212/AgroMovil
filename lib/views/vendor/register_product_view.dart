@@ -41,7 +41,7 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
   bool _isLoadingAllow = false;
   List<String> _categories = [];
   List<String> _units = [];
-  final ScrollController _scrollController = ScrollController();
+  
 
   @override
   void initState() {
@@ -1244,4 +1244,3 @@ class RegisterProductView extends StatelessWidget {
     return RegisterProductViewContent(productToEdit: productToEdit);
   }
 }
-
