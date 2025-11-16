@@ -7,7 +7,7 @@
  * See a full list of supported triggers at https://firebase.google.com/docs/functions
  */
 
-const {onDocumentCreated} = require("firebase-functions/v2/firestore");
+const {onDocumentCreated, onDocumentUpdated} = require("firebase-functions/v2/firestore");
 const {setGlobalOptions} = require("firebase-functions/v2");
 const admin = require("firebase-admin");
 admin.initializeApp();
@@ -65,3 +65,85 @@ exports.notifyNewMessage = onDocumentCreated(
     });
   }
 );
+
+// Notificar SOLO al comprador cuando cambie el estado del pedido
+exports.notifyOrderStatusChange = onDocumentUpdated(
+  {
+    document: "compras/{orderId}",
+    region: "us-central1",
+  },
+  async (event) => {
+    const before = event.data.before.data() || {};
+    const after = event.data.after.data() || {};
+    const orderId = event.params.orderId;
+
+    // Estados válidos a notificar
+    // Usar minúsculas para tolerancia de formato
+    const VALID_STATES = new Set(["preparando", "enviado", "recibido", "devolucion"]);
+
+    // Helper para mensaje por estado
+    function statusMessage(statusRaw) {
+      const s = (statusRaw || "").toString().trim().toLowerCase();
+      switch (s) {
+        case "preparando": return "Tu pedido está siendo preparado.";
+        case "enviado": return "Tu pedido fue enviado.";
+        case "recibido": return "Confirmamos que recibiste tu pedido.";
+        case "devolucion": return "Tu pedido está en proceso de devolución.";
+        default: return `Estado actualizado a ${s.toUpperCase()}`;
+      }
+    }
+
+    // 1) Cambio global de estado
+    const prevGlobal = (before.estado_pedido || before.estado || "")
+      .toString()
+      .trim()
+      .toLowerCase();
+    const currGlobal = (after.estado_pedido || after.estado || "")
+      .toString()
+      .trim()
+      .toLowerCase();
+    const buyerId = after.usuario_id || after.usuarioId;
+
+    const messages = [];
+
+    if (buyerId && currGlobal && currGlobal !== prevGlobal && VALID_STATES.has(currGlobal)) {
+      const tokens = await getUserTokens(buyerId);
+      if (tokens.length) {
+        messages.push({
+          tokens,
+          notification: {
+            title: "Actualización de pedido",
+            body: statusMessage(currGlobal),
+          },
+          data: {
+            type: "order_status",
+            orderId,
+            newStatus: currGlobal,
+          },
+        });
+      }
+    }
+
+    // 2) (Eliminado) Notificaciones por producto: solo conservamos la global de pedido
+
+    if (!messages.length) return;
+    await Promise.all(messages.map((m) => admin.messaging().sendEachForMulticast(m)));
+  }
+);
+
+async function getUserTokens(uid) {
+  try {
+    const snap = await admin.firestore().collection("usuarios").doc(uid).get();
+    const data = snap.data() || {};
+    // Admitir tokens como arreglo o como mapa {token:true}
+    if (Array.isArray(data.fcmTokens)) {
+      return data.fcmTokens.filter(Boolean);
+    }
+    if (data.fcmTokens && typeof data.fcmTokens === "object") {
+      return Object.keys(data.fcmTokens).filter(Boolean);
+    }
+    return [];
+  } catch {
+    return [];
+  }
+}
