@@ -1244,4 +1244,3 @@ class RegisterProductView extends StatelessWidget {
     return RegisterProductViewContent(productToEdit: productToEdit);
   }
 }
-
