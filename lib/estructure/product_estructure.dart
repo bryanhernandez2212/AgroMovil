@@ -161,14 +161,9 @@ class _ProductEstructureViewState extends State<ProductEstructureView> {
                 ),
               ),
 
-            // Área de contenido con padding inferior para evitar solapamiento con el banner
+            // Área de contenido (sin padding extra; el formulario maneja el teclado)
             Expanded(
-              child: Padding(
-                padding: EdgeInsets.only(
-                  bottom: MediaQuery.of(context).viewInsets.bottom,
-                ),
-                child: _currentContent ?? _buildEmptyContent(),
-              ),
+              child: _currentContent ?? _buildEmptyContent(),
             ),
           ],
             ),
