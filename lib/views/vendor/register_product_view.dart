@@ -37,6 +37,7 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
   bool _isLoadingAllow = false;
   List<String> _categories = [];
   List<String> _units = [];
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -105,16 +106,16 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
     }
   }
 
-
   @override
   void dispose() {
-    _animationController.dispose();
+    _scrollController.dispose();
     _nameController.dispose();
     _priceController.dispose();
     _stockController.dispose();
     _categoryController.dispose();
     _descriptionController.dispose();
     _unitController.dispose();
+    _animationController.dispose();
     super.dispose();
   }
 
@@ -424,363 +425,460 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
   Widget build(BuildContext context) {
     return VendorGuard(
       child: Scaffold(
-      body: Stack(
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              color: const Color.fromARGB(255, 255, 255, 255),
-            ),
-          ),
-          SafeArea(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                return FadeTransition(
-                  opacity: _fadeAnimation,
-                  child: SlideTransition(
-                    position: _slideAnimation,
-                    child: Column(
-                      children: [
-                        // Título "Editar producto" cuando se está editando
-                        if (widget.productToEdit != null)
-                          Container(
-                            color: Colors.white,
-                            width: double.infinity,
-                            padding: EdgeInsets.only(
-                              top: MediaQuery.of(context).padding.top + 12,
-                              bottom: 4,
-                              left: 20,
-                              right: 20,
-                            ),
-                            child: const Text(
-                              'Editar producto',
-                              style: TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF115213),
-                              ),
+        resizeToAvoidBottomInset: true,
+        backgroundColor: const Color.fromARGB(255, 255, 255, 255),
+        body: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return FadeTransition(
+                opacity: _fadeAnimation,
+                child: SlideTransition(
+                  position: _slideAnimation,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.max,
+                    children: [
+                      // Título "Editar producto" cuando se está editando
+                      if (widget.productToEdit != null)
+                        Container(
+                          color: Colors.white,
+                          width: double.infinity,
+                          padding: const EdgeInsets.only(
+                            top: 12,
+                            bottom: 4,
+                            left: 20,
+                            right: 20,
+                          ),
+                          child: const Text(
+                            'Editar producto',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF115213),
                             ),
                           ),
-                        Expanded(
-                          child: Center(
-                            child: Container(
-                              width: constraints.maxWidth * 0.95,
-                              height: constraints.maxHeight * 10,
-                              margin: EdgeInsets.symmetric(
-                                horizontal: constraints.maxWidth * 0.025,
-                                vertical: constraints.maxHeight * 0.02,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(25),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.15),
-                                    blurRadius: 25,
-                                    offset: const Offset(0, 15),
-                                  ),
-                                ],
-                              ),
+                        ),
+                      Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: constraints.maxWidth * 0.025,
+                            vertical: constraints.maxHeight * 0.02,
+                          ),
+                          child: SingleChildScrollView(
+                            controller: _scrollController,
+                            keyboardDismissBehavior:
+                                ScrollViewKeyboardDismissBehavior.onDrag,
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: EdgeInsets.symmetric(
+                              horizontal: constraints.maxWidth * 0.05,
+                              vertical: constraints.maxHeight * 0.015,
+                            ),
+                            child: AnimatedPadding(
+                              padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+                              duration: const Duration(milliseconds: 150),
+                              curve: Curves.easeOut,
                               child: Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
+                                  // Texto "Completa la información" ahora dentro del scroll
+                                  Padding(
+                                    padding: EdgeInsets.only(
+                                        bottom: constraints
+                                                .maxHeight *
+                                            0.01),
+                                  ),
+
+                                  // Título de la sección de imágenes
+                                  Text(
+                                    "Imágenes del producto (máximo 5)",
+                                    style: TextStyle(
+                                      fontSize:
+                                          constraints.maxWidth *
+                                              0.04,
+                                      fontWeight: FontWeight.bold,
+                                      color:
+                                          const Color(0xFF2F4157),
+                                    ),
+                                  ),
+                                  SizedBox(
+                                      height:
+                                          constraints.maxHeight *
+                                              0.01),
+
+                                  // Galería de imágenes
                                   Container(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: constraints.maxWidth * 0.05,
-                                      vertical: constraints.maxHeight * 0.02,
-                                    ),
-                                    decoration: const BoxDecoration(
-                                      color: Colors.transparent,
-                                      borderRadius: BorderRadius.only(
-                                        topLeft: Radius.circular(25),
-                                        topRight: Radius.circular(25),
-                                      ),
-                                    ),
-                                    child: Column(
+                                    height:
+                                        constraints.maxHeight *
+                                            0.19,
+                                    child: ListView(
+                                      scrollDirection:
+                                          Axis.horizontal,
                                       children: [
-                                        SizedBox(height: constraints.maxHeight * 0.01),
-                                        const Text(
-                                          "Completa la información de tu producto",
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: Color(0xFF2F4157),
-                                            height: 1.4,
+                                        // Mostrar imágenes existentes (al editar)
+                                        ..._existingImageUrls
+                                            .asMap()
+                                            .entries
+                                            .map((entry) {
+                                          int index = entry.key;
+                                          String url =
+                                              entry.value;
+                                          return _buildImageContainer(
+                                            imageUrl: url,
+                                            isNetwork: true,
+                                            onRemove: () =>
+                                                _removeExistingImage(
+                                                    index),
+                                            constraints:
+                                                constraints,
+                                          );
+                                        }),
+
+                                        // Mostrar imágenes nuevas seleccionadas
+                                        ..._selectedImages
+                                            .asMap()
+                                            .entries
+                                            .map((entry) {
+                                          int index = entry.key;
+                                          File imageFile =
+                                              entry.value;
+                                          return _buildImageContainer(
+                                            imageFile: imageFile,
+                                            isNetwork: false,
+                                            onRemove: () =>
+                                                _removeImage(
+                                                    index),
+                                            constraints:
+                                                constraints,
+                                          );
+                                        }),
+
+                                        // Botón para agregar más imágenes
+                                        if (_selectedImages
+                                                    .length +
+                                                _existingImageUrls
+                                                    .length <
+                                            5)
+                                          _buildAddImageButton(
+                                            onTap: _pickImages,
+                                            constraints:
+                                                constraints,
                                           ),
-                                          textAlign: TextAlign.center,
-                                        ),
                                       ],
                                     ),
                                   ),
-                                  
-                                  // Contenido con scroll
-                                  Expanded(
-                                    child: SingleChildScrollView(
-                                      padding: EdgeInsets.symmetric(
-                                        horizontal: constraints.maxWidth * 0.05,
-                                        vertical: constraints.maxHeight * 0.01,
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          // Título de la sección de imágenes
-                                          Text(
-                                            "Imágenes del producto (máximo 5)",
-                                            style: TextStyle(
-                                              fontSize: constraints.maxWidth * 0.04,
-                                              fontWeight: FontWeight.bold,
-                                              color: const Color(0xFF2F4157),
-                                            ),
-                                          ),
-                                          SizedBox(height: constraints.maxHeight * 0.01),
-                                          
-                                          // Galería de imágenes
-                                          Container(
-                                            height: constraints.maxHeight * 0.15,
-                                            child: ListView(
-                                              scrollDirection: Axis.horizontal,
-                                              children: [
-                                                // Mostrar imágenes existentes (al editar)
-                                                ..._existingImageUrls.asMap().entries.map((entry) {
-                                                  int index = entry.key;
-                                                  String url = entry.value;
-                                                  return _buildImageContainer(
-                                                    imageUrl: url,
-                                                    isNetwork: true,
-                                                    onRemove: () => _removeExistingImage(index),
-                                                    constraints: constraints,
-                                                  );
-                                                }),
-                                                
-                                                // Mostrar imágenes nuevas seleccionadas
-                                                ..._selectedImages.asMap().entries.map((entry) {
-                                                  int index = entry.key;
-                                                  File imageFile = entry.value;
-                                                  return _buildImageContainer(
-                                                    imageFile: imageFile,
-                                                    isNetwork: false,
-                                                    onRemove: () => _removeImage(index),
-                                                    constraints: constraints,
-                                                  );
-                                                }),
-                                                
-                                                // Botón para agregar más imágenes
-                                                if (_selectedImages.length + _existingImageUrls.length < 5)
-                                                  _buildAddImageButton(
-                                                    onTap: _pickImages,
-                                                    constraints: constraints,
-                                                  ),
-                                              ],
-                                            ),
-                                          ),
-                                          
-                                          // Indicador de cantidad de imágenes
-                                          if (_selectedImages.length + _existingImageUrls.length > 0)
-                                            Padding(
-                                              padding: EdgeInsets.only(top: constraints.maxHeight * 0.005),
-                                              child: Text(
-                                                "${_selectedImages.length + _existingImageUrls.length}/5 imágenes seleccionadas",
-                                                style: TextStyle(
-                                                  fontSize: constraints.maxWidth * 0.03,
-                                                  color: const Color(0xFF2F4157).withOpacity(0.6),
-                                                ),
-                                              ),
-                                            ),
-                                          
-                                          SizedBox(height: constraints.maxHeight * 0.03),
-                                          
-                                          // Campos del formulario
-                                          _buildFormField(
-                                            label: "Nombre del producto",
-                                            controller: _nameController,
-                                            icon: Icons.inventory_2,
-                                            constraints: constraints,
-                                          ),
-                                          
-                                          SizedBox(height: constraints.maxHeight * 0.015),
-                                          
-                                          Row(
-                                            children: [
-                                              Expanded(
-                                                child: _buildFormField(
-                                                  label: "Precio",
-                                                  controller: _priceController,
-                                                  icon: Icons.attach_money,
-                                                  keyboardType: TextInputType.number,
-                                                  constraints: constraints,
-                                                ),
-                                              ),
-                                              SizedBox(width: constraints.maxWidth * 0.03),
-                                              Expanded(
-                                                child: _buildFormField(
-                                                  label: "Stock",
-                                                  controller: _stockController,
-                                                  icon: Icons.inventory,
-                                                  keyboardType: TextInputType.number,
-                                                  constraints: constraints,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          
-                                          SizedBox(height: constraints.maxHeight * 0.015),
-                                          
-                                          _buildDropdownField(
-                                            label: "Categoría",
-                                            value: _selectedCategory,
-                                            items: _categories,
-                                            icon: Icons.category,
-                                            onChanged: (String? value) {
-                                              setState(() {
-                                                _selectedCategory = value;
-                                              });
-                                            },
-                                            constraints: constraints,
-                                          ),
-                                          
-                                          SizedBox(height: constraints.maxHeight * 0.015),
-                                          
-                                          _buildFormField(
-                                            label: "Descripción",
-                                            controller: _descriptionController,
-                                            icon: Icons.description,
-                                            maxLines: 3,
-                                            constraints: constraints,
-                                          ),
-                                          
-                                          SizedBox(height: constraints.maxHeight * 0.015),
-                                          
-                                          _buildDropdownField(
-                                            label: "Unidad",
-                                            value: _selectedUnit,
-                                            items: _units,
-                                            icon: Icons.straighten,
-                                            onChanged: (String? value) {
-                                              setState(() {
-                                                _selectedUnit = value;
-                                              });
-                                            },
-                                            constraints: constraints,
-                                          ),
-                                          
-                                          SizedBox(height: constraints.maxHeight * 0.03),
-                                          
-                                          // Botones de acción
-                                          if (widget.productToEdit != null)
-                                            // Botones al editar: Cancelar y Actualizar
-                                            Row(
-                                              children: [
-                                                Expanded(
-                                                  child: SizedBox(
-                                                    height: 45,
-                                                    child: OutlinedButton(
-                                                      onPressed: _isLoadingAllow ? null : () => Navigator.of(context).pop(),
-                                                      style: OutlinedButton.styleFrom(
-                                                        foregroundColor: const Color(0xFF2F4157),
-                                                        side: const BorderSide(
-                                                          color: Color(0xFF577C8E),
-                                                          width: 2,
-                                                        ),
-                                                        shape: RoundedRectangleBorder(
-                                                          borderRadius: BorderRadius.circular(25),
-                                                        ),
-                                                      ),
-                                                      child: const Text(
-                                                        "Cancelar",
-                                                        style: TextStyle(
-                                                          fontSize: 16,
-                                                          fontWeight: FontWeight.bold,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                                SizedBox(width: constraints.maxWidth * 0.03),
-                                                Expanded(
-                                                  child: SizedBox(
-                                                    height: 45,
-                                                    child: ElevatedButton(
-                                                      onPressed: _isLoadingAllow ? null : _saveProduct,
-                                                      style: ElevatedButton.styleFrom(
-                                                        backgroundColor: const Color.fromARGB(255, 41, 78, 44),
-                                                        foregroundColor: Colors.white,
-                                                        shape: RoundedRectangleBorder(
-                                                          borderRadius: BorderRadius.circular(25),
-                                                        ),
-                                                        elevation: 5,
-                                                      ),
-                                                      child: _isLoadingAllow
-                                                          ? const SizedBox(
-                                                              width: 20,
-                                                              height: 20,
-                                                              child: CircularProgressIndicator(
-                                                                strokeWidth: 2,
-                                                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                                              ),
-                                                            )
-                                                          : const Text(
-                                                              "Actualizar",
-                                                              style: TextStyle(
-                                                                fontSize: 16,
-                                                                fontWeight: FontWeight.bold,
-                                                              ),
-                                                            ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            )
-                                          else
-                                            // Botón al agregar nuevo producto
-                                            SizedBox(
-                                              width: double.infinity,
-                                              height: 45,
-                                              child: ElevatedButton(
-                                                onPressed: _isLoadingAllow ? null : _saveProduct,
-                                                style: ElevatedButton.styleFrom(
-                                                  backgroundColor: const Color.fromARGB(255, 41, 78, 44),
-                                                  foregroundColor: Colors.white,
-                                                  shape: RoundedRectangleBorder(
-                                                    borderRadius: BorderRadius.circular(25),
-                                                  ),
-                                                  elevation: 5,
-                                                ),
-                                                child: _isLoadingAllow
-                                                    ? const SizedBox(
-                                                        width: 20,
-                                                        height: 20,
-                                                        child: CircularProgressIndicator(
-                                                          strokeWidth: 2,
-                                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                                        ),
-                                                      )
-                                                    : const Text(
-                                                        "Guardar Producto",
-                                                        style: TextStyle(
-                                                          fontSize: 16,
-                                                          fontWeight: FontWeight.bold,
-                                                        ),
-                                                      ),
-                                              ),
-                                            ),
-                                          
-                                          SizedBox(height: constraints.maxHeight * 0.02),
-                                        ],
+
+                                  // Indicador de cantidad de imágenes
+                                  if (_selectedImages.length +
+                                          _existingImageUrls
+                                              .length >
+                                          0)
+                                    Padding(
+                                      padding: EdgeInsets.only(
+                                          top: constraints
+                                                  .maxHeight *
+                                              0.005),
+                                      child: Text(
+                                        "${_selectedImages.length + _existingImageUrls.length}/5 imágenes seleccionadas",
+                                        style: TextStyle(
+                                          fontSize: constraints
+                                                  .maxWidth *
+                                              0.03,
+                                          color: const Color(
+                                                  0xFF2F4157)
+                                              .withOpacity(0.6),
+                                        ),
                                       ),
                                     ),
+
+                                  SizedBox(
+                                      height:
+                                          constraints.maxHeight *
+                                              0.03),
+
+                                  // Campos del formulario
+                                  _buildFormField(
+                                    label: "Nombre del producto",
+                                    controller: _nameController,
+                                    icon: Icons.inventory_2,
+                                    constraints: constraints,
                                   ),
+
+                                  SizedBox(
+                                      height:
+                                          constraints.maxHeight *
+                                              0.015),
+
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: _buildFormField(
+                                          label: "Precio",
+                                          controller:
+                                              _priceController,
+                                          icon:
+                                              Icons.attach_money,
+                                          keyboardType:
+                                              TextInputType
+                                                  .number,
+                                          constraints:
+                                              constraints,
+                                        ),
+                                      ),
+                                      SizedBox(
+                                          width: constraints
+                                                  .maxWidth *
+                                              0.03),
+                                      Expanded(
+                                        child: _buildFormField(
+                                          label: "Stock",
+                                          controller:
+                                              _stockController,
+                                          icon: Icons.inventory,
+                                          keyboardType:
+                                              TextInputType
+                                                  .number,
+                                          constraints:
+                                              constraints,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+
+                                  SizedBox(
+                                      height:
+                                          constraints.maxHeight *
+                                              0.015),
+
+                                  _buildDropdownField(
+                                    label: "Categoría",
+                                    value: _selectedCategory,
+                                    items: _categories,
+                                    icon: Icons.category,
+                                    onChanged: (String? value) {
+                                      setState(() {
+                                        _selectedCategory = value;
+                                      });
+                                    },
+                                    constraints: constraints,
+                                  ),
+
+                                  SizedBox(
+                                      height:
+                                          constraints.maxHeight *
+                                              0.015),
+
+                                  _buildFormField(
+                                    label: "Descripción",
+                                    controller:
+                                        _descriptionController,
+                                    icon: Icons.description,
+                                    maxLines: 3,
+                                    constraints: constraints,
+                                  ),
+
+                                  SizedBox(
+                                      height:
+                                          constraints.maxHeight *
+                                              0.015),
+
+                                  _buildDropdownField(
+                                    label: "Unidad",
+                                    value: _selectedUnit,
+                                    items: _units,
+                                    icon: Icons.straighten,
+                                    onChanged: (String? value) {
+                                      setState(() {
+                                        _selectedUnit = value;
+                                      });
+                                    },
+                                    constraints: constraints,
+                                  ),
+
+                                  SizedBox(
+                                      height:
+                                          constraints.maxHeight *
+                                              0.03),
+
+                                  // Botones de acción
+                                  if (widget.productToEdit !=
+                                      null)
+                                    // Botones al editar: Cancelar y Actualizar
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: SizedBox(
+                                            height: 45,
+                                            child: OutlinedButton(
+                                              onPressed: _isLoadingAllow
+                                                  ? null
+                                                  : () => Navigator.of(
+                                                          context)
+                                                      .pop(),
+                                              style:
+                                                  OutlinedButton
+                                                      .styleFrom(
+                                                foregroundColor:
+                                                    const Color(
+                                                        0xFF2F4157),
+                                                side:
+                                                    const BorderSide(
+                                                  color: Color(
+                                                      0xFF577C8E),
+                                                  width: 2,
+                                                ),
+                                                shape:
+                                                    RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius
+                                                          .circular(
+                                                              25),
+                                                ),
+                                              ),
+                                              child: const Text(
+                                                "Cancelar",
+                                                style: TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight:
+                                                      FontWeight
+                                                          .bold,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        SizedBox(
+                                            width: constraints
+                                                    .maxWidth *
+                                                0.03),
+                                        Expanded(
+                                          child: SizedBox(
+                                            height: 45,
+                                            child: ElevatedButton(
+                                              onPressed:
+                                                  _isLoadingAllow
+                                                      ? null
+                                                      : _saveProduct,
+                                              style:
+                                                  ElevatedButton
+                                                      .styleFrom(
+                                                backgroundColor:
+                                                    const Color
+                                                        .fromARGB(
+                                                        255,
+                                                        41,
+                                                        78,
+                                                        44),
+                                                foregroundColor:
+                                                    Colors.white,
+                                                shape:
+                                                    RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius
+                                                          .circular(
+                                                              25),
+                                                ),
+                                                elevation: 5,
+                                              ),
+                                              child: _isLoadingAllow
+                                                  ? const SizedBox(
+                                                      width: 20,
+                                                      height: 20,
+                                                      child:
+                                                          CircularProgressIndicator(
+                                                        strokeWidth:
+                                                            2,
+                                                        valueColor: AlwaysStoppedAnimation<
+                                                                Color>(
+                                                            Colors
+                                                                .white),
+                                                      ),
+                                                    )
+                                                  : const Text(
+                                                      "Actualizar",
+                                                      style:
+                                                          TextStyle(
+                                                        fontSize:
+                                                            16,
+                                                        fontWeight:
+                                                            FontWeight
+                                                                .bold,
+                                                      ),
+                                                    ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    )
+                                  else
+                                    // Botón al agregar nuevo producto
+                                    SizedBox(
+                                      width: double.infinity,
+                                      height: 45,
+                                      child: ElevatedButton(
+                                        onPressed: _isLoadingAllow
+                                            ? null
+                                            : _saveProduct,
+                                        style: ElevatedButton
+                                            .styleFrom(
+                                          backgroundColor:
+                                              const Color
+                                                  .fromARGB(255,
+                                                  41, 78, 44),
+                                          foregroundColor:
+                                              Colors.white,
+                                          shape:
+                                              RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius
+                                                        .circular(25),
+                                              ),
+                                          elevation: 5,
+                                        ),
+                                        child: _isLoadingAllow
+                                            ? const SizedBox(
+                                                width: 20,
+                                                height: 20,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  valueColor:
+                                                      AlwaysStoppedAnimation<
+                                                              Color>(
+                                                          Colors
+                                                              .white),
+                                                ),
+                                              )
+                                            : const Text(
+                                                "Guardar Producto",
+                                                style: TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight:
+                                                      FontWeight
+                                                          .bold,
+                                                ),
+                                              ),
+                                      ),
+                                    ),
+
+                                  SizedBox(
+                                      height:
+                                          constraints.maxHeight *
+                                              0.02),
                                 ],
                               ),
                             ),
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                );
-              },
-            ),
+                ),
+              );
+            },
           ),
-        ],
+        ),
       ),
-    ),
     );
   }
 
