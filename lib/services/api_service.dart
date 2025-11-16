@@ -5,7 +5,7 @@ class ApiService {
   // Cambia esta IP por la IP de tu computadora donde corre el servidor
   // Para encontrarla, ejecuta: ifconfig (Mac/Linux) o ipconfig (Windows)
   // Asegúrate de que el dispositivo móvil y la computadora estén en la misma red WiFi
-  static const String baseUrl = 'http://192.168.1.70:3000';
+  static const String baseUrl = 'https://sttripe-server-production.up.railway.app';
   
   static Map<String, String> get _headers => {
     'Content-Type': 'application/json',
