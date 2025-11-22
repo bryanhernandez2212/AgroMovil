@@ -6,6 +6,7 @@ class CommentModel {
   final String userId;
   final String userName;
   final String userEmail;
+  final String? fotoPerfil;
   final String comentario;
   final double calificacion; // 1.0 a 5.0
   final DateTime fechaCreacion;
@@ -16,6 +17,7 @@ class CommentModel {
     required this.userId,
     required this.userName,
     required this.userEmail,
+    this.fotoPerfil,
     required this.comentario,
     required this.calificacion,
     required this.fechaCreacion,
@@ -28,6 +30,7 @@ class CommentModel {
       userId: json['usuario_id'] ?? json['userId'] ?? '',
       userName: json['usuario_nombre'] ?? json['userName'] ?? '',
       userEmail: json['usuario_email'] ?? json['userEmail'] ?? '',
+      fotoPerfil: json['foto_perfil'] ?? json['fotoPerfil'],
       comentario: json['comentario'] ?? '',
       calificacion: (json['calificacion'] ?? 0.0).toDouble(),
       fechaCreacion: json['fecha_creacion'] != null
@@ -45,6 +48,7 @@ class CommentModel {
       'usuario_id': userId,
       'usuario_nombre': userName,
       'usuario_email': userEmail,
+      'foto_perfil': fotoPerfil,
       'comentario': comentario,
       'calificacion': calificacion,
       'fecha_creacion': fechaCreacion.toIso8601String(),

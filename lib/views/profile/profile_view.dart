@@ -134,24 +134,43 @@ class _ProfileViewState extends State<ProfileView> {
       // Mostrar diálogo para elegir fuente
       final ImageSource? source = await showDialog<ImageSource>(
         context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Seleccionar imagen'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.camera_alt, color: Color(0xFF115213)),
-                title: const Text('Tomar foto'),
-                onTap: () => Navigator.pop(context, ImageSource.camera),
+        builder: (context) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          return AlertDialog(
+            backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            title: Text(
+              'Seleccionar imagen',
+              style: TextStyle(
+                color: isDark ? Colors.white : Colors.black,
               ),
-              ListTile(
-                leading: const Icon(Icons.photo_library, color: Color(0xFF115213)),
-                title: const Text('Elegir de galería'),
-                onTap: () => Navigator.pop(context, ImageSource.gallery),
-              ),
-            ],
-          ),
-        ),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.camera_alt, color: Color(0xFF115213)),
+                  title: Text(
+                    'Tomar foto',
+                    style: TextStyle(
+                      color: isDark ? Colors.white : Colors.black,
+                    ),
+                  ),
+                  onTap: () => Navigator.pop(context, ImageSource.camera),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.photo_library, color: Color(0xFF115213)),
+                  title: Text(
+                    'Elegir de galería',
+                    style: TextStyle(
+                      color: isDark ? Colors.white : Colors.black,
+                    ),
+                  ),
+                  onTap: () => Navigator.pop(context, ImageSource.gallery),
+                ),
+              ],
+            ),
+          );
+        },
       );
 
       if (source == null) return;
@@ -201,21 +220,25 @@ class _ProfileViewState extends State<ProfileView> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Consumer<AuthController>(
       builder: (context, authController, child) {
         return Scaffold(
-          backgroundColor: const Color(0xFFF9F9F9),
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           appBar: AppBar(
-            backgroundColor: Colors.white,
+            backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
             elevation: 0,
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Color(0xFF115213)),
+              icon: Icon(
+                Icons.arrow_back,
+                color: isDark ? Colors.white : const Color(0xFF115213),
+              ),
               onPressed: () => Navigator.pop(context),
             ),
-            title: const Text(
+            title: Text(
               'Mi Perfil',
               style: TextStyle(
-                color: Color(0xFF115213),
+                color: isDark ? Colors.white : const Color(0xFF115213),
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),
@@ -237,7 +260,7 @@ class _ProfileViewState extends State<ProfileView> {
                         onPressed: _toggleEditMode,
                         icon: Icon(
                           _isEditing ? Icons.close : Icons.edit,
-                          color: const Color(0xFF115213),
+                          color: isDark ? Colors.white : const Color(0xFF115213),
                           size: 28,
                         ),
                       ),
@@ -346,15 +369,16 @@ class _ProfileViewState extends State<ProfileView> {
   }
 
   Widget _buildInfoCard(AuthController authController) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
             spreadRadius: 1,
             blurRadius: 10,
             offset: const Offset(0, 2),
@@ -422,12 +446,14 @@ class _ProfileViewState extends State<ProfileView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           "Ubicación",
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF666666),
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.grey[400]
+                : const Color(0xFF666666),
           ),
         ),
         const SizedBox(height: 8),
@@ -435,89 +461,126 @@ class _ProfileViewState extends State<ProfileView> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              TextField(
-                controller: _ubicacionController,
-                enabled: _isEditing,
-                decoration: InputDecoration(
-                  hintText: "Ubicación (empieza a escribir...)",
-                  filled: true,
-                  fillColor: const Color(0xFFF5F5F5),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFF115213), width: 2),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  prefixIcon: const Icon(Icons.location_on, color: Color(0xFF115213)),
-                ),
+              Builder(
+                builder: (context) {
+                  final isDark = Theme.of(context).brightness == Brightness.dark;
+                  return TextField(
+                    controller: _ubicacionController,
+                    enabled: _isEditing,
+                    style: TextStyle(
+                      color: isDark ? Colors.white : Colors.black,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: "Ubicación (empieza a escribir...)",
+                      hintStyle: TextStyle(
+                        color: isDark ? Colors.grey[500] : Colors.grey[600],
+                      ),
+                      filled: true,
+                      fillColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF5F5F5),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: isDark ? Colors.grey[700]! : const Color(0xFFE0E0E0),
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: isDark ? Colors.grey[700]! : const Color(0xFFE0E0E0),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFF115213), width: 2),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      prefixIcon: const Icon(Icons.location_on, color: Color(0xFF115213)),
+                    ),
                 onChanged: (value) {
                   _searchPlaces(value);
                 },
-                onTap: () {
-                  if (_ubicacionController.text.isNotEmpty) {
-                    _searchPlaces(_ubicacionController.text);
-                  }
+                    onTap: () {
+                      if (_ubicacionController.text.isNotEmpty) {
+                        _searchPlaces(_ubicacionController.text);
+                      }
+                    },
+                  );
                 },
               ),
               if (_showPredictions && _placePredictions.isNotEmpty)
-                Container(
-                  margin: const EdgeInsets.only(top: 5),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey[300]!),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 10,
-                        offset: const Offset(0, 2),
+                Builder(
+                  builder: (context) {
+                    final isDark = Theme.of(context).brightness == Brightness.dark;
+                    return Container(
+                      margin: const EdgeInsets.only(top: 5),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(isDark ? 0.3 : 0.1),
+                            blurRadius: 10,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
                   constraints: const BoxConstraints(maxHeight: 200),
                   child: ListView.builder(
                     shrinkWrap: true,
                     itemCount: _placePredictions.length,
                     itemBuilder: (context, index) {
                       final prediction = _placePredictions[index];
-                      return ListTile(
-                        leading: const Icon(Icons.location_on, color: Color(0xFF115213)),
-                        title: Text(
-                          prediction.description,
-                          style: const TextStyle(fontSize: 14),
-                        ),
-                        onTap: () {
-                          _selectPlace(prediction);
-                        },
-                      );
-                    },
-                  ),
+                        return Builder(
+                          builder: (context) {
+                            final isDark = Theme.of(context).brightness == Brightness.dark;
+                            return ListTile(
+                              leading: const Icon(Icons.location_on, color: Color(0xFF115213)),
+                              title: Text(
+                                prediction.description,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: isDark ? Colors.white : Colors.black,
+                                ),
+                              ),
+                              onTap: () {
+                                _selectPlace(prediction);
+                              },
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  );
+                  },
                 ),
             ],
           )
         else
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF5F5F5),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE0E0E0)),
-            ),
-            child: Text(
-              _ubicacionController.text.isEmpty ? "No especificado" : _ubicacionController.text,
-              style: const TextStyle(
-                fontSize: 16,
-                color: Color(0xFF333333),
-              ),
-            ),
+          Builder(
+            builder: (context) {
+              final isDark = Theme.of(context).brightness == Brightness.dark;
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF5F5F5),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isDark ? Colors.grey[700]! : const Color(0xFFE0E0E0),
+                  ),
+                ),
+                child: Text(
+                  _ubicacionController.text.isEmpty ? "No especificado" : _ubicacionController.text,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: isDark ? Colors.white : const Color(0xFF333333),
+                  ),
+                ),
+              );
+            },
           ),
       ],
     );
@@ -531,15 +594,16 @@ class _ProfileViewState extends State<ProfileView> {
     bool obscure = false,
     bool isPassword = false,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF666666),
+            color: isDark ? Colors.grey[400] : const Color(0xFF666666),
           ),
         ),
         const SizedBox(height: 8),
@@ -548,17 +612,27 @@ class _ProfileViewState extends State<ProfileView> {
             controller: controller,
             obscureText: obscure,
             enabled: enabled,
+            style: TextStyle(
+              color: isDark ? Colors.white : Colors.black,
+            ),
             decoration: InputDecoration(
               hintText: value,
+              hintStyle: TextStyle(
+                color: isDark ? Colors.grey[500] : Colors.grey[600],
+              ),
               filled: true,
-              fillColor: const Color(0xFFF5F5F5),
+              fillColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF5F5F5),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+                borderSide: BorderSide(
+                  color: isDark ? Colors.grey[700]! : const Color(0xFFE0E0E0),
+                ),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+                borderSide: BorderSide(
+                  color: isDark ? Colors.grey[700]! : const Color(0xFFE0E0E0),
+                ),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -572,15 +646,17 @@ class _ProfileViewState extends State<ProfileView> {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: const Color(0xFFF5F5F5),
+              color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF5F5F5),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE0E0E0)),
+              border: Border.all(
+                color: isDark ? Colors.grey[700]! : const Color(0xFFE0E0E0),
+              ),
             ),
             child: Text(
               value,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 16,
-                color: Color(0xFF333333),
+                color: isDark ? Colors.white : const Color(0xFF333333),
               ),
             ),
           ),
@@ -658,25 +734,26 @@ class _ProfileViewState extends State<ProfileView> {
         final hasSeller = roles.any((r) => r.toLowerCase().contains('vend'));
         final hasBuyer = roles.any((r) => r.toLowerCase().contains('compr') || r.toLowerCase().contains('buyer'));
 
+        final isDark = Theme.of(context).brightness == Brightness.dark;
         return Column(
           children: [
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: const Color(0xFF115213)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     "Modo de navegación",
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF115213),
+                      color: isDark ? Colors.white : const Color(0xFF115213),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -685,14 +762,24 @@ class _ProfileViewState extends State<ProfileView> {
                     groupValue: currentRole ?? (hasSeller ? UserRoleService.sellerRole : UserRoleService.buyerRole),
                     onChanged: hasSeller ? (val) => _switchRole(true, authController) : null,
                     activeColor: const Color(0xFF115213),
-                    title: const Text('🏪 Modo Vendedor'),
+                    title: Text(
+                      '🏪 Modo Vendedor',
+                      style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black,
+                      ),
+                    ),
                   ),
                   RadioListTile<String>(
                     value: UserRoleService.buyerRole,
                     groupValue: currentRole ?? (hasSeller ? UserRoleService.sellerRole : UserRoleService.buyerRole),
                     onChanged: hasBuyer ? (val) => _switchRole(false, authController) : null,
                     activeColor: const Color(0xFF115213),
-                    title: const Text('🛒 Modo Comprador'),
+                    title: Text(
+                      '🛒 Modo Comprador',
+                      style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -703,19 +790,19 @@ class _ProfileViewState extends State<ProfileView> {
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: const Color(0xFF115213)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     "Gestionar roles",
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF115213),
+                      color: isDark ? Colors.white : const Color(0xFF115213),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -730,7 +817,7 @@ class _ProfileViewState extends State<ProfileView> {
                             size: 24,
                           ),
                           const SizedBox(width: 12),
-                          const Column(
+                          Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
@@ -738,14 +825,14 @@ class _ProfileViewState extends State<ProfileView> {
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
-                                  color: Color(0xFF333333),
+                                  color: isDark ? Colors.white : const Color(0xFF333333),
                                 ),
                               ),
                               Text(
                                 'Publicar y vender productos',
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Color(0xFF666666),
+                                  color: isDark ? Colors.grey[400] : const Color(0xFF666666),
                                 ),
                               ),
                             ],
@@ -773,7 +860,7 @@ class _ProfileViewState extends State<ProfileView> {
                             size: 24,
                           ),
                           const SizedBox(width: 12),
-                          const Column(
+                          Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
@@ -781,14 +868,14 @@ class _ProfileViewState extends State<ProfileView> {
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
-                                  color: Color(0xFF333333),
+                                  color: isDark ? Colors.white : const Color(0xFF333333),
                                 ),
                               ),
                               Text(
                                 'Explorar y comprar productos',
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Color(0xFF666666),
+                                  color: isDark ? Colors.grey[400] : const Color(0xFF666666),
                                 ),
                               ),
                             ],

@@ -449,9 +449,10 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
   @override
   Widget build(BuildContext context) {
     final total = price * quantity;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Stack(
           children: [
@@ -474,10 +475,10 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                         // Título del producto
                     Text(
                       name,
-                      style: const TextStyle(
+                      style: TextStyle(
                             fontSize: 30,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF1A1A1A),
+                            color: isDark ? Colors.white : const Color(0xFF1A1A1A),
                             height: 1.2,
                             letterSpacing: -0.5,
                           ),
@@ -487,9 +488,9 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                         // Descripción
                     Text(
                       description,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 15,
-                            color: Color(0xFF666666),
+                            color: isDark ? Colors.grey[400] : const Color(0xFF666666),
                             height: 1.5,
                           ),
                         ),
@@ -507,20 +508,20 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                                 Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text(
+                                    Text(
                                       '\$',
                                       style: TextStyle(
                                         fontSize: 22,
                                         fontWeight: FontWeight.bold,
-                                        color: Color(0xFF1A1A1A),
+                                        color: isDark ? Colors.white : const Color(0xFF1A1A1A),
                                       ),
                                     ),
                                     Text(
                                       price.toStringAsFixed(0),
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 34,
                                         fontWeight: FontWeight.bold,
-                                        color: Color(0xFF1A1A1A),
+                                        color: isDark ? Colors.white : const Color(0xFF1A1A1A),
                                         height: 1.0,
                                       ),
                                     ),
@@ -529,10 +530,10 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                                         padding: const EdgeInsets.only(left: 2, bottom: 4),
                                         child: Text(
                                           price.toStringAsFixed(1).split('.').last,
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 18,
                                             fontWeight: FontWeight.bold,
-                                            color: Color(0xFF1A1A1A),
+                                            color: isDark ? Colors.white : const Color(0xFF1A1A1A),
                                           ),
                                         ),
                                       ),
@@ -541,9 +542,9 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                                 const SizedBox(height: 4),
                                 Text(
                                   'por $unit',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
-                                    color: Color(0xFF666666),
+                                    color: isDark ? Colors.grey[400] : const Color(0xFF666666),
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
@@ -558,17 +559,17 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                                   const SizedBox(width: 6),
                     Text(
                                     widget.product!.calificacionPromedio.toStringAsFixed(1),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 18,
                                       fontWeight: FontWeight.bold,
-                                      color: Color(0xFF1A1A1A),
+                                      color: isDark ? Colors.white : const Color(0xFF1A1A1A),
                                     ),
                                   ),
                                   Text(
                                     ' (${widget.product!.totalCalificaciones})',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 14,
-                                      color: Color(0xFF666666),
+                                      color: isDark ? Colors.grey[400] : const Color(0xFF666666),
                                     ),
                                   ),
                                 ],
@@ -614,10 +615,10 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                             const SizedBox(width: 32),
                         Text(
                           '$quantity',
-                          style: const TextStyle(
+                          style: TextStyle(
                                 fontSize: 28,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFF1A1A1A),
+                                color: isDark ? Colors.white : const Color(0xFF1A1A1A),
                               ),
                             ),
                             const SizedBox(width: 32),
@@ -656,20 +657,20 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
+                            Text(
                               'Total',
                               style: TextStyle(
                                 fontSize: 18,
-                                color: Color(0xFF1A1A1A),
+                                color: isDark ? Colors.white : const Color(0xFF1A1A1A),
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
                             Text(
                               '\$${total.toStringAsFixed(2)} MXN',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFF1A1A1A),
+                                color: isDark ? Colors.white : const Color(0xFF1A1A1A),
                               ),
                             ),
                           ],
@@ -692,10 +693,15 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                   
                   const SizedBox(height: 32),
                   // Divisor entre botones y vendedor
-                  Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 20),
-                    height: 1,
-                    color: Colors.grey[300],
+                  Builder(
+                    builder: (context) {
+                      final isDark = Theme.of(context).brightness == Brightness.dark;
+                      return Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 20),
+                        height: 1,
+                        color: isDark ? Colors.grey[700] : Colors.grey[300],
+                      );
+                    },
                   ),
                   const SizedBox(height: 32),
                   
@@ -706,10 +712,15 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                   ),
                   
                   const SizedBox(height: 32),
-                  Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 20),
-                    height: 1,
-                    color: Colors.grey[200],
+                  Builder(
+                    builder: (context) {
+                      final isDark = Theme.of(context).brightness == Brightness.dark;
+                      return Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 20),
+                        height: 1,
+                        color: isDark ? Colors.grey[700] : Colors.grey[200],
+                      );
+                    },
                   ),
                   const SizedBox(height: 24),
                   
@@ -722,32 +733,39 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
         ),
       ),
             // Botón de regreso flotante
-        Positioned(
-          top: 10,
-          left: 10,
-          child: GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.9),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
+        Builder(
+          builder: (context) {
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            return Positioned(
+              top: 10,
+              left: 10,
+              child: GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: isDark 
+                        ? const Color(0xFF1E1E1E).withOpacity(0.9)
+                        : Colors.white.withOpacity(0.9),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(isDark ? 0.4 : 0.2),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
-                ],
+                  child: Icon(
+                    Icons.arrow_back,
+                    color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                    size: 24,
+                  ),
+                ),
               ),
-              child: const Icon(
-                Icons.arrow_back,
-                color: Color(0xFF1A1A1A),
-                size: 24,
-              ),
-            ),
-          ),
+            );
+          },
         ),
       ],
         ),
@@ -773,21 +791,24 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
     final vendorName = _vendorInfo?['nombre'] ?? widget.product?.vendedorNombre ?? sellerName;
     final vendorLocation = _vendorInfo?['ubicacion'] ?? 'No especificada';
     final totalProducts = _vendorInfo?['totalProductos'] ?? 0;
+    final vendorPhotoUrl = _vendorInfo?['foto_perfil'];
     
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Vendedor',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF1A1A1A),
+            color: isDark ? Colors.white : const Color(0xFF1A1A1A),
           ),
         ),
         const SizedBox(height: 12),
         Row(
           children: [
+            // Foto de perfil del vendedor
             Container(
               width: 48,
               height: 48,
@@ -795,16 +816,38 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                 color: const Color(0xFF115213).withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: Center(
-                child: Text(
-                  vendorName.isNotEmpty ? vendorName[0].toUpperCase() : 'V',
-                  style: const TextStyle(
-                    color: Color(0xFF115213),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 20,
-                  ),
-                ),
-              ),
+              child: vendorPhotoUrl != null && vendorPhotoUrl.toString().isNotEmpty
+                  ? ClipOval(
+                      child: Image.network(
+                        vendorPhotoUrl.toString(),
+                        width: 48,
+                        height: 48,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          // Si falla la carga, mostrar inicial
+                          return Center(
+                            child: Text(
+                              vendorName.isNotEmpty ? vendorName[0].toUpperCase() : 'V',
+                              style: const TextStyle(
+                                color: Color(0xFF115213),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 20,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    )
+                  : Center(
+                      child: Text(
+                        vendorName.isNotEmpty ? vendorName[0].toUpperCase() : 'V',
+                        style: const TextStyle(
+                          color: Color(0xFF115213),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
+                        ),
+                      ),
+                    ),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -813,12 +856,12 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                 children: [
                   Text(
                     vendorName,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF1A1A1A),
+                      color: isDark ? Colors.white : const Color(0xFF1A1A1A),
                     ),
-                    ),
+                  ),
                     const SizedBox(height: 8),
                   _buildVendorInfoRow(
                     icon: Icons.location_on_outlined,
@@ -845,6 +888,7 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
     required String label,
     required String value,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Row(
       children: [
         Icon(
@@ -855,18 +899,18 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
         const SizedBox(width: 8),
         Text(
           '$label: ',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
-            color: Colors.grey,
+            color: isDark ? Colors.grey[400] : Colors.grey,
             fontWeight: FontWeight.w500,
           ),
         ),
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
-              color: Color(0xFF1A1A1A),
+              color: isDark ? Colors.white : const Color(0xFF1A1A1A),
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -882,17 +926,20 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Encabezado
-        Row(
-          children: [
-            const Text(
-              'Comentarios',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF1A1A1A),
-                letterSpacing: 0.5,
-              ),
-            ),
+        Builder(
+          builder: (context) {
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            return Row(
+              children: [
+                Text(
+                  'Comentarios',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                    letterSpacing: 0.5,
+                  ),
+                ),
             const Spacer(),
             if (widget.product != null && widget.product!.calificacionPromedio > 0)
               Container(
@@ -908,18 +955,18 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                     const SizedBox(width: 6),
                     Text(
                       widget.product!.calificacionPromedio.toStringAsFixed(1),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF1A1A1A),
+                        color: isDark ? Colors.white : const Color(0xFF1A1A1A),
                       ),
                     ),
                     const SizedBox(width: 4),
                     Text(
                       '(${widget.product!.totalCalificaciones})',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
-                        color: Color(0xFF666666),
+                        color: isDark ? Colors.grey[400] : const Color(0xFF666666),
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -927,6 +974,8 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                 ),
               ),
           ],
+            );
+          },
         ),
         const SizedBox(height: 28),
         
@@ -934,28 +983,39 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
         if (user != null)
           _buildCommentForm()
         else
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.grey[50],
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey[200]!),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.info_outline, color: Colors.grey[600], size: 20),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Text(
-                    'Inicia sesión para dejar un comentario',
-                    style: TextStyle(
-                      color: Color(0xFF666666),
-                      fontSize: 14,
-                    ),
+          Builder(
+            builder: (context) {
+              final isDark = Theme.of(context).brightness == Brightness.dark;
+              return Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E1E1E) : Colors.grey[50],
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isDark ? Colors.grey[700]! : Colors.grey[200]!,
                   ),
                 ),
-              ],
-            ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      color: isDark ? Colors.grey[400] : Colors.grey[600],
+                      size: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Inicia sesión para dejar un comentario',
+                        style: TextStyle(
+                          color: isDark ? Colors.grey[400] : const Color(0xFF666666),
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
         
         const SizedBox(height: 32),
@@ -972,36 +1032,41 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
             ),
           )
         else if (_comments.isEmpty)
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 40),
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.comment_outlined,
-                    size: 64,
-                    color: Colors.grey[300],
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                    'Aún no hay comentarios',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
+          Builder(
+            builder: (context) {
+              final isDark = Theme.of(context).brightness == Brightness.dark;
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 40),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.comment_outlined,
+                        size: 64,
+                        color: isDark ? Colors.grey[600] : Colors.grey[300],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                        'Aún no hay comentarios',
+                        style: TextStyle(
+                          color: isDark ? Colors.grey[400] : Colors.grey[600],
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Sé el primero en comentar',
+                        style: TextStyle(
+                          color: isDark ? Colors.grey[500] : Colors.grey[500],
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Sé el primero en comentar',
-                    style: TextStyle(
-                      color: Colors.grey[500],
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           )
         else
           Column(
@@ -1019,15 +1084,18 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
   }
   
   Widget _buildCommentForm() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(
+          color: isDark ? Colors.grey[700]! : Colors.grey[200]!,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withOpacity(isDark ? 0.3 : 0.03),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -1051,12 +1119,12 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                 ),
               ),
               const SizedBox(width: 12),
-              const Text(
+              Text(
                 'Deja tu comentario',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF1A1A1A),
+                  color: isDark ? Colors.white : const Color(0xFF1A1A1A),
                 ),
               ),
             ],
@@ -1069,12 +1137,12 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
             runSpacing: 12,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              const Text(
+              Text(
                 'Calificación',
                         style: TextStyle(
                   fontSize: 14,
                           fontWeight: FontWeight.w600,
-                  color: Color(0xFF666666),
+                  color: isDark ? Colors.grey[400] : const Color(0xFF666666),
                 ),
               ),
               Row(
@@ -1106,10 +1174,10 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                 ),
                       child: Text(
                   _selectedRating.toStringAsFixed(1),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF1A1A1A),
+                    color: isDark ? Colors.white : const Color(0xFF1A1A1A),
                   ),
                       ),
                     ),
@@ -1121,26 +1189,30 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
           TextField(
             controller: _commentController,
             maxLines: 5,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 15,
-              color: Color(0xFF1A1A1A),
+              color: isDark ? Colors.white : const Color(0xFF1A1A1A),
               height: 1.5,
             ),
             decoration: InputDecoration(
               hintText: 'Escribe tu experiencia con este producto...',
               hintStyle: TextStyle(
-                color: Colors.grey[400],
+                color: isDark ? Colors.grey[500] : Colors.grey[400],
                 fontSize: 15,
               ),
               filled: true,
-              fillColor: Colors.grey[50],
+              fillColor: isDark ? const Color(0xFF2A2A2A) : Colors.grey[50],
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.grey[300]!),
+                borderSide: BorderSide(
+                  color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                ),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.grey[300]!),
+                borderSide: BorderSide(
+                  color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                ),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -1196,15 +1268,18 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
   }
   
   Widget _buildCommentCard(CommentModel comment) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(
+          color: isDark ? Colors.grey[700]! : Colors.grey[200]!,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withOpacity(isDark ? 0.3 : 0.02),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -1216,7 +1291,7 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Avatar mejorado
+              // Avatar con foto de perfil
               Container(
                 width: 48,
                 height: 48,
@@ -1231,18 +1306,42 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                   ),
                   shape: BoxShape.circle,
                 ),
-                child: Center(
-                  child: Text(
-                    comment.userName.isNotEmpty 
-                        ? comment.userName[0].toUpperCase()
-                        : 'U',
-                    style: const TextStyle(
-                      color: Color(0xFF115213),
-                      fontWeight: FontWeight.bold,
-                      fontSize: 20,
-                    ),
-                  ),
-                ),
+                child: comment.fotoPerfil != null && comment.fotoPerfil!.isNotEmpty
+                    ? ClipOval(
+                        child: Image.network(
+                          comment.fotoPerfil!,
+                          width: 48,
+                          height: 48,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            // Si falla la carga, mostrar inicial
+                            return Center(
+                              child: Text(
+                                comment.userName.isNotEmpty 
+                                    ? comment.userName[0].toUpperCase()
+                                    : 'U',
+                                style: const TextStyle(
+                                  color: Color(0xFF115213),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 20,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      )
+                    : Center(
+                        child: Text(
+                          comment.userName.isNotEmpty 
+                              ? comment.userName[0].toUpperCase()
+                              : 'U',
+                          style: const TextStyle(
+                            color: Color(0xFF115213),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 20,
+                          ),
+                        ),
+                      ),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -1254,10 +1353,10 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                         Expanded(
                           child: Text(
                             comment.userName,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF1A1A1A),
+                              color: isDark ? Colors.white : const Color(0xFF1A1A1A),
                             ),
                           ),
                         ),
@@ -1294,7 +1393,7 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                           _formatDate(comment.fechaCreacion),
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.grey[600],
+                            color: isDark ? Colors.grey[400] : Colors.grey[600],
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -1309,9 +1408,9 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
           // Texto del comentario
           Text(
             comment.comentario,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 15,
-              color: Color(0xFF1A1A1A),
+              color: isDark ? Colors.white : const Color(0xFF1A1A1A),
               height: 1.6,
               letterSpacing: 0.2,
               ),
@@ -1450,12 +1549,13 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                   fit: BoxFit.cover,
                   width: double.infinity,
                   errorBuilder: (context, error, stackTrace) {
+                    final isDark = Theme.of(context).brightness == Brightness.dark;
                     return Container(
-                      color: Colors.grey[300],
-                      child: const Center(
+                      color: isDark ? const Color(0xFF2A2A2A) : Colors.grey[300],
+                      child: Center(
                         child: Icon(
                           Icons.image_not_supported,
-                          color: Colors.grey,
+                          color: isDark ? Colors.grey[600] : Colors.grey,
                           size: 50,
                         ),
                       ),
@@ -1467,12 +1567,13 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                   fit: BoxFit.cover,
                   width: double.infinity,
                   errorBuilder: (context, error, stackTrace) {
+                    final isDark = Theme.of(context).brightness == Brightness.dark;
                     return Container(
-                      color: Colors.grey[300],
-                      child: const Center(
+                      color: isDark ? const Color(0xFF2A2A2A) : Colors.grey[300],
+                      child: Center(
                         child: Icon(
                           Icons.image_not_supported,
-                          color: Colors.grey,
+                          color: isDark ? Colors.grey[600] : Colors.grey,
                           size: 50,
                         ),
                       ),
@@ -1555,6 +1656,7 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
     );
   }
   Widget _primaryHollowButton({required String label, required VoidCallback onTap}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Center(
       child: InkWell(
         onTap: onTap,
@@ -1563,7 +1665,7 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
           width: double.infinity,
           height: 52,
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
             borderRadius: BorderRadius.circular(28),
             border: Border.all(
               color: const Color(0xFF115213),
@@ -1571,7 +1673,7 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
             ),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF115213).withOpacity(0.15),
+                color: const Color(0xFF115213).withOpacity(isDark ? 0.3 : 0.15),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),

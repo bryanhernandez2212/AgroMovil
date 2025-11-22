@@ -12,38 +12,41 @@ class BuyerHomeView extends StatefulWidget {
 }
 
 class _BuyerHomeViewState extends State<BuyerHomeView> {
-  final List<Map<String, dynamic>> quickCategories = [
-    {
-      'label': 'Verduras',
-      'icon': Icons.eco_outlined,
-      'color': const Color(0xFFE3F2FD),
-      'value': 'verduras',
-    },
-    {
-      'label': 'Frutas',
-      'icon': Icons.apple_outlined,
-      'color': const Color(0xFFFFF3E0),
-      'value': 'frutas',
-    },
-    {
-      'label': 'Granos',
-      'icon': Icons.grain,
-      'color': const Color(0xFFF1F8E9),
-      'value': 'granos',
-    },
-    {
-      'label': 'Lácteos',
-      'icon': Icons.local_drink_outlined,
-      'color': const Color(0xFFE8EAF6),
-      'value': 'lacteos',
-    },
-    {
-      'label': 'Orgánicos',
-      'icon': Icons.spa_outlined,
-      'color': const Color(0xFFE0F2F1),
-      'value': 'organicos',
-    },
-  ];
+  List<Map<String, dynamic>> _getQuickCategories(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return [
+      {
+        'label': 'Verduras',
+        'icon': Icons.eco_outlined,
+        'color': isDark ? const Color(0xFF1E3A5F) : const Color(0xFFE3F2FD),
+        'value': 'verduras',
+      },
+      {
+        'label': 'Frutas',
+        'icon': Icons.apple_outlined,
+        'color': isDark ? const Color(0xFF4A2C1A) : const Color(0xFFFFF3E0),
+        'value': 'frutas',
+      },
+      {
+        'label': 'Granos',
+        'icon': Icons.grain,
+        'color': isDark ? const Color(0xFF2D3E2D) : const Color(0xFFF1F8E9),
+        'value': 'granos',
+      },
+      {
+        'label': 'Lácteos',
+        'icon': Icons.local_drink_outlined,
+        'color': isDark ? const Color(0xFF2D2D3E) : const Color(0xFFE8EAF6),
+        'value': 'lacteos',
+      },
+      {
+        'label': 'Orgánicos',
+        'icon': Icons.spa_outlined,
+        'color': isDark ? const Color(0xFF1E3A3A) : const Color(0xFFE0F2F1),
+        'value': 'organicos',
+      },
+    ];
+  }
 
   final Set<int> _revealedSections = <int>{};
 
@@ -194,23 +197,28 @@ class _BuyerHomeViewState extends State<BuyerHomeView> {
   }
 
   Widget _buildQuickCategories() {
-    return SizedBox(
-      height: 96,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: EdgeInsets.zero,
-        itemCount: quickCategories.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 14),
-        itemBuilder: (context, index) {
-          final category = quickCategories[index];
-          return _QuickCategoryChip(
-            label: category['label'] as String,
-            icon: category['icon'] as IconData,
-            background: category['color'] as Color,
-            onTap: () => widget.onCategoryTap?.call(category['value'] as String),
-          );
-        },
-      ),
+    return Builder(
+      builder: (context) {
+        final categories = _getQuickCategories(context);
+        return SizedBox(
+          height: 96,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: EdgeInsets.zero,
+            itemCount: categories.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 14),
+            itemBuilder: (context, index) {
+              final category = categories[index];
+              return _QuickCategoryChip(
+                label: category['label'] as String,
+                icon: category['icon'] as IconData,
+                background: category['color'] as Color,
+                onTap: () => widget.onCategoryTap?.call(category['value'] as String),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 
@@ -219,15 +227,16 @@ class _BuyerHomeViewState extends State<BuyerHomeView> {
     String? actionLabel,
     VoidCallback? onActionTap,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w700,
-            color: Color(0xFF1B4332),
+            color: isDark ? Colors.white : const Color(0xFF1B4332),
           ),
         ),
         if (actionLabel != null)
@@ -281,6 +290,7 @@ class _BuyerHomeViewState extends State<BuyerHomeView> {
   }
 
   Widget _buildBestSellerSkeleton() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return SizedBox(
       height: 190,
       child: ListView.separated(
@@ -290,7 +300,7 @@ class _BuyerHomeViewState extends State<BuyerHomeView> {
         itemBuilder: (context, index) => Container(
           width: 150,
           decoration: BoxDecoration(
-            color: Colors.grey[200],
+            color: isDark ? const Color(0xFF2A2A2A) : Colors.grey[200],
             borderRadius: BorderRadius.circular(22),
           ),
         ),
@@ -299,15 +309,16 @@ class _BuyerHomeViewState extends State<BuyerHomeView> {
   }
 
   Widget _buildHorizontalEmptyState(String message) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return SizedBox(
       height: 120,
       child: Center(
         child: Text(
           message,
           textAlign: TextAlign.center,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
-            color: Color(0xFF6B7280),
+            color: isDark ? Colors.grey[400] : const Color(0xFF6B7280),
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -351,16 +362,17 @@ class _BuyerHomeViewState extends State<BuyerHomeView> {
       return _buildDealEmptyState();
     }
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final imageUrl = _resolveProductImage(product);
     final priceLabel = '\$${_formatPrice(product.precio)} / ${product.unidad}';
     const accent = Color(0xFFFF7043);
 
     return Container(
       decoration: BoxDecoration(
-        color: accent.withOpacity(0.1),
+        color: isDark ? accent.withOpacity(0.15) : accent.withOpacity(0.1),
         borderRadius: BorderRadius.circular(28),
         border: Border.all(
-          color: accent.withOpacity(0.25),
+          color: isDark ? accent.withOpacity(0.4) : accent.withOpacity(0.25),
           width: 1.2,
         ),
       ),
@@ -375,15 +387,15 @@ class _BuyerHomeViewState extends State<BuyerHomeView> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: isDark ? const Color(0xFF2A2A2A) : Colors.white,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       product.categoria.isNotEmpty ? product.categoria : 'Producto destacado',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF1B4332),
+                        color: isDark ? Colors.white : const Color(0xFF1B4332),
                       ),
                     ),
                   ),
@@ -392,18 +404,18 @@ class _BuyerHomeViewState extends State<BuyerHomeView> {
                     product.nombre,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w800,
-                      color: Color(0xFF1B4332),
+                      color: isDark ? Colors.white : const Color(0xFF1B4332),
                     ),
                   ),
                   const SizedBox(height: 10),
                   Text(
                     _truncate(product.descripcion, maxLength: 110),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
-                      color: Color(0xFF4E5D5B),
+                      color: isDark ? Colors.grey[400] : const Color(0xFF4E5D5B),
                       height: 1.4,
                     ),
                   ),
@@ -413,7 +425,7 @@ class _BuyerHomeViewState extends State<BuyerHomeView> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: isDark ? const Color(0xFF2A2A2A) : Colors.white,
                           borderRadius: BorderRadius.circular(14),
                         ),
                         child: Text(
@@ -433,10 +445,10 @@ class _BuyerHomeViewState extends State<BuyerHomeView> {
                             const SizedBox(width: 4),
                             Text(
                               product.calificacionPromedio.toStringAsFixed(1),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
-                                color: Color(0xFF1B4332),
+                                color: isDark ? Colors.white : const Color(0xFF1B4332),
                               ),
                             ),
                           ],
@@ -480,32 +492,36 @@ class _BuyerHomeViewState extends State<BuyerHomeView> {
   }
 
   Widget _buildDealSkeleton() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       height: 160,
       decoration: BoxDecoration(
-        color: Colors.grey[200],
+        color: isDark ? const Color(0xFF2A2A2A) : Colors.grey[200],
         borderRadius: BorderRadius.circular(28),
       ),
     );
   }
 
   Widget _buildDealEmptyState() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       height: 160,
       decoration: BoxDecoration(
-        color: Colors.grey[100],
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.grey[100],
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: Colors.grey[300]!),
+        border: Border.all(
+          color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+        ),
       ),
-      child: const Center(
+      child: Center(
         child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Text(
             'Aún no hay promociones destacadas. Revisa más tarde.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,
-              color: Color(0xFF6B7280),
+              color: isDark ? Colors.grey[400] : const Color(0xFF6B7280),
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -568,6 +584,7 @@ class _BuyerHomeViewState extends State<BuyerHomeView> {
   }
 
   Widget _buildRecommendationsSkeleton() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -580,7 +597,7 @@ class _BuyerHomeViewState extends State<BuyerHomeView> {
       ),
       itemBuilder: (context, index) => Container(
         decoration: BoxDecoration(
-          color: Colors.grey[200],
+          color: isDark ? const Color(0xFF2A2A2A) : Colors.grey[200],
           borderRadius: BorderRadius.circular(24),
         ),
       ),
@@ -588,11 +605,12 @@ class _BuyerHomeViewState extends State<BuyerHomeView> {
   }
 
   Widget _buildVerticalEmptyState(String message) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 24),
       decoration: BoxDecoration(
-        color: Colors.grey[100],
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.grey[100],
         borderRadius: BorderRadius.circular(20),
       ),
       child: Center(
@@ -601,9 +619,9 @@ class _BuyerHomeViewState extends State<BuyerHomeView> {
           child: Text(
             message,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
-              color: Color(0xFF6B7280),
+              color: isDark ? Colors.grey[400] : const Color(0xFF6B7280),
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -628,6 +646,7 @@ class _QuickCategoryChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -642,11 +661,11 @@ class _QuickCategoryChip extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isDark ? const Color(0xFF2A2A2A) : Colors.white,
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
                     blurRadius: 8,
                     offset: const Offset(0, 4),
                   ),
@@ -657,10 +676,10 @@ class _QuickCategoryChip extends StatelessWidget {
             const SizedBox(height: 10),
             Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF3F3D56),
+                color: isDark ? Colors.white : const Color(0xFF3F3D56),
               ),
             ),
           ],
@@ -688,17 +707,18 @@ class _BestSellerCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasRating = rating > 0;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return GestureDetector(
       onTap: onTap,
       child: Container(
         width: 150,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
           borderRadius: BorderRadius.circular(22),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
+              color: Colors.black.withOpacity(isDark ? 0.3 : 0.06),
               blurRadius: 10,
               offset: const Offset(0, 6),
             ),
@@ -720,14 +740,20 @@ class _BestSellerCard extends StatelessWidget {
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) => Container(
                         height: 110,
-                        color: Colors.grey[200],
-                        child: const Icon(Icons.image_not_supported_outlined, color: Colors.grey),
+                        color: isDark ? const Color(0xFF2A2A2A) : Colors.grey[200],
+                        child: Icon(
+                          Icons.image_not_supported_outlined,
+                          color: isDark ? Colors.grey[600] : Colors.grey,
+                        ),
                       ),
                     )
                   : Container(
                       height: 110,
-                      color: Colors.grey[200],
-                      child: const Icon(Icons.image_not_supported_outlined, color: Colors.grey),
+                      color: isDark ? const Color(0xFF2A2A2A) : Colors.grey[200],
+                      child: Icon(
+                        Icons.image_not_supported_outlined,
+                        color: isDark ? Colors.grey[600] : Colors.grey,
+                      ),
                     ),
             ),
             Padding(
@@ -747,7 +773,9 @@ class _BestSellerCard extends StatelessWidget {
                         hasRating ? rating.toStringAsFixed(1) : 'Nuevo',
                         style: TextStyle(
                           fontWeight: FontWeight.w600,
-                          color: hasRating ? const Color(0xFF3F3D56) : Colors.grey[700],
+                          color: hasRating
+                              ? (isDark ? Colors.white : const Color(0xFF3F3D56))
+                              : Colors.grey[700],
                         ),
                       ),
                     ],
@@ -757,9 +785,9 @@ class _BestSellerCard extends StatelessWidget {
                     product.nombre,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF2F2E41),
+                      color: isDark ? Colors.white : const Color(0xFF2F2E41),
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -834,6 +862,7 @@ class _RecommendationCardState extends State<_RecommendationCard>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return ScaleTransition(
       scale: _scale,
       child: FadeTransition(
@@ -842,11 +871,11 @@ class _RecommendationCardState extends State<_RecommendationCard>
           onTap: widget.onTap,
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
                   blurRadius: 14,
                   offset: const Offset(0, 8),
                 ),
@@ -870,14 +899,20 @@ class _RecommendationCardState extends State<_RecommendationCard>
                               fit: BoxFit.cover,
                               errorBuilder: (context, error, stackTrace) => Container(
                                 height: 120,
-                                color: Colors.grey[200],
-                                child: const Icon(Icons.image_not_supported_outlined, color: Colors.grey),
+                                color: isDark ? const Color(0xFF2A2A2A) : Colors.grey[200],
+                                child: Icon(
+                                  Icons.image_not_supported_outlined,
+                                  color: isDark ? Colors.grey[600] : Colors.grey,
+                                ),
                               ),
                             )
                           : Container(
                               height: 120,
-                              color: Colors.grey[200],
-                              child: const Icon(Icons.image_not_supported_outlined, color: Colors.grey),
+                              color: isDark ? const Color(0xFF2A2A2A) : Colors.grey[200],
+                              child: Icon(
+                                Icons.image_not_supported_outlined,
+                                color: isDark ? Colors.grey[600] : Colors.grey,
+                              ),
                             ),
                       Positioned(
                         top: 10,
@@ -885,7 +920,9 @@ class _RecommendationCardState extends State<_RecommendationCard>
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.85),
+                            color: isDark
+                                ? const Color(0xFF2A2A2A).withOpacity(0.9)
+                                : Colors.white.withOpacity(0.85),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Row(
@@ -904,9 +941,9 @@ class _RecommendationCardState extends State<_RecommendationCard>
                                 widget.product.calificacionPromedio > 0
                                     ? widget.product.calificacionPromedio.toStringAsFixed(1)
                                     : 'Nuevo',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontWeight: FontWeight.w700,
-                                  color: Color(0xFF3F3D56),
+                                  color: isDark ? Colors.white : const Color(0xFF3F3D56),
                                 ),
                               ),
                             ],
@@ -943,19 +980,19 @@ class _RecommendationCardState extends State<_RecommendationCard>
                         widget.product.nombre,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF2F2E41),
+                          color: isDark ? Colors.white : const Color(0xFF2F2E41),
                         ),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         '${widget.priceLabel} / ${widget.unitLabel}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
-                          color: Color(0xFF1B4332),
+                          color: isDark ? Colors.white : const Color(0xFF1B4332),
                         ),
                       ),
                     ],

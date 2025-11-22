@@ -24,7 +24,7 @@ class _BuyerCartViewState extends State<BuyerCartView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Consumer<CartController>(
           builder: (context, cartController, _) {
@@ -68,13 +68,14 @@ class _BuyerCartViewState extends State<BuyerCartView> {
   }
 
   Widget _buildHeader() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -95,9 +96,9 @@ class _BuyerCartViewState extends State<BuyerCartView> {
             builder: (context, cartController, _) {
               return Text(
                 '${cartController.totalItemCount} producto${cartController.totalItemCount != 1 ? 's' : ''}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
-                  color: Color(0xFF666666),
+                  color: isDark ? Colors.grey[400] : const Color(0xFF666666),
                 ),
               );
             },
@@ -108,16 +109,19 @@ class _BuyerCartViewState extends State<BuyerCartView> {
   }
 
   Widget _buildCartItemCard(BuildContext context, CartItemModel item, CartController cartController) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(
+          color: isDark ? Colors.grey[700]! : Colors.grey[200]!,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withOpacity(isDark ? 0.3 : 0.03),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -138,22 +142,24 @@ class _BuyerCartViewState extends State<BuyerCartView> {
                   height: 80,
                   fit: BoxFit.cover,
                   errorBuilder: (context, error, stackTrace) {
+                    final isDark = Theme.of(context).brightness == Brightness.dark;
                     return Container(
                       width: 80,
                       height: 80,
-                      color: Colors.grey[200],
-                      child: const Icon(
+                      color: isDark ? const Color(0xFF2A2A2A) : Colors.grey[200],
+                      child: Icon(
                         Icons.image_not_supported,
-                        color: Colors.grey,
+                        color: isDark ? Colors.grey[600] : Colors.grey,
                       ),
                     );
                   },
                   loadingBuilder: (context, child, loadingProgress) {
                     if (loadingProgress == null) return child;
+                    final isDark = Theme.of(context).brightness == Brightness.dark;
                     return Container(
                       width: 80,
                       height: 80,
-                      color: Colors.grey[100],
+                      color: isDark ? const Color(0xFF2A2A2A) : Colors.grey[100],
                       child: const Center(
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
@@ -173,10 +179,10 @@ class _BuyerCartViewState extends State<BuyerCartView> {
                   children: [
                     Text(
                       item.productName,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF1A1A1A),
+                        color: isDark ? Colors.white : const Color(0xFF1A1A1A),
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -184,9 +190,9 @@ class _BuyerCartViewState extends State<BuyerCartView> {
                     const SizedBox(height: 4),
                     Text(
                       'Vendedor: ${item.sellerName}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: Color(0xFF666666),
+                        color: isDark ? Colors.grey[400] : const Color(0xFF666666),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -229,10 +235,10 @@ class _BuyerCartViewState extends State<BuyerCartView> {
                   const SizedBox(width: 16),
                   Text(
                     '${item.quantity}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF1A1A1A),
+                      color: isDark ? Colors.white : const Color(0xFF1A1A1A),
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -284,13 +290,14 @@ class _BuyerCartViewState extends State<BuyerCartView> {
   }
 
   Widget _buildCartSummary(BuildContext context, CartController cartController) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),
@@ -304,12 +311,12 @@ class _BuyerCartViewState extends State<BuyerCartView> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
+                Text(
                   'Total',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF1A1A1A),
+                    color: isDark ? Colors.white : const Color(0xFF1A1A1A),
                   ),
                 ),
                 Text(
@@ -364,6 +371,7 @@ class _BuyerCartViewState extends State<BuyerCartView> {
   }
 
   Widget _buildEmptyCart() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(40),
@@ -373,7 +381,7 @@ class _BuyerCartViewState extends State<BuyerCartView> {
             Icon(
               Icons.shopping_cart_outlined,
               size: 100,
-              color: Colors.grey[300],
+              color: isDark ? Colors.grey[600] : Colors.grey[300],
             ),
             const SizedBox(height: 24),
             Text(
@@ -381,7 +389,7 @@ class _BuyerCartViewState extends State<BuyerCartView> {
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey[700],
+                color: isDark ? Colors.grey[400] : Colors.grey[700],
               ),
             ),
             const SizedBox(height: 12),
@@ -389,7 +397,7 @@ class _BuyerCartViewState extends State<BuyerCartView> {
               'Agrega productos para comenzar a comprar',
               style: TextStyle(
                 fontSize: 16,
-                color: Colors.grey[600],
+                color: isDark ? Colors.grey[500] : Colors.grey[600],
               ),
               textAlign: TextAlign.center,
             ),
@@ -421,15 +429,32 @@ class _BuyerCartViewState extends State<BuyerCartView> {
   }
 
   void _showDeleteDialog(BuildContext context, CartItemModel item, CartController cartController) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Eliminar producto'),
-        content: Text('¿Deseas eliminar ${item.productName} del carrito?'),
+        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        title: Text(
+          'Eliminar producto',
+          style: TextStyle(
+            color: isDark ? Colors.white : Colors.black,
+          ),
+        ),
+        content: Text(
+          '¿Deseas eliminar ${item.productName} del carrito?',
+          style: TextStyle(
+            color: isDark ? Colors.grey[300] : Colors.black,
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
+            child: Text(
+              'Cancelar',
+              style: TextStyle(
+                color: isDark ? Colors.grey[400] : Colors.black,
+              ),
+            ),
           ),
           TextButton(
             onPressed: () async {

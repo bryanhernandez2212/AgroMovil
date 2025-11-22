@@ -78,28 +78,28 @@ class _SellerOrdersViewState extends State<SellerOrdersView> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF115213)),
+          icon: Icon(Icons.arrow_back, color: Theme.of(context).iconTheme.color),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'Mis ventas',
           style: TextStyle(
-            color: Color(0xFF115213),
             fontSize: 20,
             fontWeight: FontWeight.bold,
           ),
         ),
       ),
       body: _isLoading
-          ? const Center(
+          ? Center(
               child: CircularProgressIndicator(
-                color: Color(0xFF115213),
+                color: Theme.of(context).colorScheme.primary,
               ),
             )
           : _orders.isEmpty
@@ -110,7 +110,7 @@ class _SellerOrdersViewState extends State<SellerOrdersView> {
                       Icon(
                         Icons.sell_outlined,
                         size: 80,
-                        color: Colors.grey[400],
+                        color: isDark ? Colors.grey[600] : Colors.grey[400],
                       ),
                       const SizedBox(height: 16),
                       Text(
@@ -118,7 +118,7 @@ class _SellerOrdersViewState extends State<SellerOrdersView> {
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
-                          color: Colors.grey[600],
+                          color: isDark ? Colors.grey[400] : Colors.grey[600],
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -127,7 +127,7 @@ class _SellerOrdersViewState extends State<SellerOrdersView> {
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 14,
-                          color: Colors.grey[500],
+                          color: isDark ? Colors.grey[500] : Colors.grey[500],
                         ),
                       ),
                     ],
@@ -135,7 +135,7 @@ class _SellerOrdersViewState extends State<SellerOrdersView> {
                 )
               : RefreshIndicator(
                   onRefresh: _loadOrders,
-                  color: const Color(0xFF115213),
+                  color: Theme.of(context).colorScheme.primary,
                   child: ListView.builder(
                     padding: const EdgeInsets.all(16),
                     itemCount: _orders.length,
@@ -149,6 +149,7 @@ class _SellerOrdersViewState extends State<SellerOrdersView> {
   }
 
   Widget _buildOrderCard(OrderModel order) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final firstProduct = order.productos.isNotEmpty ? order.productos.first : null;
     final productImage = firstProduct?.imagen;
     final totalProducts = order.productos.length;
@@ -170,14 +171,14 @@ class _SellerOrdersViewState extends State<SellerOrdersView> {
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? Theme.of(context).cardColor : Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: Colors.grey[300]!,
+            color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
               blurRadius: 10,
               offset: const Offset(0, 2),
             ),
@@ -194,28 +195,36 @@ class _SellerOrdersViewState extends State<SellerOrdersView> {
                       width: 80,
                       height: 80,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        width: 80,
-                        height: 80,
-                        color: Colors.grey[200],
-                        child: Icon(
-                          Icons.image_not_supported,
-                          color: Colors.grey[400],
-                        ),
-                      ),
+                      errorBuilder: (context, error, stackTrace) {
+                        final isDark = Theme.of(context).brightness == Brightness.dark;
+                        return Container(
+                          width: 80,
+                          height: 80,
+                          color: isDark ? Colors.grey[800] : Colors.grey[200],
+                          child: Icon(
+                            Icons.image_not_supported,
+                            color: isDark ? Colors.grey[500] : Colors.grey[400],
+                          ),
+                        );
+                      },
                     )
-                  : Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[200],
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        Icons.sell,
-                        color: Colors.grey[400],
-                        size: 40,
-                      ),
+                  : Builder(
+                      builder: (context) {
+                        final isDark = Theme.of(context).brightness == Brightness.dark;
+                        return Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            color: isDark ? Colors.grey[800] : Colors.grey[200],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.sell,
+                            color: isDark ? Colors.grey[500] : Colors.grey[400],
+                            size: 40,
+                          ),
+                        );
+                      },
                     ),
             ),
             const SizedBox(width: 12),
@@ -225,10 +234,10 @@ class _SellerOrdersViewState extends State<SellerOrdersView> {
                 children: [
                   Text(
                     productLabel,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF1A1A1A),
+                      color: Theme.of(context).textTheme.titleLarge?.color,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -238,7 +247,7 @@ class _SellerOrdersViewState extends State<SellerOrdersView> {
                     'Comprador: ${order.usuarioNombre}',
                     style: TextStyle(
                       fontSize: 13,
-                      color: Colors.grey[600],
+                      color: isDark ? Colors.grey[400] : Colors.grey[600],
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -264,7 +273,7 @@ class _SellerOrdersViewState extends State<SellerOrdersView> {
                     _formatDate(order.fechaCompra),
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey[600],
+                      color: isDark ? Colors.grey[400] : Colors.grey[600],
                     ),
                   ),
                 ],
@@ -275,10 +284,10 @@ class _SellerOrdersViewState extends State<SellerOrdersView> {
               children: [
                 Text(
                   '\$${order.total.toStringAsFixed(2)}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF115213),
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                 ),
               ],

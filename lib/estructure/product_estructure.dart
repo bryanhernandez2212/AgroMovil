@@ -61,21 +61,21 @@ class _ProductEstructureViewState extends State<ProductEstructureView> {
     
     return Scaffold(
       extendBody: true,
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Container(
-        color: Colors.white,
+        color: Theme.of(context).scaffoldBackgroundColor,
         child: SafeArea(
           top: true,
           bottom: false,
           child: Container(
-            color: Colors.white,
+            color: Theme.of(context).scaffoldBackgroundColor,
             child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
             // Título específico para registro de productos - primero para evitar espacio verde
             if (!isBuyer && currentIndex == 1)
               Container(
-                color: Colors.white,
+                color: Theme.of(context).scaffoldBackgroundColor,
                 width: double.infinity,
                 padding: EdgeInsets.only(
                   top: MediaQuery.of(context).padding.top + 8,
@@ -148,7 +148,7 @@ class _ProductEstructureViewState extends State<ProductEstructureView> {
             // Título para otras vistas
             if (currentTitle != null)
               Container(
-                color: Colors.white,
+                color: Theme.of(context).scaffoldBackgroundColor,
                 width: double.infinity,
                 padding: const EdgeInsets.only(top: 16, left: 20, right: 20, bottom: 8),
                 child: Text(

@@ -85,185 +85,189 @@ class _OrderConfirmationViewState extends State<OrderConfirmationView> {
         return false;
       },
       child: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: AppBar(
-          backgroundColor: Colors.white,
+          backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
           elevation: 0,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Color(0xFF115213)),
+            icon: Icon(Icons.arrow_back, color: Theme.of(context).iconTheme.color),
             onPressed: () => Navigator.of(context).pop(_shouldRefreshOnPop),
           ),
           title: const Text(
             'Detalles del pedido',
             style: TextStyle(
-              color: Color(0xFF115213),
               fontSize: 20,
               fontWeight: FontWeight.bold,
             ),
           ),
         ),
         body: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[50],
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey[300]!),
-                  ),
-                  child: Wrap(
-                    spacing: 16,
-                    runSpacing: 12,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+          child: Builder(
+            builder: (context) {
+              final isDark = Theme.of(context).brightness == Brightness.dark;
+              return SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: isDark ? Theme.of(context).cardColor : Colors.grey[50],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[300]!),
+                      ),
+                      child: Wrap(
+                        spacing: 16,
+                        runSpacing: 12,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
-                          Text(
-                            'ID del pedido',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          SizedBox(
-                            width: MediaQuery.of(context).size.width * 0.6,
-                            child: Text(
-                              widget.order.id,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF1A1A1A),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'ID del pedido',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDark ? Colors.grey[400] : Colors.grey[600],
+                                ),
                               ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                              const SizedBox(height: 4),
+                              SizedBox(
+                                width: MediaQuery.of(context).size.width * 0.6,
+                                child: Text(
+                                  widget.order.id,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Theme.of(context).textTheme.titleLarge?.color,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: sellerUserId != null
+                                ? _buildStatusDropdown(sellerUserId)
+                                : Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: Color(int.parse(_getStatusColor(_orderStatus))).withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      _orderStatus.toUpperCase(),
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(int.parse(_getStatusColor(_orderStatus))),
+                                      ),
+                                    ),
+                                  ),
                           ),
                         ],
                       ),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: sellerUserId != null
-                            ? _buildStatusDropdown(sellerUserId)
-                            : Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: Color(int.parse(_getStatusColor(_orderStatus))).withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  _orderStatus.toUpperCase(),
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(int.parse(_getStatusColor(_orderStatus))),
+                    ),
+                    const SizedBox(height: 24),
+
+                    _buildSectionTitle('Información del pedido'),
+                    const SizedBox(height: 12),
+                    _buildInfoCard([
+                      _buildInfoRow('Fecha de compra', _formatDate(widget.order.fechaCompra)),
+                      _buildInfoRow('Estado del pago', widget.order.estado),
+                      _buildInfoRow('Estado del pedido', _orderStatus),
+                      _buildInfoRow('Método de pago', widget.order.metodoPago == 'tarjeta' ? 'Tarjeta' : widget.order.metodoPago),
+                      if (widget.order.paymentIntentId != null)
+                        _buildInfoRow('ID de pago', widget.order.paymentIntentId!),
+                    ]),
+                    const SizedBox(height: 24),
+
+                    _buildSectionTitle('Dirección de envío'),
+                    const SizedBox(height: 12),
+                    _buildInfoCard([
+                    _buildInfoRow('Destino', widget.order.ciudad.isNotEmpty ? widget.order.ciudad : 'No especificado'),
+                      if (widget.order.telefono.isNotEmpty)
+                        _buildInfoRow('Teléfono', widget.order.telefono),
+                    ]),
+                    const SizedBox(height: 24),
+
+                    _buildSectionTitle('Productos (${widget.order.productos.length})'),
+                    const SizedBox(height: 12),
+                    ...widget.order.productos.map((producto) => _buildProductCard(producto)),
+                    const SizedBox(height: 24),
+
+                    _buildSectionTitle('Resumen'),
+                    const SizedBox(height: 12),
+                    _buildInfoCard([
+                      _buildInfoRow('Subtotal', '\$${widget.order.subtotal.toStringAsFixed(2)}'),
+                      _buildInfoRow('Envío', '\$${widget.order.envio.toStringAsFixed(2)}'),
+                      _buildInfoRow('Impuestos (10%)', '\$${widget.order.impuestos.toStringAsFixed(2)}'),
+                      Divider(height: 24, color: isDark ? Colors.grey[700] : Colors.grey[300]),
+                      _buildInfoRow(
+                        'Total',
+                        '\$${widget.order.total.toStringAsFixed(2)}',
+                        isTotal: true,
+                      ),
+                    ]),
+                    const SizedBox(height: 32),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: const Text('Funcionalidad de devolución próximamente'),
+                                  backgroundColor: Theme.of(context).colorScheme.primary,
+                                  behavior: SnackBarBehavior.floating,
+                                  duration: const Duration(seconds: 2),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(20),
                                   ),
+                                  margin: const EdgeInsets.all(16),
                                 ),
-                              ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                _buildSectionTitle('Información del pedido'),
-                const SizedBox(height: 12),
-                _buildInfoCard([
-                  _buildInfoRow('Fecha de compra', _formatDate(widget.order.fechaCompra)),
-                  _buildInfoRow('Estado del pago', widget.order.estado),
-                  _buildInfoRow('Estado del pedido', _orderStatus),
-                  _buildInfoRow('Método de pago', widget.order.metodoPago == 'tarjeta' ? 'Tarjeta' : widget.order.metodoPago),
-                  if (widget.order.paymentIntentId != null)
-                    _buildInfoRow('ID de pago', widget.order.paymentIntentId!),
-                ]),
-                const SizedBox(height: 24),
-
-                _buildSectionTitle('Dirección de envío'),
-                const SizedBox(height: 12),
-                _buildInfoCard([
-                _buildInfoRow('Destino', widget.order.ciudad.isNotEmpty ? widget.order.ciudad : 'No especificado'),
-                  if (widget.order.telefono.isNotEmpty)
-                    _buildInfoRow('Teléfono', widget.order.telefono),
-                ]),
-                const SizedBox(height: 24),
-
-                _buildSectionTitle('Productos (${widget.order.productos.length})'),
-                const SizedBox(height: 12),
-                ...widget.order.productos.map((producto) => _buildProductCard(producto)),
-                const SizedBox(height: 24),
-
-                _buildSectionTitle('Resumen'),
-                const SizedBox(height: 12),
-                _buildInfoCard([
-                  _buildInfoRow('Subtotal', '\$${widget.order.subtotal.toStringAsFixed(2)}'),
-                  _buildInfoRow('Envío', '\$${widget.order.envio.toStringAsFixed(2)}'),
-                  _buildInfoRow('Impuestos (10%)', '\$${widget.order.impuestos.toStringAsFixed(2)}'),
-                  const Divider(height: 24),
-                  _buildInfoRow(
-                    'Total',
-                    '\$${widget.order.total.toStringAsFixed(2)}',
-                    isTotal: true,
-                  ),
-                ]),
-                const SizedBox(height: 32),
-
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: const Text('Funcionalidad de devolución próximamente'),
-                              backgroundColor: const Color(0xFF115213),
-                              behavior: SnackBarBehavior.floating,
-                              duration: const Duration(seconds: 2),
+                              );
+                            },
+                            icon: const Icon(Icons.assignment_return, size: 20),
+                            label: const Text('Devolución'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Theme.of(context).colorScheme.primary,
+                              side: BorderSide(color: Theme.of(context).colorScheme.primary),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                              margin: const EdgeInsets.all(16),
                             ),
-                          );
-                        },
-                        icon: const Icon(Icons.assignment_return, size: 20),
-                        label: const Text('Devolución'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF115213),
-                          side: const BorderSide(color: Color(0xFF115213)),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () => _contactCounterpart(context),
-                        icon: const Icon(Icons.message, size: 20),
-                        label: Text(contactButtonLabel),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF115213),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () => _contactCounterpart(context),
+                            icon: const Icon(Icons.message, size: 20),
+                            label: Text(contactButtonLabel),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Theme.of(context).colorScheme.primary,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 0,
+                            ),
                           ),
-                          elevation: 0,
                         ),
-                      ),
+                      ],
                     ),
+                    SizedBox(height: MediaQuery.of(context).padding.bottom + 20),
                   ],
                 ),
-                SizedBox(height: MediaQuery.of(context).padding.bottom + 20),
-              ],
-            ),
+              );
+            },
           ),
         ),
       ),
@@ -271,128 +275,149 @@ class _OrderConfirmationViewState extends State<OrderConfirmationView> {
   }
 
   Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: const TextStyle(
-        fontSize: 20,
-        fontWeight: FontWeight.bold,
-        color: Color(0xFF1A1A1A),
-      ),
+    return Builder(
+      builder: (context) {
+        return Text(
+          title,
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).textTheme.titleLarge?.color,
+          ),
+        );
+      },
     );
   }
 
   Widget _buildInfoCard(List<Widget> children) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.grey[50],
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[300]!),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: children,
-      ),
+    return Builder(
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDark ? Theme.of(context).cardColor : Colors.grey[50],
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[300]!),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: children,
+          ),
+        );
+      },
     );
   }
 
   Widget _buildInfoRow(String label, String value, {bool isTotal = false}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: isTotal ? 18 : 14,
-              fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
-              color: Colors.grey[700],
-            ),
+    return Builder(
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final primaryColor = Theme.of(context).colorScheme.primary;
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: isTotal ? 18 : 14,
+                  fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
+                  color: isDark ? Colors.grey[400] : Colors.grey[700],
+                ),
+              ),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: isTotal ? 18 : 14,
+                  fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
+                  color: isTotal ? primaryColor : Theme.of(context).textTheme.bodyLarge?.color,
+                ),
+              ),
+            ],
           ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: isTotal ? 18 : 14,
-              fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
-              color: isTotal ? const Color(0xFF115213) : const Color(0xFF1A1A1A),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
   Widget _buildProductCard(OrderItem producto) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[300]!),
-      ),
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: producto.imagen.isNotEmpty
-                ? Image.network(
-                    producto.imagen,
-                    width: 60,
-                    height: 60,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      width: 60,
-                      height: 60,
-                      color: Colors.grey[200],
-                      child: Icon(Icons.image_not_supported, color: Colors.grey[400]),
+    return Builder(
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final primaryColor = Theme.of(context).colorScheme.primary;
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isDark ? Theme.of(context).cardColor : Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[300]!),
+          ),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: producto.imagen.isNotEmpty
+                    ? Image.network(
+                        producto.imagen,
+                        width: 60,
+                        height: 60,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          width: 60,
+                          height: 60,
+                          color: isDark ? Colors.grey[800] : Colors.grey[200],
+                          child: Icon(Icons.image_not_supported, color: isDark ? Colors.grey[500] : Colors.grey[400]),
+                        ),
+                      )
+                    : Container(
+                        width: 60,
+                        height: 60,
+                        color: isDark ? Colors.grey[800] : Colors.grey[200],
+                        child: Icon(Icons.image_not_supported, color: isDark ? Colors.grey[500] : Colors.grey[400]),
+                      ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      producto.nombre,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).textTheme.titleLarge?.color,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  )
-                : Container(
-                    width: 60,
-                    height: 60,
-                    color: Colors.grey[200],
-                    child: Icon(Icons.image_not_supported, color: Colors.grey[400]),
-                  ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  producto.nombre,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1A1A1A),
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                    const SizedBox(height: 4),
+                    Text(
+                      '${producto.cantidad} ${producto.unidad} x \$${producto.precioUnitario.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isDark ? Colors.grey[400] : Colors.grey[600],
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  '${producto.cantidad} ${producto.unidad} x \$${producto.precioUnitario.toStringAsFixed(2)}',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey[600],
-                  ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '\$${producto.precioTotal.toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: primaryColor,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          Text(
-            '\$${producto.precioTotal.toStringAsFixed(2)}',
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF115213),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -517,7 +542,7 @@ class _OrderConfirmationViewState extends State<OrderConfirmationView> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Estado actualizado a ${newStatus.toUpperCase()}'),
-          backgroundColor: const Color(0xFF115213),
+          backgroundColor: Theme.of(context).colorScheme.primary,
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 2),
           shape: RoundedRectangleBorder(
@@ -605,9 +630,9 @@ class _OrderConfirmationViewState extends State<OrderConfirmationView> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => const Center(
+      builder: (ctx) => Center(
         child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF115213)),
+          valueColor: AlwaysStoppedAnimation<Color>(Theme.of(ctx).colorScheme.primary),
         ),
       ),
     );
@@ -668,7 +693,7 @@ class _OrderConfirmationViewState extends State<OrderConfirmationView> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: isError ? Colors.redAccent : const Color(0xFF115213),
+        backgroundColor: isError ? Colors.redAccent : Theme.of(context).colorScheme.primary,
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 2),
         shape: RoundedRectangleBorder(
