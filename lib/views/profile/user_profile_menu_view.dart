@@ -624,11 +624,11 @@ class _UserProfileMenuViewState extends State<UserProfileMenuView> {
           ),
           TextButton(
             onPressed: () async {
+              if (authController.isLoggingOut) return;
               Navigator.of(context).pop();
               await authController.logout();
               if (context.mounted) {
-                Navigator.pushAndRemoveUntil(
-                  context,
+                Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
                   MaterialPageRoute(builder: (context) => const LoginPage()),
                   (route) => false,
                 );

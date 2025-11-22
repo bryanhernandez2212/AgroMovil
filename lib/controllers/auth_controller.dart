@@ -12,12 +12,14 @@ class AuthController extends ChangeNotifier {
   UserModel? _currentUser;
   String? _errorMessage;
   String? _resetSessionToken;
+  bool _isLoggingOut = false;
 
   bool get isLoading => _isLoading;
   UserModel? get currentUser => _currentUser;
   String? get errorMessage => _errorMessage;
   bool get isLoggedIn => _isLoggedIn;
   String? get resetSessionToken => _resetSessionToken;
+  bool get isLoggingOut => _isLoggingOut;
 
   AuthController() {
     // Escuchar cambios de autenticación
@@ -411,17 +413,32 @@ class AuthController extends ChangeNotifier {
 
   /// Logout
   Future<void> logout() async {
+    if (_isLoggingOut) return;
+    _isLoggingOut = true;
+    notifyListeners();
+
     try {
-      if (_currentUser != null) {
-        await NotificationService.unregisterDeviceToken(_currentUser!.id);
+      // Intentar desregistrar token del dispositivo (no bloquear por errores)
+      try {
+        if (_currentUser != null) {
+          await NotificationService.unregisterDeviceToken(_currentUser!.id);
+        }
+      } catch (e) {
+        print('⚠️ Error desregistrando token: $e');
       }
+
+      // Cerrar sesión de Firebase
       await FirebaseService.signOut();
+
+      // Limpiar estado local
       _currentUser = null;
       _isLoggedIn = false;
       _clearError();
-      notifyListeners();
     } catch (e) {
       print('❌ Error en logout: $e');
+    } finally {
+      _isLoggingOut = false;
+      notifyListeners();
     }
   }
 
