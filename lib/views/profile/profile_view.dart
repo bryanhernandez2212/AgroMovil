@@ -5,10 +5,13 @@ import 'package:agromarket/views/about/about_view.dart';
 import 'package:agromarket/services/user_role_service.dart';
 import 'package:agromarket/services/firebase_service.dart';
 import 'package:agromarket/services/places_service.dart';
+import 'package:agromarket/services/vendor_request_service.dart';
+import 'package:agromarket/models/solicitud_vendedor_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import 'dart:io';
 
 class ProfileView extends StatefulWidget {
@@ -33,6 +36,15 @@ class _ProfileViewState extends State<ProfileView> {
   File? _selectedImageFile;
   String? _profileImageUrl;
   final ImagePicker _imagePicker = ImagePicker();
+  
+  // Para el formulario de solicitud de vendedor
+  final TextEditingController _tiendaSolicitudController = TextEditingController();
+  final TextEditingController _ubicacionSolicitudController = TextEditingController();
+  File? _documentoSolicitud;
+  String? _documentoSolicitudFileName;
+  PlaceDetails? _selectedPlaceSolicitud;
+  List<PlacePrediction> _placePredictionsSolicitud = [];
+  bool _showPredictionsSolicitud = false;
 
   @override
   void initState() {
@@ -927,6 +939,54 @@ class _ProfileViewState extends State<ProfileView> {
         _isLoading = true;
       });
 
+      // Si se intenta cambiar a vendedor, verificar solicitud aprobada
+      if (toSeller) {
+        print('🔍 Verificando solicitud de vendedor para el usuario ${user.uid}...');
+        
+        final solicitud = await VendorRequestService.getSolicitudById(user.uid);
+        
+        if (solicitud == null) {
+          setState(() {
+            _isLoading = false;
+          });
+          // Mostrar formulario para crear solicitud
+          await _showVendorRequestForm();
+          return;
+        }
+        
+        final estado = solicitud.estado.toLowerCase();
+        print('📋 Estado de la solicitud: $estado');
+        
+        if (estado == 'pendiente') {
+          setState(() {
+            _isLoading = false;
+          });
+          _showErrorSnackBar(
+            'Tu solicitud de vendedor está pendiente de revisión. '
+            'Te notificaremos cuando sea aprobada.'
+          );
+          return;
+        } else if (estado == 'rechazada') {
+          setState(() {
+            _isLoading = false;
+          });
+          // Mostrar diálogo con opción de reenviar solicitud
+          await _showRejectedRequestDialog(solicitud);
+          return;
+        } else if (estado != 'aprobada') {
+          setState(() {
+            _isLoading = false;
+          });
+          _showErrorSnackBar(
+            'Tu solicitud de vendedor tiene un estado inválido. '
+            'Por favor, contacta al administrador.'
+          );
+          return;
+        }
+        
+        print('✅ Solicitud aprobada, cambiando a modo vendedor...');
+      }
+
       // Actualizar rol_activo en Firestore
       final newRolActivo = toSeller ? 'vendedor' : 'comprador';
       print('🔄 ProfileView - Cambiando rol_activo a: $newRolActivo (toSeller: $toSeller)');
@@ -978,6 +1038,56 @@ class _ProfileViewState extends State<ProfileView> {
       final currentRolActivo = userData?['rol_activo'] ?? 'comprador';
 
       if (enable) {
+        // Si se intenta activar el rol de vendedor, verificar que exista una solicitud aprobada
+        if (role == 'vendedor') {
+          print('🔍 Verificando solicitud de vendedor para el usuario ${user.uid}...');
+          
+          // Obtener la solicitud de vendedor (el ID del documento es el user.uid)
+          final solicitud = await VendorRequestService.getSolicitudById(user.uid);
+          
+          if (solicitud == null) {
+            setState(() {
+              _isLoading = false;
+            });
+            // Mostrar formulario para crear solicitud
+            await _showVendorRequestForm();
+            return;
+          }
+          
+          final estado = solicitud.estado.toLowerCase();
+          print('📋 Estado de la solicitud: $estado');
+          
+          if (estado == 'pendiente') {
+            setState(() {
+              _isLoading = false;
+            });
+            _showErrorSnackBar(
+              'Tu solicitud de vendedor está pendiente de revisión. '
+              'Te notificaremos cuando sea aprobada.'
+            );
+            return;
+          } else if (estado == 'rechazada') {
+            setState(() {
+              _isLoading = false;
+            });
+            // Mostrar diálogo con opción de reenviar solicitud
+            await _showRejectedRequestDialog(solicitud);
+            return;
+          } else if (estado != 'aprobada') {
+            setState(() {
+              _isLoading = false;
+            });
+            _showErrorSnackBar(
+              'Tu solicitud de vendedor tiene un estado inválido. '
+              'Por favor, contacta al administrador.'
+            );
+            return;
+          }
+          
+          // Si llegamos aquí, la solicitud está aprobada
+          print('✅ Solicitud aprobada, activando rol de vendedor...');
+        }
+        
         // Agregar el rol al array en Firestore
         await FirebaseFirestore.instance
             .collection('usuarios')
@@ -1206,6 +1316,566 @@ class _ProfileViewState extends State<ProfileView> {
     return "${date.day}/${date.month}/${date.year}";
   }
 
+  /// Mostrar formulario para crear solicitud de vendedor
+  Future<void> _showVendorRequestForm({SolicitudVendedorModel? solicitudAnterior}) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final authController = Provider.of<AuthController>(context, listen: false);
+    final user = authController.currentUser;
+    
+    if (user == null) {
+      _showErrorSnackBar('Error: Usuario no autenticado');
+      return;
+    }
+
+    // Si hay una solicitud anterior, pre-llenar los campos
+    if (solicitudAnterior != null) {
+      _tiendaSolicitudController.text = solicitudAnterior.nombreTienda;
+      _ubicacionSolicitudController.text = solicitudAnterior.ubicacionFormatted ?? solicitudAnterior.ubicacion;
+      // Restaurar ubicación si tiene coordenadas
+      if (solicitudAnterior.ubicacionLat != null && solicitudAnterior.ubicacionLng != null) {
+        // Crear un PlaceDetails aproximado con los datos guardados
+        _selectedPlaceSolicitud = PlaceDetails(
+          name: solicitudAnterior.ubicacionFormatted ?? solicitudAnterior.ubicacion,
+          formattedAddress: solicitudAnterior.ubicacionFormatted ?? solicitudAnterior.ubicacion,
+          lat: solicitudAnterior.ubicacionLat,
+          lng: solicitudAnterior.ubicacionLng,
+        );
+      }
+    } else {
+      // Limpiar campos del formulario si no hay solicitud anterior
+      _tiendaSolicitudController.clear();
+      _ubicacionSolicitudController.clear();
+      _selectedPlaceSolicitud = null;
+    }
+    
+    // Limpiar documento (siempre se debe subir uno nuevo)
+    _documentoSolicitud = null;
+    _documentoSolicitudFileName = null;
+    _placePredictionsSolicitud = [];
+    _showPredictionsSolicitud = false;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.9,
+              ),
+              padding: const EdgeInsets.all(24),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Solicitud de Vendedor',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : Colors.black,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(context),
+                          color: isDark ? Colors.white : Colors.black,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Completa los siguientes datos para solicitar el rol de vendedor',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: isDark ? Colors.grey[400] : Colors.grey[600],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // Nombre de tienda
+                    TextField(
+                      controller: _tiendaSolicitudController,
+                      decoration: InputDecoration(
+                        labelText: 'Nombre de tienda *',
+                        hintText: 'Ingresa el nombre de tu tienda',
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF5F5F5),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: isDark ? Colors.grey[700]! : const Color(0xFFE0E0E0),
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: isDark ? Colors.grey[700]! : const Color(0xFFE0E0E0),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFF115213), width: 2),
+                        ),
+                        prefixIcon: const Icon(Icons.store, color: Color(0xFF115213)),
+                      ),
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Ubicación
+                    TextField(
+                      controller: _ubicacionSolicitudController,
+                      decoration: InputDecoration(
+                        labelText: 'Ubicación *',
+                        hintText: 'Ubicación (empieza a escribir...)',
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF5F5F5),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: isDark ? Colors.grey[700]! : const Color(0xFFE0E0E0),
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: isDark ? Colors.grey[700]! : const Color(0xFFE0E0E0),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFF115213), width: 2),
+                        ),
+                        prefixIcon: const Icon(Icons.location_on, color: Color(0xFF115213)),
+                      ),
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                      onChanged: (value) async {
+                        if (value.length >= 3) {
+                          final predictions = await PlacesService.getPlacePredictions(value);
+                          setDialogState(() {
+                            _placePredictionsSolicitud = predictions;
+                            _showPredictionsSolicitud = predictions.isNotEmpty;
+                          });
+                        } else {
+                          setDialogState(() {
+                            _placePredictionsSolicitud = [];
+                            _showPredictionsSolicitud = false;
+                          });
+                        }
+                      },
+                      onTap: () async {
+                        if (_ubicacionSolicitudController.text.isNotEmpty) {
+                          final predictions = await PlacesService.getPlacePredictions(_ubicacionSolicitudController.text);
+                          setDialogState(() {
+                            _placePredictionsSolicitud = predictions;
+                            _showPredictionsSolicitud = predictions.isNotEmpty;
+                          });
+                        }
+                      },
+                    ),
+                    if (_showPredictionsSolicitud && _placePredictionsSolicitud.isNotEmpty)
+                      Container(
+                        margin: const EdgeInsets.only(top: 5),
+                        constraints: const BoxConstraints(maxHeight: 150),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                          ),
+                        ),
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: _placePredictionsSolicitud.length,
+                          itemBuilder: (context, index) {
+                            final prediction = _placePredictionsSolicitud[index];
+                            return ListTile(
+                              leading: const Icon(Icons.location_on, color: Color(0xFF115213)),
+                              title: Text(
+                                prediction.description,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: isDark ? Colors.white : Colors.black,
+                                ),
+                              ),
+                              onTap: () async {
+                                final details = await PlacesService.getPlaceDetails(prediction.placeId);
+                                setDialogState(() {
+                                  _selectedPlaceSolicitud = details;
+                                  _ubicacionSolicitudController.text = prediction.description;
+                                  _showPredictionsSolicitud = false;
+                                });
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                    const SizedBox(height: 16),
+                    
+                    // Documento
+                    GestureDetector(
+                      onTap: () => _pickDocumentForRequest(setDialogState),
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF5F5F5),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isDark ? Colors.grey[700]! : const Color(0xFFE0E0E0),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.description, color: Color(0xFF115213)),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _documentoSolicitudFileName ?? 'Documento de identificación *',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: _documentoSolicitudFileName != null
+                                          ? (isDark ? Colors.white : Colors.black)
+                                          : (isDark ? Colors.grey[400] : Colors.grey[600]),
+                                    ),
+                                  ),
+                                  if (_documentoSolicitudFileName == null)
+                                    Text(
+                                      'JPG, PNG o PDF (máx. 5MB)',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: isDark ? Colors.grey[500] : Colors.grey[500],
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            Icon(
+                              Icons.upload_file,
+                              color: isDark ? Colors.grey[400] : Colors.grey[600],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // Botones
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF115213),
+                              side: const BorderSide(color: Color(0xFF115213)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                            ),
+                            child: const Text('Cancelar'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () => _submitVendorRequest(context, setDialogState, user.id, user.nombre, user.email),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF115213),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                            ),
+                            child: const Text('Enviar Solicitud'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _pickDocumentForRequest(StateSetter setDialogState) async {
+    try {
+      final String? fileType = await showDialog<String>(
+        context: context,
+        builder: (context) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          return AlertDialog(
+            backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            title: Text(
+              'Seleccionar documento',
+              style: TextStyle(color: isDark ? Colors.white : Colors.black),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.image, color: Color(0xFF115213)),
+                  title: Text(
+                    'Imagen (JPG, PNG)',
+                    style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                  ),
+                  onTap: () => Navigator.pop(context, 'image'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.picture_as_pdf, color: Color(0xFF115213)),
+                  title: Text(
+                    'PDF',
+                    style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                  ),
+                  onTap: () => Navigator.pop(context, 'pdf'),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+
+      if (fileType == null) return;
+
+      if (fileType == 'image') {
+        final ImageSource? source = await showDialog<ImageSource>(
+          context: context,
+          builder: (context) {
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            return AlertDialog(
+              backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+              title: Text(
+                'Seleccionar imagen',
+                style: TextStyle(color: isDark ? Colors.white : Colors.black),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.camera_alt, color: Color(0xFF115213)),
+                    title: Text(
+                      'Tomar foto',
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                    ),
+                    onTap: () => Navigator.pop(context, ImageSource.camera),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.photo_library, color: Color(0xFF115213)),
+                    title: Text(
+                      'Elegir de galería',
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                    ),
+                    onTap: () => Navigator.pop(context, ImageSource.gallery),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+
+        if (source == null) return;
+
+        final XFile? image = await _imagePicker.pickImage(
+          source: source,
+          imageQuality: 85,
+        );
+
+        if (image != null) {
+          final file = File(image.path);
+          final fileSize = await file.length();
+          const maxSize = 5 * 1024 * 1024; // 5MB
+
+          if (fileSize > maxSize) {
+            _showErrorSnackBar('El archivo es demasiado grande. Máximo 5MB permitido.');
+            return;
+          }
+
+          setDialogState(() {
+            _documentoSolicitud = file;
+            _documentoSolicitudFileName = image.name;
+          });
+        }
+      } else if (fileType == 'pdf') {
+        final result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['pdf'],
+        );
+
+        if (result != null && result.files.single.path != null) {
+          final file = File(result.files.single.path!);
+          final fileSize = await file.length();
+          const maxSize = 5 * 1024 * 1024; // 5MB
+
+          if (fileSize > maxSize) {
+            _showErrorSnackBar('El archivo es demasiado grande. Máximo 5MB permitido.');
+            return;
+          }
+
+          setDialogState(() {
+            _documentoSolicitud = file;
+            _documentoSolicitudFileName = result.files.single.name;
+          });
+        }
+      }
+    } catch (e) {
+      _showErrorSnackBar('Error al seleccionar documento: $e');
+    }
+  }
+
+  /// Mostrar diálogo cuando la solicitud fue rechazada
+  Future<void> _showRejectedRequestDialog(SolicitudVendedorModel solicitud) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final motivo = solicitud.motivoRechazo;
+    
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Row(
+          children: [
+            Icon(
+              Icons.cancel_outlined,
+              color: Colors.red,
+              size: 28,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Solicitud Rechazada',
+                style: TextStyle(
+                  color: isDark ? Colors.white : Colors.black,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              motivo != null && motivo.isNotEmpty
+                  ? 'Motivo del rechazo:\n\n$motivo'
+                  : 'Tu solicitud de vendedor fue rechazada. Por favor, revisa la información y vuelve a intentar.',
+              style: TextStyle(
+                color: isDark ? Colors.grey[300] : Colors.grey[700],
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              '¿Deseas enviar una nueva solicitud?',
+              style: TextStyle(
+                color: isDark ? Colors.white : Colors.black,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Cancelar',
+              style: TextStyle(
+                color: isDark ? Colors.grey[400] : Colors.grey[600],
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // Mostrar formulario para reenviar solicitud con datos anteriores
+              _showVendorRequestForm(solicitudAnterior: solicitud);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF115213),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('Reenviar Solicitud'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _submitVendorRequest(BuildContext dialogContext, StateSetter setDialogState, String userId, String nombre, String email) async {
+    // Validaciones
+    if (_tiendaSolicitudController.text.trim().isEmpty) {
+      _showErrorSnackBar('Por favor, ingresa el nombre de tu tienda');
+      return;
+    }
+
+    if (_selectedPlaceSolicitud == null) {
+      _showErrorSnackBar('Por favor, selecciona una ubicación');
+      return;
+    }
+
+    if (_documentoSolicitud == null) {
+      _showErrorSnackBar('Por favor, sube un documento de verificación');
+      return;
+    }
+
+    setDialogState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final result = await VendorRequestService.createVendorRequestForExistingUser(
+        userId: userId,
+        nombre: nombre,
+        email: email,
+        nombreTienda: _tiendaSolicitudController.text.trim(),
+        ubicacion: _selectedPlaceSolicitud!.formattedAddress,
+        ubicacionFormatted: _selectedPlaceSolicitud!.formattedAddress,
+        ubicacionLat: _selectedPlaceSolicitud!.lat,
+        ubicacionLng: _selectedPlaceSolicitud!.lng,
+        documentoFile: _documentoSolicitud!,
+      );
+
+      if (mounted) {
+        Navigator.pop(dialogContext); // Cerrar diálogo
+        
+        if (result['success']) {
+          _showSuccessSnackBar(result['message'] ?? 'Solicitud enviada exitosamente');
+        } else {
+          _showErrorSnackBar(result['message'] ?? 'Error al enviar la solicitud');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(dialogContext);
+        _showErrorSnackBar('Error inesperado: ${e.toString()}');
+      }
+    }
+  }
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -1213,6 +1883,8 @@ class _ProfileViewState extends State<ProfileView> {
     _passwordController.dispose();
     _tiendaController.dispose();
     _ubicacionController.dispose();
+    _tiendaSolicitudController.dispose();
+    _ubicacionSolicitudController.dispose();
     super.dispose();
   }
 }

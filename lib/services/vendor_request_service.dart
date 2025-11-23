@@ -330,5 +330,128 @@ class VendorRequestService {
       return null;
     }
   }
+
+  /// Crear una solicitud de vendedor para un usuario ya autenticado
+  static Future<Map<String, dynamic>> createVendorRequestForExistingUser({
+    required String userId,
+    required String nombre,
+    required String email,
+    required String nombreTienda,
+    required String ubicacion,
+    String? ubicacionFormatted,
+    double? ubicacionLat,
+    double? ubicacionLng,
+    required File documentoFile,
+  }) async {
+    try {
+      print('📝 VendorRequestService: Creando solicitud de vendedor para usuario existente $userId');
+
+      // Verificar que el usuario esté autenticado
+      final currentUser = _auth.currentUser;
+      if (currentUser == null || currentUser.uid != userId) {
+        return {
+          'success': false,
+          'message': 'Error: Usuario no autenticado o no coincide',
+        };
+      }
+
+      // Verificar que el token esté disponible
+      try {
+        final token = await currentUser.getIdToken();
+        if (token == null || token.isEmpty) {
+          print('⚠️ Token vacío, forzando refresh...');
+          await currentUser.getIdToken(true);
+        }
+        print('✅ Token de autenticación verificado');
+      } catch (tokenError) {
+        print('⚠️ Error obteniendo token: $tokenError');
+      }
+
+      // 1. Subir el documento a Firebase Storage
+      print('📤 Subiendo documento de verificación...');
+      String? documentoUrl;
+      try {
+        documentoUrl = await _uploadDocument(documentoFile, email, userId);
+        
+        if (documentoUrl == null) {
+          return {
+            'success': false,
+            'message': 'Error al subir el documento de verificación',
+          };
+        }
+        print('✅ Documento subido exitosamente: $documentoUrl');
+      } catch (uploadError) {
+        print('❌ Error subiendo documento: $uploadError');
+        return {
+          'success': false,
+          'message': 'Error al subir el documento: ${uploadError.toString()}',
+        };
+      }
+
+      // 2. Verificar si ya existe una solicitud para este usuario
+      print('🔍 Verificando solicitudes existentes...');
+      try {
+        final existentes = await _firestore
+            .collection('solicitudes_vendedores')
+            .doc(userId)
+            .get();
+
+        if (existentes.exists) {
+          final estado = (existentes.data()?['estado'] ?? 'pendiente').toString().toLowerCase();
+          if (estado == 'pendiente' || estado == 'aprobada') {
+            return {
+              'success': false,
+              'message': 'Ya existe una solicitud asociada a tu cuenta. Estado: $estado',
+            };
+          }
+          // Si está rechazada, actualizar la solicitud existente
+          print('🔄 Actualizando solicitud rechazada anterior...');
+        }
+      } catch (e) {
+        print('⚠️ Error verificando solicitudes existentes: $e');
+        // Continuar de todas formas
+      }
+
+      // 3. Guardar la solicitud en Firestore
+      print('💾 Guardando solicitud en Firestore...');
+      final solicitudData = {
+        'user_id': userId,
+        'nombre': nombre,
+        'email': email,
+        'password_hash': null, // No guardamos la contraseña en la solicitud
+        'nombre_tienda': nombreTienda,
+        'ubicacion': ubicacion,
+        'ubicacion_formatted': ubicacionFormatted ?? ubicacion,
+        'ubicacion_lat': ubicacionLat,
+        'ubicacion_lng': ubicacionLng,
+        'documento_url': documentoUrl,
+        'estado': 'pendiente',
+        'fecha_solicitud': FieldValue.serverTimestamp(),
+        'fecha_revision': null,
+        'revisado_por': null,
+        'motivo_rechazo': null,
+      };
+
+      // Usar doc(userId).set() para crear o actualizar
+      await _firestore
+          .collection('solicitudes_vendedores')
+          .doc(userId)
+          .set(solicitudData);
+
+      print('✅ Solicitud guardada exitosamente con ID: $userId');
+
+      return {
+        'success': true,
+        'message': 'Solicitud enviada exitosamente. Te notificaremos cuando sea revisada.',
+        'solicitudId': userId,
+      };
+    } catch (e) {
+      print('❌ Error creando solicitud de vendedor: $e');
+      return {
+        'success': false,
+        'message': 'Error al crear la solicitud: ${e.toString()}',
+      };
+    }
+  }
 }
 

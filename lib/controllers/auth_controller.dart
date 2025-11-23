@@ -24,12 +24,31 @@ class AuthController extends ChangeNotifier {
   AuthController() {
     // Escuchar cambios de autenticación
     FirebaseService.authStateChanges.listen((User? user) {
+      // No recargar datos si estamos en proceso de logout
+      if (_isLoggingOut) {
+        print('⚠️ Ignorando authStateChanges durante logout');
+        return;
+      }
+      
+      // Si el estado ya está limpio y el usuario es null, no hacer nada
+      if (user == null && _currentUser == null && !_isLoggedIn) {
+        print('ℹ️ Usuario ya desautenticado, ignorando evento');
+        return;
+      }
+      
       if (user != null) {
-        _loadUserData(user.uid);
+        // Solo cargar datos si no estamos haciendo logout
+        if (!_isLoggingOut) {
+          _loadUserData(user.uid);
+        }
       } else {
-        _currentUser = null;
-        _isLoggedIn = false;
-        notifyListeners();
+        // Solo limpiar si no estamos haciendo logout explícitamente
+        if (!_isLoggingOut) {
+          print('ℹ️ Usuario desautenticado (no durante logout)');
+          _currentUser = null;
+          _isLoggedIn = false;
+          notifyListeners();
+        }
       }
     });
   }
@@ -413,32 +432,69 @@ class AuthController extends ChangeNotifier {
 
   /// Logout
   Future<void> logout() async {
-    if (_isLoggingOut) return;
+    if (_isLoggingOut) {
+      print('⚠️ Logout ya en progreso, ignorando...');
+      return;
+    }
+    
     _isLoggingOut = true;
     notifyListeners();
 
     try {
+      print('🚪 AuthController: Iniciando logout...');
+      
+      // Limpiar estado local PRIMERO para evitar recargas
+      final userId = _currentUser?.id;
+      _currentUser = null;
+      _isLoggedIn = false;
+      _clearError();
+      notifyListeners(); // Notificar cambios inmediatamente
+      
+      // Esperar un momento para que los listeners procesen el cambio
+      await Future.delayed(const Duration(milliseconds: 50));
+      
       // Intentar desregistrar token del dispositivo (no bloquear por errores)
       try {
-        if (_currentUser != null) {
-          await NotificationService.unregisterDeviceToken(_currentUser!.id);
+        if (userId != null) {
+          await NotificationService.unregisterDeviceToken(userId).timeout(
+            const Duration(seconds: 3),
+            onTimeout: () => print('⚠️ Timeout desregistrando token'),
+          );
+          print('✅ Token desregistrado');
         }
       } catch (e) {
         print('⚠️ Error desregistrando token: $e');
       }
 
       // Cerrar sesión de Firebase
-      await FirebaseService.signOut();
+      await FirebaseService.signOut().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => print('⚠️ Timeout cerrando sesión de Firebase'),
+      );
+      print('✅ Sesión de Firebase cerrada');
 
-      // Limpiar estado local
+      // Esperar un momento más para asegurar que Firebase procese el signOut
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      // Asegurar que el estado esté limpio
       _currentUser = null;
       _isLoggedIn = false;
       _clearError();
+      
+      print('✅ Logout completado exitosamente');
+      
     } catch (e) {
       print('❌ Error en logout: $e');
+      // Asegurar limpieza incluso si hay error
+      _currentUser = null;
+      _isLoggedIn = false;
+      _clearError();
     } finally {
+      // Esperar un momento antes de marcar como completado
+      await Future.delayed(const Duration(milliseconds: 50));
       _isLoggingOut = false;
       notifyListeners();
+      print('✅ Estado de logout actualizado');
     }
   }
 

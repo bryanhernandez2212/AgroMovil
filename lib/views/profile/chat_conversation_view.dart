@@ -87,6 +87,31 @@ class _ChatConversationViewState extends State<ChatConversationView> {
     _currentUserId = currentUser.id;
 
     try {
+      // Verificar acceso al chat antes de cargar mensajes
+      print('🔍 Verificando acceso al chat: ${widget.chatId}');
+      final chatDoc = await ChatService.getChat(widget.chatId);
+      
+      if (chatDoc == null) {
+        print('❌ Chat no existe: ${widget.chatId}');
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'El chat no existe';
+        });
+        return;
+      }
+      
+      final participants = chatDoc['participants'] as List? ?? [];
+      if (!participants.contains(currentUser.id)) {
+        print('❌ Usuario no es participante del chat');
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'No tienes acceso a este chat';
+        });
+        return;
+      }
+      
+      print('✅ Usuario tiene acceso al chat');
+      
       if (_hasOrderId) {
         await ChatService.ensureChat(
           orderId: widget.orderId,
@@ -111,6 +136,7 @@ class _ChatConversationViewState extends State<ChatConversationView> {
       );
     } catch (e) {
       if (!mounted) return;
+      print('❌ Error en _initialize: $e');
       setState(() {
         _isLoading = false;
         _errorMessage = 'No se pudo cargar la conversación: $e';
@@ -120,10 +146,14 @@ class _ChatConversationViewState extends State<ChatConversationView> {
 
   void _listenToMessages() {
     _messagesSubscription?.cancel();
+    print('🔍 Iniciando listener de mensajes para chat: ${widget.chatId}');
+    print('🔍 Usuario actual: $_currentUserId');
+    
     _messagesSubscription =
         ChatService.streamChatMessages(widget.chatId).listen(
       (messages) {
         if (!mounted) return;
+        print('✅ Mensajes recibidos: ${messages.length}');
         setState(() {
           _messages = messages;
           _isLoading = false;
@@ -139,9 +169,19 @@ class _ChatConversationViewState extends State<ChatConversationView> {
       },
       onError: (error) {
         if (!mounted) return;
+        print('❌ Error en listener de mensajes: $error');
+        print('❌ Tipo de error: ${error.runtimeType}');
+        
+        // Intentar obtener más detalles del error
+        String errorMessage = 'Error cargando mensajes: ${error.toString()}';
+        if (error.toString().contains('permission-denied')) {
+          errorMessage = 'Error de permisos: No tienes acceso a estos mensajes. '
+              'Verifica que eres participante del chat.';
+        }
+        
         setState(() {
           _isLoading = false;
-          _errorMessage = 'Error cargando mensajes: ${error.toString()}';
+          _errorMessage = errorMessage;
         });
       },
     );
