@@ -5,6 +5,7 @@ import 'package:agromarket/models/cart_item_model.dart';
 import 'package:agromarket/services/product_service.dart';
 import 'package:agromarket/controllers/cart_controller.dart';
 import 'package:agromarket/views/buyer/shipping_address_view.dart';
+import 'package:agromarket/estructure/product_estructure.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -302,6 +303,7 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
       
       if (result['success']) {
         if (mounted) {
+          // Mostrar mensaje de éxito brevemente
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Row(
@@ -312,7 +314,7 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                 ],
               ),
               backgroundColor: const Color(0xFF115213),
-              duration: const Duration(seconds: 2),
+              duration: const Duration(seconds: 1),
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
@@ -320,6 +322,19 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
               margin: const EdgeInsets.all(16),
             ),
           );
+          
+          // Navegar al carrito después de un breve delay
+          Future.delayed(const Duration(milliseconds: 800), () {
+            if (mounted) {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ProductEstructureView(currentIndex: 2),
+                ),
+                (route) => false, // Eliminar todas las rutas anteriores
+              );
+            }
+          });
         }
       } else {
         if (mounted) {

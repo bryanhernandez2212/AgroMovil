@@ -5,6 +5,7 @@ import 'package:agromarket/controllers/auth_controller.dart';
 import 'package:agromarket/views/profile/profile_view.dart';
 import 'package:agromarket/views/profile/notifications_view.dart';
 import 'package:agromarket/views/profile/chat_view.dart';
+import 'package:agromarket/views/about/about_view.dart';
 import 'package:agromarket/services/user_role_service.dart';
 import 'package:agromarket/views/buyer/my_orders_view.dart';
 import 'package:agromarket/views/vendor/seller_orders_view.dart';
@@ -41,6 +42,14 @@ class _UserProfileMenuViewState extends State<UserProfileMenuView> {
 
     final uri = Uri.parse('https://dashboard.stripe.com/login');
     await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  /// Trunca el nombre si excede el máximo de caracteres
+  String _truncateName(String name, {int maxLength = 25}) {
+    if (name.length <= maxLength) {
+      return name;
+    }
+    return '${name.substring(0, maxLength)}...';
   }
 
   @override
@@ -126,12 +135,17 @@ class _UserProfileMenuViewState extends State<UserProfileMenuView> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            userModel?.nombre ?? user?.displayName ?? 'Usuario',
+                            _truncateName(
+                              userModel?.nombre ?? user?.displayName ?? 'Usuario',
+                              maxLength: 25,
+                            ),
                             style: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
                               color: Color(0xFF1A1A1A),
                             ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
                           if (user?.email != null)
                             Text(
@@ -299,6 +313,20 @@ class _UserProfileMenuViewState extends State<UserProfileMenuView> {
                               borderRadius: BorderRadius.circular(20),
                             ),
                             margin: const EdgeInsets.all(16),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    _buildMenuButton(
+                      context,
+                      icon: Icons.info_outline,
+                      title: 'Acerca de',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const AboutView(),
                           ),
                         );
                       },

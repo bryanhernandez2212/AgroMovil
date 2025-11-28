@@ -8,6 +8,8 @@ service cloud.firestore {
     match /usuarios/{userId} {
       // Permitir lectura para usuarios autenticados
       // Esto permite ver información básica de otros usuarios en chats (nombre, photoUrl, isOnline)
+      // NOTA: Las consultas por email para recuperación de contraseña requieren autenticación
+      // Si no hay autenticación, el servicio continuará sin el nombre del usuario
       allow read: if request.auth != null;
       
       // Permitir escritura solo si el usuario está autenticado y es el dueño del documento
@@ -53,10 +55,13 @@ service cloud.firestore {
                        request.resource.data.usuario_id == request.auth.uid;
       
       // Permitir actualizar si:
-      // - El usuario es el comprador (dueño de la compra), O
-      // - El usuario es un vendedor (necesario para actualizar estado del pedido)
-      // Nota: El filtrado por vendedor se hace en el código, verificando que sus productos estén en la compra
-      allow update: if request.auth != null;
+      // - El usuario es el comprador (dueño de la compra), PERO no puede cambiar estado_pedido
+      // - El usuario es un vendedor (puede actualizar estado del pedido)
+      // Validación: Si se intenta actualizar estado_pedido, el usuario NO debe ser el comprador
+      allow update: if request.auth != null && 
+                       // Si está cambiando estado_pedido y es diferente al anterior, el usuario NO debe ser el comprador
+                       (request.resource.data.estado_pedido == resource.data.estado_pedido ||
+                        request.auth.uid != resource.data.usuario_id);
       
       // Permitir eliminar solo si el usuario es el dueño de la compra
       allow delete: if request.auth != null && 
@@ -163,6 +168,23 @@ service cloud.firestore {
       // Permitir eliminar solo si el usuario es el dueño de la solicitud o es administrador
       allow delete: if request.auth != null && 
                        (request.auth.uid == solicitudId || isAdmin());
+    }
+    
+    // Códigos de recuperación de contraseña
+    // Solo las Cloud Functions pueden escribir/leer estos documentos
+    // Los usuarios no pueden acceder directamente
+    match /passwordResetCodes/{codeId} {
+      // Denegar acceso directo de usuarios
+      // Las Cloud Functions tienen permisos de administrador y pueden acceder
+      allow read, write: if false;
+    }
+    
+    // Sesiones de recuperación de contraseña
+    // Solo las Cloud Functions pueden escribir/leer estos documentos
+    match /passwordResetSessions/{sessionId} {
+      // Denegar acceso directo de usuarios
+      // Las Cloud Functions tienen permisos de administrador y pueden acceder
+      allow read, write: if false;
     }
     
     // Para desarrollo: Si necesitas reglas más permisivas temporalmente,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:agromarket/models/product_model.dart';
 import 'package:agromarket/services/product_service.dart';
 import 'package:agromarket/views/buyer/product_detail_view.dart';
+import 'package:agromarket/estructure/product_estructure.dart';
 
 class BuyerHomeView extends StatefulWidget {
   final Function(String)? onCategoryTap;
@@ -140,7 +141,15 @@ class _BuyerHomeViewState extends State<BuyerHomeView> {
                       _buildSectionTitle(
                         title: 'Más vendidos',
                         actionLabel: 'Ver todo',
-                        onActionTap: () {},
+                        onActionTap: () {
+                          // Navegar a la vista de productos
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const ProductEstructureView(currentIndex: 1),
+                            ),
+                          );
+                        },
                       ),
                       const SizedBox(height: 16),
                       _buildBestSellerList(),
@@ -161,7 +170,15 @@ class _BuyerHomeViewState extends State<BuyerHomeView> {
                       _buildSectionTitle(
                         title: 'Recomendados para ti',
                         actionLabel: 'Ver más',
-                        onActionTap: () {},
+                        onActionTap: () {
+                          // Navegar a la vista de productos
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const ProductEstructureView(currentIndex: 1),
+                            ),
+                          );
+                        },
                       ),
                       const SizedBox(height: 16),
                       _buildRecommendationsGrid(),
@@ -566,7 +583,7 @@ class _BuyerHomeViewState extends State<BuyerHomeView> {
         crossAxisCount: 2,
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
-        childAspectRatio: 0.9,
+        childAspectRatio: 0.82,
       ),
       itemBuilder: (context, index) {
         final product = _recommendedProducts[index];
@@ -953,49 +970,57 @@ class _RecommendationCardState extends State<_RecommendationCard>
                     ],
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFF7043).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFF7043).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            widget.tag,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFFFF7043),
+                            ),
+                          ),
                         ),
-                        child: Text(
-                          widget.tag,
+                        const SizedBox(height: 6),
+                        Flexible(
+                          child: Text(
+                            widget.product.nombre,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: isDark ? Colors.white : const Color(0xFF2F2E41),
+                              height: 1.2,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          '${widget.priceLabel} / ${widget.unitLabel}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
                             color: Color(0xFFFF7043),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        widget.product.nombre,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: isDark ? Colors.white : const Color(0xFF2F2E41),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '${widget.priceLabel} / ${widget.unitLabel}',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: isDark ? Colors.white : const Color(0xFF1B4332),
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ],

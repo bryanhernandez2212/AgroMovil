@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
-import 'package:agromarket/views/auth/login_view.dart';
 import 'package:agromarket/estructure/product_estructure.dart';
 import 'package:agromarket/controllers/auth_controller.dart';
 import 'package:agromarket/controllers/cart_controller.dart';
@@ -14,6 +13,7 @@ import 'package:agromarket/services/ad_service.dart';
 import 'package:agromarket/config/stripe_config.dart';
 import 'package:agromarket/services/notification_service.dart';
 import 'package:agromarket/views/profile/chat_conversation_view.dart';
+import 'package:agromarket/widgets/auth_wrapper.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(
@@ -233,7 +233,7 @@ class AgroMarketApp extends StatelessWidget {
               ),
             ),
             themeMode: themeController.isDarkMode ? ThemeMode.dark : ThemeMode.light,
-        home: const LoginPage(), 
+        home: const AuthWrapper(), 
         routes: {
           '/home': (context) => const ProductEstructureView(), 
         },

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:agromarket/controllers/auth_controller.dart';
-import 'package:agromarket/views/about/about_view.dart';
 import 'package:agromarket/services/user_role_service.dart';
 import 'package:agromarket/services/firebase_service.dart';
 import 'package:agromarket/services/places_service.dart';
@@ -745,59 +744,116 @@ class _ProfileViewState extends State<ProfileView> {
         final roles = user?.roles ?? const <String>[];
         final hasSeller = roles.any((r) => r.toLowerCase().contains('vend'));
         final hasBuyer = roles.any((r) => r.toLowerCase().contains('compr') || r.toLowerCase().contains('buyer'));
+        final hasBothRoles = hasSeller && hasBuyer; // Solo mostrar si tiene ambos roles
+        final isOnlyBuyer = hasBuyer && !hasSeller; // Solo tiene rol comprador
 
         final isDark = Theme.of(context).brightness == Brightness.dark;
         return Column(
           children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF115213)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Modo de navegación",
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : const Color(0xFF115213),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  RadioListTile<String>(
-                    value: UserRoleService.sellerRole,
-                    groupValue: currentRole ?? (hasSeller ? UserRoleService.sellerRole : UserRoleService.buyerRole),
-                    onChanged: hasSeller ? (val) => _switchRole(true, authController) : null,
-                    activeColor: const Color(0xFF115213),
-                    title: Text(
-                      '🏪 Modo Vendedor',
+            // Solo mostrar "Modo de navegación" si el usuario tiene ambos roles
+            if (hasBothRoles) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF115213)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Modo de navegación",
                       style: TextStyle(
-                        color: isDark ? Colors.white : Colors.black,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : const Color(0xFF115213),
                       ),
                     ),
-                  ),
-                  RadioListTile<String>(
-                    value: UserRoleService.buyerRole,
-                    groupValue: currentRole ?? (hasSeller ? UserRoleService.sellerRole : UserRoleService.buyerRole),
-                    onChanged: hasBuyer ? (val) => _switchRole(false, authController) : null,
-                    activeColor: const Color(0xFF115213),
-                    title: Text(
-                      '🛒 Modo Comprador',
-                      style: TextStyle(
-                        color: isDark ? Colors.white : Colors.black,
+                    const SizedBox(height: 8),
+                    RadioListTile<String>(
+                      value: UserRoleService.sellerRole,
+                      groupValue: currentRole ?? (hasSeller ? UserRoleService.sellerRole : UserRoleService.buyerRole),
+                      onChanged: hasSeller ? (val) => _switchRole(true, authController) : null,
+                      activeColor: const Color(0xFF115213),
+                      title: Text(
+                        '🏪 Modo Vendedor',
+                        style: TextStyle(
+                          color: isDark ? Colors.white : Colors.black,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                    RadioListTile<String>(
+                      value: UserRoleService.buyerRole,
+                      groupValue: currentRole ?? (hasSeller ? UserRoleService.sellerRole : UserRoleService.buyerRole),
+                      onChanged: hasBuyer ? (val) => _switchRole(false, authController) : null,
+                      activeColor: const Color(0xFF115213),
+                      title: Text(
+                        '🛒 Modo Comprador',
+                        style: TextStyle(
+                          color: isDark ? Colors.white : Colors.black,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            
-            const SizedBox(height: 12),
+              const SizedBox(height: 12),
+            ],
+            // Mensaje informativo cuando solo tiene un rol
+            if (!hasBothRoles) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFFE8F5E9) : const Color(0xFFF1F8F4),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: const Color(0xFF115213).withOpacity(0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      isOnlyBuyer ? Icons.store_outlined : Icons.shopping_cart_outlined,
+                      color: const Color(0xFF115213),
+                      size: 28,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            isOnlyBuyer
+                                ? '¿Quieres vender productos?'
+                                : '¿Quieres comprar productos?',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? const Color(0xFF115213) : const Color(0xFF1B4332),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            isOnlyBuyer
+                                ? 'Activa el rol de vendedor para publicar y vender tus productos agrícolas. Gestiona tus ventas y crece tu negocio en AgroMarket.'
+                                : 'Activa el rol de comprador para explorar y comprar productos de diferentes vendedores en AgroMarket.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: isDark ? Colors.grey[300] : const Color(0xFF4A5568),
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
@@ -905,25 +961,6 @@ class _ProfileViewState extends State<ProfileView> {
               ),
             ),
             
-            const SizedBox(height: 12),
-            
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton.icon(
-                onPressed: _navigateToAbout,
-                icon: const Icon(Icons.info_outline, size: 20),
-                label: const Text("Acerca de"),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF115213),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 2,
-                ),
-              ),
-            ),
           ],
         );
       },
@@ -941,50 +978,62 @@ class _ProfileViewState extends State<ProfileView> {
 
       // Si se intenta cambiar a vendedor, verificar solicitud aprobada
       if (toSeller) {
-        print('🔍 Verificando solicitud de vendedor para el usuario ${user.uid}...');
+        // Verificar si el usuario ya tiene ambos roles usando los datos del AuthController
+        final currentUser = authController.currentUser;
+        final roles = currentUser?.roles ?? const <String>[];
+        final hasSellerRole = roles.any((r) => r.toLowerCase().contains('vend'));
+        final hasBuyerRole = roles.any((r) => r.toLowerCase().contains('compr') || r.toLowerCase().contains('buyer'));
         
-        final solicitud = await VendorRequestService.getSolicitudById(user.uid);
-        
-        if (solicitud == null) {
-          setState(() {
-            _isLoading = false;
-          });
-          // Mostrar formulario para crear solicitud
-          await _showVendorRequestForm();
-          return;
+        if (hasSellerRole && hasBuyerRole) {
+          // Si ya tiene ambos roles, cambiar directamente sin solicitud
+          print('✅ Usuario ya tiene ambos roles, cambiando directamente a modo vendedor...');
+        } else {
+          // Si no tiene ambos roles, verificar solicitud
+          print('🔍 Verificando solicitud de vendedor para el usuario ${user.uid}...');
+          
+          final solicitud = await VendorRequestService.getSolicitudById(user.uid);
+          
+          if (solicitud == null) {
+            setState(() {
+              _isLoading = false;
+            });
+            // Mostrar formulario para crear solicitud
+            await _showVendorRequestForm();
+            return;
+          }
+          
+          final estado = solicitud.estado.toLowerCase();
+          print('📋 Estado de la solicitud: $estado');
+          
+          if (estado == 'pendiente') {
+            setState(() {
+              _isLoading = false;
+            });
+            _showErrorSnackBar(
+              'Tu solicitud de vendedor está pendiente de revisión. '
+              'Te notificaremos cuando sea aprobada.'
+            );
+            return;
+          } else if (estado == 'rechazada') {
+            setState(() {
+              _isLoading = false;
+            });
+            // Mostrar diálogo con opción de reenviar solicitud
+            await _showRejectedRequestDialog(solicitud);
+            return;
+          } else if (estado != 'aprobada') {
+            setState(() {
+              _isLoading = false;
+            });
+            _showErrorSnackBar(
+              'Tu solicitud de vendedor tiene un estado inválido. '
+              'Por favor, contacta al administrador.'
+            );
+            return;
+          }
+          
+          print('✅ Solicitud aprobada, cambiando a modo vendedor...');
         }
-        
-        final estado = solicitud.estado.toLowerCase();
-        print('📋 Estado de la solicitud: $estado');
-        
-        if (estado == 'pendiente') {
-          setState(() {
-            _isLoading = false;
-          });
-          _showErrorSnackBar(
-            'Tu solicitud de vendedor está pendiente de revisión. '
-            'Te notificaremos cuando sea aprobada.'
-          );
-          return;
-        } else if (estado == 'rechazada') {
-          setState(() {
-            _isLoading = false;
-          });
-          // Mostrar diálogo con opción de reenviar solicitud
-          await _showRejectedRequestDialog(solicitud);
-          return;
-        } else if (estado != 'aprobada') {
-          setState(() {
-            _isLoading = false;
-          });
-          _showErrorSnackBar(
-            'Tu solicitud de vendedor tiene un estado inválido. '
-            'Por favor, contacta al administrador.'
-          );
-          return;
-        }
-        
-        print('✅ Solicitud aprobada, cambiando a modo vendedor...');
       }
 
       // Actualizar rol_activo en Firestore
@@ -1040,52 +1089,64 @@ class _ProfileViewState extends State<ProfileView> {
       if (enable) {
         // Si se intenta activar el rol de vendedor, verificar que exista una solicitud aprobada
         if (role == 'vendedor') {
-          print('🔍 Verificando solicitud de vendedor para el usuario ${user.uid}...');
+          // Verificar si el usuario ya tiene ambos roles
+          final rolesFromData = userData?['roles'] as List<dynamic>?;
+          final rolesList = rolesFromData?.map((r) => r.toString().toLowerCase()).toList() ?? [];
+          final hasSellerRole = rolesList.any((r) => r.contains('vend'));
+          final hasBuyerRole = rolesList.any((r) => r.contains('compr') || r.contains('buyer'));
           
-          // Obtener la solicitud de vendedor (el ID del documento es el user.uid)
-          final solicitud = await VendorRequestService.getSolicitudById(user.uid);
-          
-          if (solicitud == null) {
-            setState(() {
-              _isLoading = false;
-            });
-            // Mostrar formulario para crear solicitud
-            await _showVendorRequestForm();
-            return;
+          if (hasSellerRole && hasBuyerRole) {
+            // Si ya tiene ambos roles, activar directamente sin solicitud
+            print('✅ Usuario ya tiene ambos roles, activando rol de vendedor directamente...');
+          } else {
+            // Si no tiene ambos roles, verificar solicitud
+            print('🔍 Verificando solicitud de vendedor para el usuario ${user.uid}...');
+            
+            // Obtener la solicitud de vendedor (el ID del documento es el user.uid)
+            final solicitud = await VendorRequestService.getSolicitudById(user.uid);
+            
+            if (solicitud == null) {
+              setState(() {
+                _isLoading = false;
+              });
+              // Mostrar formulario para crear solicitud
+              await _showVendorRequestForm();
+              return;
+            }
+            
+            final estado = solicitud.estado.toLowerCase();
+            print('📋 Estado de la solicitud: $estado');
+            
+            if (estado == 'pendiente') {
+              setState(() {
+                _isLoading = false;
+              });
+              _showErrorSnackBar(
+                'Tu solicitud de vendedor está pendiente de revisión. '
+                'Te notificaremos cuando sea aprobada.'
+              );
+              return;
+            } else if (estado == 'rechazada') {
+              setState(() {
+                _isLoading = false;
+              });
+              // Mostrar diálogo con opción de reenviar solicitud
+              await _showRejectedRequestDialog(solicitud);
+              return;
+            } else if (estado != 'aprobada') {
+              setState(() {
+                _isLoading = false;
+              });
+              _showErrorSnackBar(
+                'Tu solicitud de vendedor tiene un estado inválido. '
+                'Por favor, contacta al administrador.'
+              );
+              return;
+            }
+            
+            // Si llegamos aquí, la solicitud está aprobada
+            print('✅ Solicitud aprobada, activando rol de vendedor...');
           }
-          
-          final estado = solicitud.estado.toLowerCase();
-          print('📋 Estado de la solicitud: $estado');
-          
-          if (estado == 'pendiente') {
-            setState(() {
-              _isLoading = false;
-            });
-            _showErrorSnackBar(
-              'Tu solicitud de vendedor está pendiente de revisión. '
-              'Te notificaremos cuando sea aprobada.'
-            );
-            return;
-          } else if (estado == 'rechazada') {
-            setState(() {
-              _isLoading = false;
-            });
-            // Mostrar diálogo con opción de reenviar solicitud
-            await _showRejectedRequestDialog(solicitud);
-            return;
-          } else if (estado != 'aprobada') {
-            setState(() {
-              _isLoading = false;
-            });
-            _showErrorSnackBar(
-              'Tu solicitud de vendedor tiene un estado inválido. '
-              'Por favor, contacta al administrador.'
-            );
-            return;
-          }
-          
-          // Si llegamos aquí, la solicitud está aprobada
-          print('✅ Solicitud aprobada, activando rol de vendedor...');
         }
         
         // Agregar el rol al array en Firestore
@@ -1164,13 +1225,6 @@ class _ProfileViewState extends State<ProfileView> {
       _selectedImageFile = null; // Limpiar imagen seleccionada
       _loadUserData(); // Recargar datos originales
     });
-  }
-
-  void _navigateToAbout() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const AboutView()),
-    );
   }
 
   Future<void> _saveChanges() async {
@@ -1318,9 +1372,22 @@ class _ProfileViewState extends State<ProfileView> {
 
   /// Mostrar formulario para crear solicitud de vendedor
   Future<void> _showVendorRequestForm({SolicitudVendedorModel? solicitudAnterior}) async {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final authController = Provider.of<AuthController>(context, listen: false);
     final user = authController.currentUser;
+    
+    // Validar si el usuario ya tiene ambos roles
+    if (user != null) {
+      final roles = user.roles;
+      final hasSellerRole = roles.any((r) => r.toLowerCase().contains('vend'));
+      final hasBuyerRole = roles.any((r) => r.toLowerCase().contains('compr') || r.toLowerCase().contains('buyer'));
+      
+      if (hasSellerRole && hasBuyerRole) {
+        _showErrorSnackBar('Ya tienes ambos roles activos. No es necesario enviar una nueva solicitud.');
+        return;
+      }
+    }
+    
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     
     if (user == null) {
       _showErrorSnackBar('Error: Usuario no autenticado');
@@ -1826,6 +1893,23 @@ class _ProfileViewState extends State<ProfileView> {
   }
 
   Future<void> _submitVendorRequest(BuildContext dialogContext, StateSetter setDialogState, String userId, String nombre, String email) async {
+    // Validar si el usuario ya tiene ambos roles
+    try {
+      final userData = await FirebaseService.getCurrentUserData();
+      final rolesFromData = userData?['roles'] as List<dynamic>?;
+      final rolesList = rolesFromData?.map((r) => r.toString().toLowerCase()).toList() ?? [];
+      final hasSellerRole = rolesList.any((r) => r.contains('vend'));
+      final hasBuyerRole = rolesList.any((r) => r.contains('compr') || r.contains('buyer'));
+      
+      if (hasSellerRole && hasBuyerRole) {
+        Navigator.pop(dialogContext); // Cerrar el diálogo
+        _showErrorSnackBar('Ya tienes ambos roles activos. No es necesario enviar una nueva solicitud.');
+        return;
+      }
+    } catch (e) {
+      print('⚠️ Error validando roles antes de enviar solicitud: $e');
+    }
+
     // Validaciones
     if (_tiendaSolicitudController.text.trim().isEmpty) {
       _showErrorSnackBar('Por favor, ingresa el nombre de tu tienda');

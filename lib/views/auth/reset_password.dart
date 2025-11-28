@@ -27,16 +27,20 @@ class _ResetPasswordState extends State<ResetPassword> {
       final success = await authController.sendPasswordResetEmail(_emailController.text.trim());
       
       if (success && mounted) {
-        _showSuccessSnackBar('Código de verificación enviado. Revisa tu bandeja de entrada');
-        // Navegar a la vista de verificación de código
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => VerifyCodeView(
-              email: _emailController.text.trim(),
-            ),
-          ),
-        );
+        _showSuccessSnackBar('Código de recuperación enviado. Revisa tu bandeja de entrada');
+        // Redirigir a la pantalla de verificación de código
+        Future.delayed(const Duration(seconds: 1), () {
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => VerifyCodeView(
+                  email: _emailController.text.trim(),
+                ),
+              ),
+            );
+          }
+        });
       } else if (mounted) {
         _showErrorSnackBar(authController.errorMessage ?? 'Error al enviar el email. Inténtalo de nuevo');
       }
@@ -260,7 +264,7 @@ class _ResetPasswordState extends State<ResetPassword> {
                                       ),
                                     )
                                   : const Text(
-                                      'Enviar enlace',
+                                      'Enviar código',
                                       style: TextStyle(
                                         color: Colors.white,
                                         fontSize: 16,

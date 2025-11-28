@@ -78,6 +78,63 @@
 -keep class io.flutter.embedding.** { *; }
 
 ############################
+# Reglas para HTTP y Cloud Functions #
+############################
+
+# Mantener todas las clases de servicios de agromarket
+-keep class agromarket.services.** { *; }
+-keep class agromarket.controllers.** { *; }
+-keep class agromarket.models.** { *; }
+
+# Mantener métodos estáticos de servicios (importante para FirebaseService)
+-keepclassmembers class agromarket.services.FirebaseService {
+    public static *;
+    public *;
+}
+
+-keepclassmembers class agromarket.services.EmailService {
+    public static *;
+    public *;
+}
+
+# Mantener clases de package http (usado para Cloud Functions)
+-keep class io.flutter.plugins.connectivity.** { *; }
+-keep class io.flutter.plugins.** { *; }
+
+# Mantener clases de JSON
+-keepattributes Signature
+-keepattributes *Annotation*
+-keepattributes EnclosingMethod
+-keepattributes InnerClasses
+
+# Mantener clases serializables
+-keepclassmembers class * implements java.io.Serializable {
+    static final long serialVersionUID;
+    private static final java.io.ObjectStreamField[] serialPersistentFields;
+    private void writeObject(java.io.ObjectOutputStream);
+    private void readObject(java.io.ObjectInputStream);
+    java.lang.Object writeReplace();
+    java.lang.Object readResolve();
+}
+
+# Mantener clases de excepciones
+-keep class * extends java.lang.Exception
+-keep class dart.async.TimeoutException { *; }
+-keep class dart.io.SocketException { *; }
+-keep class dart.io.HttpException { *; }
+
+# Mantener clases de Uri
+-keep class dart.core.Uri { *; }
+
+# No ofuscar nombres de métodos que se usan con reflection
+-keepnames class * {
+    @dart.core.JsonSerializable *;
+}
+
+# Mantener clases de Flutter que manejan HTTP
+-keep class io.flutter.plugins.connectivity.** { *; }
+
+############################
 # Reglas para Google Play Core (componentes diferidos - opcionales) #
 ############################
 

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:agromarket/models/user_model.dart';
 import 'package:agromarket/services/firebase_service.dart';
-import 'package:agromarket/services/email_service.dart';
 import 'package:agromarket/services/microsoft_auth_service.dart';
 import 'package:agromarket/services/notification_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -263,6 +262,10 @@ class AuthController extends ChangeNotifier {
       print('AuthController: Resultado del envío: $result');
       
       if (result['success']) {
+        // Guardar el sessionToken si viene en la respuesta
+        if (result['sessionToken'] != null) {
+          _resetSessionToken = result['sessionToken'] as String;
+        }
         _setLoading(false);
         notifyListeners();
         return true;
@@ -284,21 +287,23 @@ class AuthController extends ChangeNotifier {
   // ========== VERIFICACIÓN DE CÓDIGO ==========
 
   /// Verificar código de recuperación de contraseña
-  Future<bool> verifyResetCode(String email, String code) async {
+  Future<bool> verifyResetCode(String email, String code, {String? sessionToken}) async {
     _setLoading(true);
     _clearError();
 
     try {
       print('AuthController: Verificando código para $email');
       
-      final result = await EmailService.verifyResetCode(
+      final result = await FirebaseService.verifyResetCode(
         email: email,
         code: code,
+        sessionToken: sessionToken,
       );
       
       print('AuthController: Resultado de verificación: $result');
       
       if (result['success']) {
+        // Guardar el sessionToken para usarlo al cambiar la contraseña
         _resetSessionToken = result['session_token'] as String?;
         _setLoading(false);
         notifyListeners();
@@ -339,13 +344,6 @@ class AuthController extends ChangeNotifier {
       );
       
       if (result['success']) {
-        // Si requiere un enlace de email, mostrar mensaje especial
-        if (result['requires_email_link'] == true) {
-          _setError(result['message'] ?? 'Revisa tu correo para cambiar la contraseña');
-          _setLoading(false);
-          notifyListeners();
-          return false; // Retornar false para mostrar el mensaje
-        }
         _setLoading(false);
         notifyListeners();
         return true;

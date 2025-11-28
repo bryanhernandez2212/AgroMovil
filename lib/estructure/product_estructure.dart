@@ -100,9 +100,12 @@ class _ProductEstructureViewState extends State<ProductEstructureView> {
                 child: Consumer<AuthController>(
                   builder: (context, authController, _) {
                     final userName = authController.currentUser?.nombre;
-                    final displayName = (userName != null && userName.trim().isNotEmpty)
+                    final fullName = (userName != null && userName.trim().isNotEmpty)
                         ? userName.trim()
                         : 'Usuario';
+                    
+                    // Truncar el nombre si es muy largo (máximo 18 caracteres)
+                    final displayName = _truncateName(fullName, maxLength: 18);
 
                     return Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
@@ -116,28 +119,31 @@ class _ProductEstructureViewState extends State<ProductEstructureView> {
                           ),
                         ),
                         const Spacer(),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text(
-                              'Bienvenido',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Color(0xFF6B7280),
+                        Flexible(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text(
+                                'Bienvenido',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF6B7280),
+                                ),
                               ),
-                            ),
-                            Text(
-                              displayName,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF1B4332),
+                              Text(
+                                displayName,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF1B4332),
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                                textAlign: TextAlign.right,
                               ),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ],
                     );
@@ -217,7 +223,7 @@ class _ProductEstructureViewState extends State<ProductEstructureView> {
       // Navegación para compradores
       return [
         _buildNavItem(Icons.home_outlined, currentIndex == 0), 
-        _buildNavItem(Icons.favorite_outline, currentIndex == 1), 
+        _buildNavItem(Icons.store_outlined, currentIndex == 1), 
         _buildNavItem(Icons.shopping_cart_outlined, currentIndex == 2), 
         _buildNavItem(Icons.menu, currentIndex == 3),
       ];
@@ -348,6 +354,13 @@ class _ProductEstructureViewState extends State<ProductEstructureView> {
     );
   }
 
+  /// Trunca el nombre si excede el máximo de caracteres
+  String _truncateName(String name, {int maxLength = 18}) {
+    if (name.length <= maxLength) {
+      return name;
+    }
+    return '${name.substring(0, maxLength)}...';
+  }
 
   /// Ícono individual de navegación
   Widget _buildNavItem(IconData icon, bool isSelected) {

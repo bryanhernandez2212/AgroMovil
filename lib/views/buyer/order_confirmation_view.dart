@@ -67,14 +67,27 @@ class _OrderConfirmationViewState extends State<OrderConfirmationView> {
   Widget build(BuildContext context) {
     final authController = Provider.of<AuthController>(context);
     final currentUser = authController.currentUser;
-    final firstProduct = widget.order.productos.isNotEmpty ? widget.order.productos.first : null;
 
+    // Verificar si el usuario es vendedor y NO es el comprador del pedido
     String? sellerUserId;
-    if (currentUser != null &&
-        firstProduct != null &&
-        (currentUser.rolActivo.toLowerCase() == 'vendedor' ||
-            currentUser.id == firstProduct.vendedorId)) {
-      sellerUserId = currentUser.id;
+    if (currentUser != null) {
+      final isVendedor = currentUser.rolActivo.toLowerCase() == 'vendedor';
+      final isComprador = currentUser.id == widget.order.usuarioId;
+      
+      // Solo permitir cambiar el estado si:
+      // 1. El usuario tiene rol activo de vendedor
+      // 2. El usuario NO es el comprador del pedido
+      // 3. El usuario es uno de los vendedores de los productos del pedido
+      if (isVendedor && !isComprador) {
+        // Verificar si el usuario es vendedor de alguno de los productos
+        final isProductVendor = widget.order.productos.any(
+          (producto) => producto.vendedorId == currentUser.id
+        ) || widget.order.vendorIds.contains(currentUser.id);
+        
+        if (isProductVendor) {
+          sellerUserId = currentUser.id;
+        }
+      }
     }
     final bool isSellerContext = sellerUserId != null;
     final contactButtonLabel = isSellerContext ? 'Contactar comprador' : 'Contactar vendedor';
@@ -466,6 +479,67 @@ class _OrderConfirmationViewState extends State<OrderConfirmationView> {
   }
 
   Future<void> _updateOrderStatus(String newStatus, String currentUserId) async {
+    // Validación de seguridad: verificar que el usuario es vendedor y no el comprador
+    final authController = Provider.of<AuthController>(context, listen: false);
+    final currentUser = authController.currentUser;
+    
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Debes iniciar sesión para actualizar el estado.'),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+      return;
+    }
+    
+    // Verificar que el usuario es vendedor
+    final isVendedor = currentUser.rolActivo.toLowerCase() == 'vendedor';
+    final isComprador = currentUser.id == widget.order.usuarioId;
+    
+    if (!isVendedor || isComprador) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Solo el vendedor puede cambiar el estado del pedido.'),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+      return;
+    }
+    
+    // Verificar que el usuario es vendedor de alguno de los productos
+    final isProductVendor = widget.order.productos.any(
+      (producto) => producto.vendedorId == currentUser.id
+    ) || widget.order.vendorIds.contains(currentUser.id);
+    
+    if (!isProductVendor) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('No tienes permisos para cambiar el estado de este pedido.'),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+      return;
+    }
+    
     final currentIndex = _statusSequence.indexOf(_orderStatus);
     final newIndex = _statusSequence.indexOf(newStatus);
 
