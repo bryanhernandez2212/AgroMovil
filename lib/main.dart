@@ -28,9 +28,7 @@ Future<void> _firebaseMessagingBackgroundHandler(
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Manejar errores de inicialización para evitar que la app se cierre
   try {
-    // Inicializar Firebase con opciones por defecto
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
@@ -38,10 +36,8 @@ void main() async {
     FirebaseMessaging.onBackgroundMessage(
         _firebaseMessagingBackgroundHandler);
     
-    // Inicializar Stripe con la clave pública
     Stripe.publishableKey = StripeConfig.publishableKey;
     
-    // Inicializar AdMob (puede fallar en algunos dispositivos, pero no debe bloquear la app)
     try {
       await AdService.initialize();
     } catch (e) {
@@ -58,8 +54,6 @@ void main() async {
     // Ejecutar la app
     runApp(const AgroMarketApp());
     
-    // Verificar mensajes iniciales después de un pequeño delay
-    // para asegurar que la app esté completamente inicializada
     Future.delayed(const Duration(milliseconds: 500), () {
       NotificationService.checkInitialMessage();
     });
@@ -67,8 +61,6 @@ void main() async {
     debugPrint('❌ Error crítico al inicializar la app: $e');
     debugPrint('Stack trace: $stackTrace');
     
-    // Ejecutar la app de todos modos para que el usuario vea algo
-    // en lugar de solo un crash
     runApp(const AgroMarketApp());
   }
 }

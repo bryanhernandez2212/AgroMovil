@@ -251,9 +251,12 @@ class FirebaseService {
     try {
       print('📧 Enviando código de recuperación a: $email usando Cloud Functions');
       
-      final projectId = _auth.app.options.projectId;
+      final projectId = _auth.app.options.projectId ?? 'agromarket-625b2';
       final region = 'us-central1';
       final functionUrl = 'https://$region-$projectId.cloudfunctions.net/sendPasswordResetCode';
+      
+      print('🌐 URL construida para sendPasswordResetCode: $functionUrl');
+      print('📤 Enviando petición para: $email');
       
       final response = await http.post(
         Uri.parse(functionUrl),
@@ -271,6 +274,11 @@ class FirebaseService {
           throw TimeoutException('Cloud Function timeout');
         },
       );
+      
+      print('📥 Respuesta recibida - Status: ${response.statusCode}');
+      if (response.statusCode != 200) {
+        print('📄 Body: ${response.body}');
+      }
       
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
@@ -292,6 +300,15 @@ class FirebaseService {
       } else {
         print('❌ Error del servidor: ${response.statusCode}');
         print('📄 Respuesta: ${response.body}');
+        
+        // Manejo específico para error 404
+        if (response.statusCode == 404) {
+          return {
+            'success': false,
+            'message': 'La función de recuperación de contraseña no está disponible. Por favor, verifica que las Cloud Functions estén desplegadas correctamente en Firebase. URL intentada: $functionUrl',
+          };
+        }
+        
         return {
           'success': false,
           'message': 'Error enviando código: ${response.statusCode}',
@@ -469,9 +486,12 @@ class FirebaseService {
       print('📧 Enviando comprobante de compra a: $email usando Cloud Functions');
       
       // Obtener el projectId de Firebase
-      final projectId = _auth.app.options.projectId;
+      final projectId = _auth.app.options.projectId ?? 'agromarket-625b2';
       final region = 'us-central1';
       final functionUrl = 'https://$region-$projectId.cloudfunctions.net/sendReceiptEmail';
+      
+      print('🌐 URL construida para sendReceiptEmail: $functionUrl');
+      print('📤 Enviando comprobante para orden: $orderId');
       
       final response = await http.post(
         Uri.parse(functionUrl),
@@ -521,6 +541,15 @@ class FirebaseService {
       } else {
         print('❌ Error del servidor: ${response.statusCode}');
         print('📄 Respuesta: ${response.body}');
+        
+        // Manejo específico para error 404
+        if (response.statusCode == 404) {
+          return {
+            'success': false,
+            'message': 'La función de envío de comprobante no está disponible. Por favor, verifica que las Cloud Functions estén desplegadas correctamente en Firebase. URL intentada: $functionUrl',
+          };
+        }
+        
         return {
           'success': false,
           'message': 'Error al enviar el comprobante. Por favor, intenta más tarde.',

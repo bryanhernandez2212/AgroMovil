@@ -66,8 +66,9 @@ class _OptionPageState extends State<OptionPage> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Stack(
         children: [
           SafeArea(
@@ -93,7 +94,7 @@ class _OptionPageState extends State<OptionPage> with TickerProviderStateMixin {
                                 style: TextStyle(
                                   fontSize: constraints.maxWidth * 0.08, 
                                   fontWeight: FontWeight.bold,
-                                  color: const Color(0xFF03083A),
+                                  color: isDark ? Colors.white : const Color(0xFF03083A),
                                 ),
                                 textAlign: TextAlign.center,
                               ),
@@ -104,7 +105,7 @@ class _OptionPageState extends State<OptionPage> with TickerProviderStateMixin {
                                   "¿Qué te interesaría hacer dentro de nuestra aplicación?",
                                   style: TextStyle(
                                     fontSize: constraints.maxWidth * 0.04, 
-                                    color: const Color(0xFF2F4157),
+                                    color: isDark ? Colors.grey[400] : const Color(0xFF2F4157),
                                     height: 1.4,
                                   ),
                                   textAlign: TextAlign.center,
@@ -184,6 +185,7 @@ class _OptionPageState extends State<OptionPage> with TickerProviderStateMixin {
     required Color cardColor,
     required VoidCallback onTap,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return AnimatedBuilder(
       animation: _floatingAnimation,
       builder: (context, child) {
@@ -196,7 +198,7 @@ class _OptionPageState extends State<OptionPage> with TickerProviderStateMixin {
                 child: Container(
                   height: constraints.maxWidth * 0.40, 
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: isDark ? Colors.grey[800] : Colors.white,
                     borderRadius: BorderRadius.circular(30),
                     border: Border.all(
                       color: const Color(0xFF577C8E).withOpacity(0.3),
@@ -266,7 +268,7 @@ class _OptionPageState extends State<OptionPage> with TickerProviderStateMixin {
                                     style: TextStyle(
                                       fontSize: constraints.maxWidth * 0.05,
                                       fontWeight: FontWeight.bold,
-                                      color: const Color(0xFF03083A),
+                                      color: isDark ? Colors.white : const Color(0xFF03083A),
                                       letterSpacing: 0.2,
                                     ),
                                     maxLines: 2,
@@ -277,7 +279,7 @@ class _OptionPageState extends State<OptionPage> with TickerProviderStateMixin {
                                     description,
                                     style: TextStyle(
                                       fontSize: constraints.maxWidth * 0.03,
-                                      color: const Color(0xFF2F4157).withOpacity(0.8),
+                                      color: isDark ? Colors.grey[400] : const Color(0xFF2F4157).withOpacity(0.8),
                                       height: 1.6,
                                     ),
                                     maxLines: 2,

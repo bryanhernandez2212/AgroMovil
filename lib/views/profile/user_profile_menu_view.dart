@@ -11,6 +11,7 @@ import 'package:agromarket/views/buyer/my_orders_view.dart';
 import 'package:agromarket/views/vendor/seller_orders_view.dart';
 import 'package:agromarket/views/auth/login_view.dart';
 import 'package:agromarket/services/notification_service.dart';
+import 'package:agromarket/controllers/theme_controller.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class UserProfileMenuView extends StatefulWidget {
@@ -44,6 +45,43 @@ class _UserProfileMenuViewState extends State<UserProfileMenuView> {
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
+  Future<void> _openSupportPage() async {
+    try {
+      final uri = Uri.parse('https://agromarkett.up.railway.app/soporte');
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('No se pudo abrir la página de soporte'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al abrir la página: ${e.toString()}'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+    }
+  }
+
   /// Trunca el nombre si excede el máximo de caracteres
   String _truncateName(String name, {int maxLength = 25}) {
     if (name.length <= maxLength) {
@@ -58,6 +96,7 @@ class _UserProfileMenuViewState extends State<UserProfileMenuView> {
     final authController = Provider.of<AuthController>(context);
     final userModel = authController.currentUser;
     final isVendedor = UserRoleService.isSeller();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final bottomInset = MediaQuery.of(context).padding.bottom;
 
@@ -73,10 +112,10 @@ class _UserProfileMenuViewState extends State<UserProfileMenuView> {
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
                       blurRadius: 10,
                       offset: const Offset(0, 2),
                     ),
@@ -89,7 +128,7 @@ class _UserProfileMenuViewState extends State<UserProfileMenuView> {
                       width: 70,
                       height: 70,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF115213),
+                        color: isDark ? const Color(0xFF2E7D32) : const Color(0xFF2E7D32),
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
@@ -139,10 +178,10 @@ class _UserProfileMenuViewState extends State<UserProfileMenuView> {
                               userModel?.nombre ?? user?.displayName ?? 'Usuario',
                               maxLength: 25,
                             ),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF1A1A1A),
+                              color: isDark ? Colors.white : const Color(0xFF1A1A1A),
                             ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
@@ -152,7 +191,7 @@ class _UserProfileMenuViewState extends State<UserProfileMenuView> {
                               user!.email!,
                               style: TextStyle(
                                 fontSize: 14,
-                                color: Colors.grey[600],
+                                color: isDark ? Colors.grey[400] : Colors.grey[600],
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -170,9 +209,9 @@ class _UserProfileMenuViewState extends State<UserProfileMenuView> {
                           ),
                         );
                       },
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.arrow_forward_ios,
-                        color: Color(0xFF115213),
+                        color: isDark ? const Color(0xFF4CAF50) : const Color(0xFF2E7D32),
                         size: 20,
                       ),
                     ),
@@ -302,20 +341,7 @@ class _UserProfileMenuViewState extends State<UserProfileMenuView> {
                       context,
                       icon: Icons.help_outline,
                       title: 'Ayuda',
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Text('Ayuda próximamente'),
-                            backgroundColor: const Color(0xFF115213),
-                            behavior: SnackBarBehavior.floating,
-                            duration: const Duration(seconds: 2),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            margin: const EdgeInsets.all(16),
-                          ),
-                        );
-                      },
+                      onTap: () => _openSupportPage(),
                     ),
                     const SizedBox(height: 8),
                     _buildMenuButton(
@@ -331,6 +357,8 @@ class _UserProfileMenuViewState extends State<UserProfileMenuView> {
                         );
                       },
                     ),
+                    const SizedBox(height: 8),
+                    _buildThemeToggleButton(context),
                   ],
                 ),
               ),
@@ -374,8 +402,9 @@ class _UserProfileMenuViewState extends State<UserProfileMenuView> {
     required VoidCallback onTap,
     bool isDestructive = false,
   }) {
-    final iconColor = isDestructive ? Colors.red : const Color(0xFF115213);
-    final backgroundColor = isDestructive ? Colors.red.withOpacity(0.1) : const Color(0xFF115213).withOpacity(0.1);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final iconColor = isDestructive ? Colors.red : (isDark ? const Color(0xFF4CAF50) : const Color(0xFF2E7D32));
+    final backgroundColor = isDestructive ? Colors.red.withOpacity(0.1) : (isDark ? const Color(0xFF4CAF50).withOpacity(0.1) : const Color(0xFF2E7D32).withOpacity(0.1));
     
     return InkWell(
       onTap: onTap,
@@ -383,14 +412,16 @@ class _UserProfileMenuViewState extends State<UserProfileMenuView> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isDestructive ? Colors.red.withOpacity(0.3) : Colors.grey[300]!,
+            color: isDestructive 
+                ? Colors.red.withOpacity(0.3) 
+                : (isDark ? Colors.grey[700]! : Colors.grey[300]!),
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
               blurRadius: 5,
               offset: const Offset(0, 2),
             ),
@@ -418,7 +449,9 @@ class _UserProfileMenuViewState extends State<UserProfileMenuView> {
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: isDestructive ? Colors.red : const Color(0xFF1A1A1A),
+                  color: isDestructive 
+                      ? Colors.red 
+                      : (isDark ? Colors.white : const Color(0xFF1A1A1A)),
                 ),
               ),
             ),
@@ -431,6 +464,76 @@ class _UserProfileMenuViewState extends State<UserProfileMenuView> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildThemeToggleButton(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Consumer<ThemeController>(
+      builder: (context, themeController, child) {
+        final isDarkMode = themeController.isDarkMode;
+        
+        return InkWell(
+          onTap: () {
+            themeController.toggleTheme();
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
+                  blurRadius: 5,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: isDarkMode 
+                        ? const Color(0xFF4CAF50).withOpacity(0.1) 
+                        : const Color(0xFF2E7D32).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    isDarkMode ? Icons.light_mode : Icons.dark_mode,
+                    color: isDarkMode ? const Color(0xFF4CAF50) : const Color(0xFF2E7D32),
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    isDarkMode ? 'Modo claro' : 'Modo oscuro',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                    ),
+                  ),
+                ),
+                Switch(
+                  value: isDarkMode,
+                  onChanged: (value) {
+                    themeController.toggleTheme();
+                  },
+                  activeColor: isDark ? const Color(0xFF4CAF50) : const Color(0xFF2E7D32),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

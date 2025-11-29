@@ -140,8 +140,9 @@ class _VerifyCodeViewState extends State<VerifyCodeView> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       resizeToAvoidBottomInset: true,
       body: Stack(
         children: [
@@ -166,7 +167,7 @@ class _VerifyCodeViewState extends State<VerifyCodeView> {
             right: 0,
             child: CustomPaint(
               size: Size(MediaQuery.of(context).size.width, 100),
-              painter: SmoothWavePainter(),
+              painter: SmoothWavePainter(isDark: isDark),
             ),
           ),
 
@@ -201,17 +202,17 @@ class _VerifyCodeViewState extends State<VerifyCodeView> {
             right: 0,
             bottom: 0,
             child: Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(
+              decoration: BoxDecoration(
+                color: Theme.of(context).scaffoldBackgroundColor,
+                borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(40),
                   topRight: Radius.circular(40),
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black12,
+                    color: isDark ? Colors.black.withOpacity(0.5) : Colors.black12,
                     blurRadius: 20,
-                    offset: Offset(0, -5),
+                    offset: const Offset(0, -5),
                   ),
                 ],
               ),
@@ -222,13 +223,13 @@ class _VerifyCodeViewState extends State<VerifyCodeView> {
                   children: [
                     Row(
                       children: [
-                        const Expanded(
+                        Expanded(
                           child: Text(
                             'Verificar código',
                             style: TextStyle(
                               fontSize: 36,
                               fontWeight: FontWeight.w700,
-                              color: Color(0xFF1B5E20),
+                              color: isDark ? Colors.white : const Color(0xFF2E7D32),
                               letterSpacing: -0.5,
                             ),
                           ),
@@ -247,11 +248,11 @@ class _VerifyCodeViewState extends State<VerifyCodeView> {
 
                     const SizedBox(height: 8),
 
-                    const Text(
+                    Text(
                       'Ingresa el código de 6 dígitos que recibiste por correo',
                       style: TextStyle(
                         fontSize: 18,
-                        color: Color(0xFF757575),
+                        color: isDark ? Colors.grey[400] : const Color(0xFF757575),
                         fontWeight: FontWeight.w400,
                       ),
                     ),
@@ -271,10 +272,10 @@ class _VerifyCodeViewState extends State<VerifyCodeView> {
                             textAlign: TextAlign.center,
                             keyboardType: TextInputType.number,
                             maxLength: 1,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF1B5E20),
+                              color: isDark ? Colors.white : const Color(0xFF2E7D32),
                             ),
                             decoration: InputDecoration(
                               counterText: '',
@@ -396,10 +397,14 @@ class _VerifyCodeViewState extends State<VerifyCodeView> {
 }
 
 class SmoothWavePainter extends CustomPainter {
+  final bool isDark;
+  
+  SmoothWavePainter({this.isDark = false});
+  
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.white
+      ..color = isDark ? const Color(0xFF1E1E1E) : Colors.white
       ..style = PaintingStyle.fill;
 
     final path = Path();

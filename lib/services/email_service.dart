@@ -7,14 +7,26 @@ class EmailService {
   // Usar Firebase Functions en lugar de Railway
   static String get _projectId {
     try {
-      return FirebaseAuth.instance.app.options.projectId;
+      final projectId = FirebaseAuth.instance.app.options.projectId;
+      if (projectId == null || projectId.isEmpty) {
+        print('⚠️ ProjectId es null o vacío, usando valor por defecto');
+        return 'agromarket-625b2';
+      }
+      print('✅ ProjectId obtenido: $projectId');
+      return projectId;
     } catch (e) {
+      print('⚠️ Error obteniendo projectId: $e, usando valor por defecto');
       return 'agromarket-625b2';
     }
   }
   static String get _region => 'us-central1';
-  static String _getFunctionUrl(String functionName) => 
-      'https://$_region-$_projectId.cloudfunctions.net/$functionName';
+  static String _getFunctionUrl(String functionName) {
+    final projectId = _projectId;
+    final region = _region;
+    final url = 'https://$region-$projectId.cloudfunctions.net/$functionName';
+    print('🌐 URL construida para $functionName: $url');
+    return url;
+  }
 
   /// Parsea y mejora mensajes de error comunes de SMTP
   static String _parseSmtpError(String? errorMessage, int? statusCode) {
@@ -90,6 +102,9 @@ class EmailService {
       
       final functionUrl = _getFunctionUrl('sendPasswordResetCode');
       
+      print('📤 Enviando petición a: $functionUrl');
+      print('📋 Datos: email=$email');
+      
       final response = await http.post(
         Uri.parse(functionUrl),
         headers: {
@@ -107,6 +122,9 @@ class EmailService {
           throw TimeoutException('Firebase Function está tardando demasiado en responder. Por favor, intenta más tarde.');
         },
       );
+
+      print('📥 Respuesta recibida - Status: ${response.statusCode}');
+      print('📄 Body: ${response.body}');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
@@ -131,6 +149,20 @@ class EmailService {
       } else {
         print('❌ Error del servidor: ${response.statusCode}');
         print('📄 Respuesta del servidor: ${response.body}');
+        
+        // Manejo específico para error 404
+        if (response.statusCode == 404) {
+          final projectId = _projectId;
+          final region = _region;
+          return {
+            'success': false,
+            'message': 'La función de correo no está disponible. Por favor, verifica que las Cloud Functions estén desplegadas. URL intentada: https://$region-$projectId.cloudfunctions.net/sendPasswordResetCode',
+            'raw_error': '404 - Función no encontrada',
+            'status_code': 404,
+            'function_url': 'https://$region-$projectId.cloudfunctions.net/sendPasswordResetCode',
+          };
+        }
+        
         try {
           final errorData = jsonDecode(response.body);
           final rawMessage = errorData['message'] ?? errorData['error'] ?? 'Error enviando correo';
@@ -300,6 +332,9 @@ class EmailService {
         metodoPagoFormateado = _formatMetodoPago(metodoPago);
       }
       
+      print('📤 Enviando comprobante a: $functionUrl');
+      print('📋 Datos: orderId=$orderId, email=$email, total=$total');
+      
       final response = await http.post(
         Uri.parse(functionUrl),
         headers: {
@@ -329,6 +364,9 @@ class EmailService {
         },
       );
 
+      print('📥 Respuesta recibida - Status: ${response.statusCode}');
+      print('📄 Body: ${response.body.substring(0, response.body.length > 500 ? 500 : response.body.length)}...');
+
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
         final data = (responseData['result'] ?? responseData) as Map<String, dynamic>;
@@ -352,6 +390,20 @@ class EmailService {
       } else {
         print('❌ Error del servidor: ${response.statusCode}');
         print('📄 Respuesta del servidor: ${response.body}');
+        
+        // Manejo específico para error 404
+        if (response.statusCode == 404) {
+          final projectId = _projectId;
+          final region = _region;
+          return {
+            'success': false,
+            'message': 'La función de envío de comprobante no está disponible. Por favor, verifica que las Cloud Functions estén desplegadas. URL intentada: https://$region-$projectId.cloudfunctions.net/sendReceiptEmail',
+            'raw_error': '404 - Función no encontrada',
+            'status_code': 404,
+            'function_url': 'https://$region-$projectId.cloudfunctions.net/sendReceiptEmail',
+          };
+        }
+        
         try {
           final errorData = jsonDecode(response.body);
           final rawMessage = errorData['message'] ?? errorData['error'] ?? 'Error enviando comprobante';
