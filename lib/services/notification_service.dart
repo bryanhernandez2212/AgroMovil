@@ -62,7 +62,7 @@ class NotificationService {
         try {
           final data =
               Map<String, dynamic>.from(jsonDecode(payload));
-          _navigateToChatFromData(data);
+          _navigateFromNotificationData(data);
         } catch (e) {
           debugPrint('❌ Error procesando payload: $e');
         }
@@ -85,18 +85,38 @@ class NotificationService {
   static Future<void> _handleForegroundMessage(
       RemoteMessage message) async {
     final notification = message.notification;
-    final title = notification?.title ??
-        message.data['title'] ??
-        'Nuevo mensaje';
-    final body = notification?.body ??
-        message.data['body'] ??
-        (message.data['type'] == 'image'
-            ? '📷 Imagen'
-            : 'Tienes un nuevo mensaje');
+    final notificationType = message.data['type']?.toString() ?? '';
+    
+    // Determinar título y cuerpo según el tipo de notificación
+    String title;
+    String body;
+    
+    if (notificationType == 'order_status') {
+      // Notificación de estado de pedido
+      title = notification?.title ?? 
+          message.data['title'] ?? 
+          'Actualización de pedido';
+      body = notification?.body ?? 
+          message.data['body'] ?? 
+          'Tu pedido ha sido actualizado';
+    } else {
+      // Notificación de chat
+      title = notification?.title ??
+          message.data['title'] ??
+          'Nuevo mensaje';
+      body = notification?.body ??
+          message.data['body'] ??
+          (message.data['type'] == 'image'
+              ? '📷 Imagen'
+              : 'Tienes un nuevo mensaje');
+    }
 
+    // Incluir todos los datos relevantes en el payload
     final payload = jsonEncode({
+      'type': notificationType.isEmpty ? 'chat' : notificationType,
       'chatId': message.data['chatId'] ?? '',
       'orderId': message.data['orderId'] ?? '',
+      'newStatus': message.data['newStatus'] ?? '',
     });
 
     await _localNotifications.show(
@@ -124,7 +144,37 @@ class NotificationService {
 
   static void _handleMessageTap(RemoteMessage message) {
     final data = message.data;
+    _navigateFromNotificationData(data);
+  }
+
+  /// Navega según el tipo de notificación (chat o estado de pedido)
+  static void _navigateFromNotificationData(Map<String, dynamic> data) async {
+    final notificationType = data['type']?.toString() ?? '';
+    
+    // Si es una notificación de estado de pedido
+    if (notificationType == 'order_status') {
+      _navigateToOrders(data);
+      return;
+    }
+    
+    // Si es una notificación de chat (o sin tipo especificado)
     _navigateToChatFromData(data);
+  }
+
+  /// Navega a la pantalla de "Mis compras" cuando se toca una notificación de estado de pedido
+  static void _navigateToOrders(Map<String, dynamic> data) async {
+    final navigator = navigatorKey.currentState;
+    if (navigator == null) return;
+
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) return;
+
+      // Navegar a la pantalla de "Mis compras"
+      navigator.pushNamed('/orders');
+    } catch (e) {
+      debugPrint('❌ Error navegando a pedidos desde notificación: $e');
+    }
   }
 
   static void _navigateToChatFromData(Map<String, dynamic> data) async {
@@ -230,7 +280,7 @@ class NotificationService {
   static Future<void> checkInitialMessage() async {
     final message = await FirebaseMessaging.instance.getInitialMessage();
     if (message != null) {
-      _navigateToChatFromData(message.data);
+      _navigateFromNotificationData(message.data);
     }
   }
 }

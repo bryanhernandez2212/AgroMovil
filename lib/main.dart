@@ -13,7 +13,7 @@ import 'package:agromarket/services/ad_service.dart';
 import 'package:agromarket/config/stripe_config.dart';
 import 'package:agromarket/services/notification_service.dart';
 import 'package:agromarket/views/profile/chat_conversation_view.dart';
-import 'package:agromarket/widgets/auth_wrapper.dart';
+import 'package:agromarket/views/buyer/my_orders_view.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(
@@ -237,24 +237,27 @@ class AgroMarketApp extends StatelessWidget {
         routes: {
           '/home': (context) => const ProductEstructureView(), 
         },
-            onGenerateRoute: (settings) {
-              if (settings.name == '/chat/conversation') {
-                final args =
-                    settings.arguments as Map<String, dynamic>?;
-                if (args == null) return null;
-                return MaterialPageRoute(
-                  builder: (_) => ChatConversationView(
-                    chatId: args['chatId']?.toString() ?? '',
-                    otherUserId: args['otherUserId']?.toString() ?? '',
-                    userName: args['userName']?.toString() ?? 'Usuario',
-                    userImage: args['userImage']?.toString(),
-                    orderId: args['orderId']?.toString() ?? '',
-                  ),
-                );
-              }
-              return null;
-            },
-          );
+        onGenerateRoute: (settings) {
+          if (settings.name == '/chat/conversation') {
+            final args =
+                settings.arguments as Map<String, dynamic>?;
+            if (args == null) return null;
+            return MaterialPageRoute(
+              builder: (_) => ChatConversationView(
+                chatId: args['chatId']?.toString() ?? '',
+                otherUserId: args['otherUserId']?.toString() ?? '',
+                userName: args['userName']?.toString() ?? 'Usuario',
+                userImage: args['userImage']?.toString(),
+                orderId: args['orderId']?.toString() ?? '',
+              ),
+            );
+          }
+          if (settings.name == '/orders') {
+            return MaterialPageRoute(
+              builder: (_) => const MyOrdersView(),
+            );
+          }
+          return null;
         },
       ),
     );
