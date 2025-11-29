@@ -1,0 +1,36 @@
+# ========================================
+# CONFIGURACIÓN SMTP - REEMPLAZA ESTOS VALORES
+# ========================================
+# 
+# Copia aquí los valores que tenías configurados en Railway o donde los tuvieras
+# Luego úsalos para configurar Firebase Functions
+#
+# ========================================
+
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=tu-email@gmail.com
+SMTP_PASS=tu-contraseña-o-app-password
+SMTP_SECURE=false
+SMTP_FROM=tu-email@gmail.com
+
+# ========================================
+# INSTRUCCIONES:
+# ========================================
+# 
+# 1. Reemplaza los valores de arriba con los que ya tenías configurados
+# 2. Luego ejecuta estos comandos uno por uno (copiará el valor automáticamente):
+#
+# firebase functions:secrets:set SMTP_HOST < VALORES_SMTP_AQUI.txt
+# firebase functions:secrets:set SMTP_PORT < VALORES_SMTP_AQUI.txt
+# firebase functions:secrets:set SMTP_USER < VALORES_SMTP_AQUI.txt
+# firebase functions:secrets:set SMTP_PASS < VALORES_SMTP_AQUI.txt
+# firebase functions:secrets:set SMTP_SECURE < VALORES_SMTP_AQUI.txt
+# firebase functions:secrets:set SMTP_FROM < VALORES_SMTP_AQUI.txt
+#
+# O mejor aún, usa el script: bash configurar_smtp_firebase.sh
+# (pero primero edita los valores en el script)
+#
+# 3. Después de configurar todos, despliega:
+#    firebase deploy --only functions
+

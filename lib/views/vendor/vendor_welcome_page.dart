@@ -260,9 +260,9 @@ class _VendorWelcomePageContentState extends State<VendorWelcomePageContent> {
                           ],
                         ),
                         const SizedBox(height: 8),
-                        Text(
+                        const Text(
                           'Necesitas finalizar la configuración de Stripe Connect para poder publicar productos y recibir pagos.',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
                             color: Color(0xFF92400E),
                             height: 1.4,

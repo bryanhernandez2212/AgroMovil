@@ -134,28 +134,28 @@ class _MyOrdersViewState extends State<MyOrdersView> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF115213)),
+          icon: Icon(Icons.arrow_back, color: Theme.of(context).iconTheme.color),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'Mis compras',
           style: TextStyle(
-            color: Color(0xFF115213),
             fontSize: 20,
             fontWeight: FontWeight.bold,
           ),
         ),
       ),
       body: _isLoading
-          ? const Center(
+          ? Center(
               child: CircularProgressIndicator(
-                color: Color(0xFF115213),
+                color: Theme.of(context).colorScheme.primary,
               ),
             )
           : _orders.isEmpty
@@ -166,7 +166,7 @@ class _MyOrdersViewState extends State<MyOrdersView> {
                       Icon(
                         Icons.shopping_bag_outlined,
                         size: 80,
-                        color: Colors.grey[400],
+                        color: isDark ? Colors.grey[600] : Colors.grey[400],
                       ),
                       const SizedBox(height: 16),
                       Text(
@@ -174,7 +174,7 @@ class _MyOrdersViewState extends State<MyOrdersView> {
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
-                          color: Colors.grey[600],
+                          color: isDark ? Colors.grey[400] : Colors.grey[600],
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -182,7 +182,7 @@ class _MyOrdersViewState extends State<MyOrdersView> {
                         'Cuando hagas una compra, aparecerá aquí',
                         style: TextStyle(
                           fontSize: 14,
-                          color: Colors.grey[500],
+                          color: isDark ? Colors.grey[500] : Colors.grey[500],
                         ),
                       ),
                     ],
@@ -196,7 +196,7 @@ class _MyOrdersViewState extends State<MyOrdersView> {
                     Expanded(
                       child: RefreshIndicator(
                         onRefresh: _loadOrders,
-                        color: const Color(0xFF115213),
+                        color: Theme.of(context).colorScheme.primary,
                         child: _buildGroupedOrdersList(),
                       ),
                     ),
@@ -206,13 +206,14 @@ class _MyOrdersViewState extends State<MyOrdersView> {
   }
 
   Widget _buildStatusFilters() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? Theme.of(context).cardColor : Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withOpacity(isDark ? 0.3 : 0.03),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -262,6 +263,8 @@ class _MyOrdersViewState extends State<MyOrdersView> {
     required VoidCallback onTap,
     Color? statusColor,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = statusColor ?? Theme.of(context).colorScheme.primary;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -271,13 +274,13 @@ class _MyOrdersViewState extends State<MyOrdersView> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
             color: isSelected
-                ? (statusColor ?? const Color(0xFF115213)).withOpacity(0.15)
-                : Colors.grey[100],
+                ? primaryColor.withOpacity(0.15)
+                : (isDark ? Colors.grey[800] : Colors.grey[100]),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: isSelected
-                  ? (statusColor ?? const Color(0xFF115213))
-                  : Colors.grey[300]!,
+                  ? primaryColor
+                  : (isDark ? Colors.grey[700]! : Colors.grey[300]!),
               width: isSelected ? 1.5 : 1,
             ),
           ),
@@ -301,8 +304,8 @@ class _MyOrdersViewState extends State<MyOrdersView> {
                   fontSize: 13,
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
                   color: isSelected
-                      ? (statusColor ?? const Color(0xFF115213))
-                      : Colors.grey[700],
+                      ? primaryColor
+                      : (isDark ? Colors.grey[400] : Colors.grey[700]),
                 ),
               ),
             ],
@@ -315,6 +318,7 @@ class _MyOrdersViewState extends State<MyOrdersView> {
   Widget _buildGroupedOrdersList() {
     final filteredOrders = _filteredOrders;
     
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     if (filteredOrders.isEmpty) {
       return Center(
         child: Column(
@@ -323,7 +327,7 @@ class _MyOrdersViewState extends State<MyOrdersView> {
             Icon(
               Icons.filter_list_outlined,
               size: 80,
-              color: Colors.grey[400],
+              color: isDark ? Colors.grey[600] : Colors.grey[400],
             ),
             const SizedBox(height: 16),
             Text(
@@ -333,7 +337,7 @@ class _MyOrdersViewState extends State<MyOrdersView> {
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
-                color: Colors.grey[600],
+                color: isDark ? Colors.grey[400] : Colors.grey[600],
               ),
             ),
             const SizedBox(height: 8),
@@ -344,10 +348,10 @@ class _MyOrdersViewState extends State<MyOrdersView> {
                     _selectedStatus = null;
                   });
                 },
-                child: const Text(
+                child: Text(
                   'Ver todos los pedidos',
                   style: TextStyle(
-                    color: Color(0xFF115213),
+                    color: Theme.of(context).colorScheme.primary,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -384,17 +388,17 @@ class _MyOrdersViewState extends State<MyOrdersView> {
                 width: 4,
                 height: 20,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF115213),
+                  color: Theme.of(context).colorScheme.primary,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
               const SizedBox(width: 12),
               Text(
                 _formatDateHeader(date),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF1A1A1A),
+                  color: Theme.of(context).textTheme.titleLarge?.color,
                   letterSpacing: -0.3,
                 ),
               ),
@@ -421,6 +425,7 @@ class _MyOrdersViewState extends State<MyOrdersView> {
   }
 
   Widget _buildOrderCard(OrderModel order) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     // Obtener el primer producto para mostrar
     final firstProduct = order.productos.isNotEmpty ? order.productos[0] : null;
     final productImage = firstProduct != null && firstProduct.imagen.isNotEmpty
@@ -443,27 +448,27 @@ class _MyOrdersViewState extends State<MyOrdersView> {
           );
         },
         borderRadius: BorderRadius.circular(16),
-        splashColor: const Color(0xFF115213).withOpacity(0.1),
-        highlightColor: const Color(0xFF115213).withOpacity(0.05),
+        splashColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+        highlightColor: Theme.of(context).colorScheme.primary.withOpacity(0.05),
         child: Container(
           margin: const EdgeInsets.only(bottom: 16),
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isDark ? Theme.of(context).cardColor : Colors.white,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: Colors.grey[100]!,
+              color: isDark ? Colors.grey[700]! : Colors.grey[100]!,
               width: 1,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withOpacity(isDark ? 0.3 : 0.04),
                 blurRadius: 10,
                 offset: const Offset(0, 2),
                 spreadRadius: 0,
               ),
               BoxShadow(
-                color: Colors.black.withOpacity(0.02),
+                color: Colors.black.withOpacity(isDark ? 0.2 : 0.02),
                 blurRadius: 4,
                 offset: const Offset(0, 1),
                 spreadRadius: 0,
@@ -493,44 +498,50 @@ class _MyOrdersViewState extends State<MyOrdersView> {
                           width: 90,
                           height: 90,
                           fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => Container(
-                            width: 90,
-                            height: 90,
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  Colors.grey[200]!,
-                                  Colors.grey[300]!,
-                                ],
+                          errorBuilder: (context, error, stackTrace) {
+                            final isDark = Theme.of(context).brightness == Brightness.dark;
+                            return Container(
+                              width: 90,
+                              height: 90,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: isDark
+                                      ? [Colors.grey[800]!, Colors.grey[900]!]
+                                      : [Colors.grey[200]!, Colors.grey[300]!],
+                                ),
                               ),
-                            ),
-                            child: Icon(
-                              Icons.image_not_supported,
-                              color: Colors.grey[500],
-                              size: 28,
-                            ),
-                          ),
+                              child: Icon(
+                                Icons.image_not_supported,
+                                color: isDark ? Colors.grey[500] : Colors.grey[500],
+                                size: 28,
+                              ),
+                            );
+                          },
                         )
-                      : Container(
-                          width: 90,
-                          height: 90,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                Colors.grey[100]!,
-                                Colors.grey[200]!,
-                              ],
-                            ),
-                          ),
-                          child: Icon(
-                            Icons.shopping_bag_rounded,
-                            color: Colors.grey[400],
-                            size: 36,
-                          ),
+                      : Builder(
+                          builder: (context) {
+                            final isDark = Theme.of(context).brightness == Brightness.dark;
+                            return Container(
+                              width: 90,
+                              height: 90,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: isDark
+                                      ? [Colors.grey[800]!, Colors.grey[900]!]
+                                      : [Colors.grey[100]!, Colors.grey[200]!],
+                                ),
+                              ),
+                              child: Icon(
+                                Icons.shopping_bag_rounded,
+                                color: isDark ? Colors.grey[500] : Colors.grey[400],
+                                size: 36,
+                              ),
+                            );
+                          },
                         ),
                 ),
               ),
@@ -578,36 +589,45 @@ class _MyOrdersViewState extends State<MyOrdersView> {
                     ),
                     const SizedBox(height: 10),
                     // Nombre del producto
-                    Text(
-                      productName,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF1A1A1A),
-                        height: 1.3,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                    Builder(
+                      builder: (context) {
+                        return Text(
+                          productName,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Theme.of(context).textTheme.titleLarge?.color,
+                            height: 1.3,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        );
+                      },
                     ),
                     if (productQuantity.isNotEmpty) ...[
                       const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.inventory_2_outlined,
-                            size: 14,
-                            color: Colors.grey[500],
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            productQuantity,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey[600],
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
+                      Builder(
+                        builder: (context) {
+                          final isDark = Theme.of(context).brightness == Brightness.dark;
+                          return Row(
+                            children: [
+                              Icon(
+                                Icons.inventory_2_outlined,
+                                size: 14,
+                                color: isDark ? Colors.grey[500] : Colors.grey[500],
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                productQuantity,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: isDark ? Colors.grey[400] : Colors.grey[600],
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
                     ],
                   ],
@@ -615,37 +635,42 @@ class _MyOrdersViewState extends State<MyOrdersView> {
               ),
               const SizedBox(width: 16),
               // Precio con diseño mejorado
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    '\$${order.total.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF115213),
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                  Container(
-                    margin: const EdgeInsets.only(top: 4),
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF115213).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Text(
-                      'Total',
-                      style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF115213),
-                        letterSpacing: 0.5,
+              Builder(
+                builder: (context) {
+                  final primaryColor = Theme.of(context).colorScheme.primary;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        '\$${order.total.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: primaryColor,
+                          letterSpacing: -0.5,
+                        ),
                       ),
-                    ),
-                  ),
-                ],
+                      Container(
+                        margin: const EdgeInsets.only(top: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: primaryColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'Total',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w600,
+                            color: primaryColor,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
             ],
           ),

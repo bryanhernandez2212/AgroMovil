@@ -69,22 +69,42 @@ class _ListProductViewContentState extends State<ListProductViewContent> {
                   elevation: 4,
                   borderRadius: BorderRadius.circular(30),
                   shadowColor: Colors.black26,
-                  child: TextField(
-                    onChanged: (value) {
-                      setState(() {
-                        _searchQuery = value;
-                      });
+                  child: Builder(
+                    builder: (context) {
+                      final isDark = Theme.of(context).brightness == Brightness.dark;
+                      return TextField(
+                        onChanged: (value) {
+                          setState(() {
+                            _searchQuery = value;
+                          });
+                        },
+                        style: TextStyle(
+                          color: isDark ? Colors.white : Colors.black,
+                        ),
+                        decoration: InputDecoration(
+                          prefixIcon: Icon(
+                            Icons.search,
+                            color: isDark ? Colors.grey[400] : const Color.fromARGB(255, 13, 19, 13),
+                          ),
+                          hintText: 'Buscar mis productos...',
+                          hintStyle: TextStyle(
+                            color: isDark ? Colors.grey[500] : Colors.grey,
+                            fontSize: 16,
+                          ),
+                          filled: true,
+                          fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                          contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                          enabledBorder: _buildInputBorder(
+                            isDark ? Colors.grey[700]! : const Color(0xFF2E7D32),
+                            1,
+                          ),
+                          focusedBorder: _buildInputBorder(
+                            isDark ? const Color(0xFF4CAF50) : const Color(0xFF2E7D32),
+                            2,
+                          ),
+                        ),
+                      );
                     },
-                    decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.search, color: Color.fromARGB(255, 13, 19, 13)),
-                      hintText: 'Buscar mis productos...',
-                      hintStyle: const TextStyle(color: Colors.grey, fontSize: 16),
-                      filled: true,
-                      fillColor: Colors.white,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                      enabledBorder: _buildInputBorder(const Color(0xFF2E7D32), 1),
-                      focusedBorder: _buildInputBorder(const Color(0xFF2E7D32), 2),
-                    ),
                   ),
                 ),
               ),
@@ -104,10 +124,12 @@ class _ListProductViewContentState extends State<ListProductViewContent> {
                                 _searchQuery.isNotEmpty
                                     ? 'No se encontraron productos que coincidan'
                                     : 'No tienes productos registrados',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.grey,
+                                  color: Theme.of(context).brightness == Brightness.dark
+                                      ? Colors.grey[400]
+                                      : Colors.grey,
                                 ),
                                 textAlign: TextAlign.center,
                               ),
@@ -116,9 +138,11 @@ class _ListProductViewContentState extends State<ListProductViewContent> {
                                 _searchQuery.isNotEmpty
                                     ? 'Intenta con otra búsqueda'
                                     : 'Comienza a agregar tus productos ahora',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 14,
-                                  color: Colors.grey,
+                                  color: Theme.of(context).brightness == Brightness.dark
+                                      ? Colors.grey[500]
+                                      : Colors.grey,
                                 ),
                                 textAlign: TextAlign.center,
                               ),
@@ -155,8 +179,9 @@ class _ListProductViewContentState extends State<ListProductViewContent> {
   }
 
   Widget _buildProductCard(ProductModel product) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Card(
-        color: const Color.fromARGB(255, 255, 255, 255),
+      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
       elevation: 4,
       margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(
@@ -180,19 +205,31 @@ class _ListProductViewContentState extends State<ListProductViewContent> {
                         height: 100,
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) {
+                          final isDark = Theme.of(context).brightness == Brightness.dark;
                           return Container(
                             width: 100,
                             height: 100,
-                            color: Colors.grey[300],
-                            child: const Icon(Icons.image_not_supported),
+                            color: isDark ? Colors.grey[800] : Colors.grey[300],
+                            child: Icon(
+                              Icons.image_not_supported,
+                              color: isDark ? Colors.grey[400] : Colors.grey[600],
+                            ),
                           );
                         },
                       )
-                    : Container(
-                        width: 100,
-                        height: 100,
-                        color: Colors.grey[300],
-                        child: const Icon(Icons.image_not_supported),
+                    : Builder(
+                        builder: (context) {
+                          final isDark = Theme.of(context).brightness == Brightness.dark;
+                          return Container(
+                            width: 100,
+                            height: 100,
+                            color: isDark ? Colors.grey[800] : Colors.grey[300],
+                            child: Icon(
+                              Icons.image_not_supported,
+                              color: isDark ? Colors.grey[400] : Colors.grey[600],
+                            ),
+                          );
+                        },
                       ),
               ),
               const SizedBox(width: 12),
@@ -202,10 +239,10 @@ class _ListProductViewContentState extends State<ListProductViewContent> {
                   children: [
                     Text(
                       product.nombre,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF2E7D32),
+                        color: isDark ? const Color(0xFF4CAF50) : const Color(0xFF2E7D32),
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -219,15 +256,17 @@ class _ListProductViewContentState extends State<ListProductViewContent> {
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF2E7D32).withOpacity(0.1),
+                            color: isDark
+                                ? const Color(0xFF4CAF50).withOpacity(0.2)
+                                : const Color(0xFF2E7D32).withOpacity(0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
                             product.categoria.toUpperCase(),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF2E7D32),
+                              color: isDark ? const Color(0xFF4CAF50) : const Color(0xFF2E7D32),
                             ),
                           ),
                         ),
@@ -250,9 +289,9 @@ class _ListProductViewContentState extends State<ListProductViewContent> {
                     const SizedBox(height: 8),
                     Text(
                       product.descripcion,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
-                        color: Colors.grey,
+                        color: isDark ? Colors.grey[400] : Colors.grey,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -263,20 +302,22 @@ class _ListProductViewContentState extends State<ListProductViewContent> {
                       children: [
                         Text(
                           '\$${product.precio.toStringAsFixed(2)} / ${product.unidad}',
-                          style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                            color: Color(0xFF2E7D32),
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? const Color(0xFF4CAF50) : const Color(0xFF2E7D32),
                           ),
                         ),
                         Text(
                           'Stock: ${product.stock}',
                           style: TextStyle(
                             fontSize: 14,
-                            color: product.stock > 0 ? Colors.black : Colors.red,
+                            color: product.stock > 0
+                                ? (isDark ? Colors.white : Colors.black)
+                                : Colors.red,
                             fontWeight: FontWeight.bold,
-                  ),
-                ),
+                          ),
+                        ),
               ],
             ),
                     const SizedBox(height: 12),
@@ -288,7 +329,11 @@ class _ListProductViewContentState extends State<ListProductViewContent> {
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: () => _editProduct(product),
-                            icon: const Icon(Icons.edit, size: 18, color: Colors.black),
+                            icon: Icon(
+                              Icons.edit,
+                              size: 18,
+                              color: isDark ? Colors.black : Colors.black,
+                            ),
                             label: const Text(
                               'Editar',
                               style: TextStyle(

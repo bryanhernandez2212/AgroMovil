@@ -502,7 +502,7 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
     return VendorGuard(
       child: Scaffold(
         resizeToAvoidBottomInset: true,
-        backgroundColor: const Color.fromARGB(255, 255, 255, 255),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
@@ -516,7 +516,7 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
                       // Título "Editar producto" cuando se está editando
                       if (widget.productToEdit != null)
                         Container(
-                          color: Colors.white,
+                          color: Theme.of(context).scaffoldBackgroundColor,
                           width: double.infinity,
                           padding: const EdgeInsets.only(
                             top: 12,
@@ -573,8 +573,9 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
                                           constraints.maxWidth *
                                               0.04,
                                       fontWeight: FontWeight.bold,
-                                      color:
-                                          const Color(0xFF2F4157),
+                                      color: Theme.of(context).brightness == Brightness.dark
+                                          ? Colors.white
+                                          : const Color(0xFF2F4157),
                                     ),
                                   ),
                                   SizedBox(
@@ -660,9 +661,9 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
                                           fontSize: constraints
                                                   .maxWidth *
                                               0.03,
-                                          color: const Color(
-                                                  0xFF2F4157)
-                                              .withOpacity(0.6),
+                                          color: Theme.of(context).brightness == Brightness.dark
+                                              ? Colors.grey[400]
+                                              : const Color(0xFF2F4157).withOpacity(0.6),
                                         ),
                                       ),
                                     ),
@@ -785,41 +786,36 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
                                         Expanded(
                                           child: SizedBox(
                                             height: 45,
-                                            child: OutlinedButton(
-                                              onPressed: _isLoadingAllow
-                                                  ? null
-                                                  : () => Navigator.of(
-                                                          context)
-                                                      .pop(),
-                                              style:
-                                                  OutlinedButton
-                                                      .styleFrom(
-                                                foregroundColor:
-                                                    const Color(
-                                                        0xFF2F4157),
-                                                side:
-                                                    const BorderSide(
-                                                  color: Color(
-                                                      0xFF577C8E),
-                                                  width: 2,
-                                                ),
-                                                shape:
-                                                    RoundedRectangleBorder(
-                                                  borderRadius:
-                                                      BorderRadius
-                                                          .circular(
-                                                              25),
-                                                ),
-                                              ),
-                                              child: const Text(
-                                                "Cancelar",
-                                                style: TextStyle(
-                                                  fontSize: 16,
-                                                  fontWeight:
-                                                      FontWeight
-                                                          .bold,
-                                                ),
-                                              ),
+                                            child: Builder(
+                                              builder: (context) {
+                                                final isDark = Theme.of(context).brightness == Brightness.dark;
+                                                return OutlinedButton(
+                                                  onPressed: _isLoadingAllow
+                                                      ? null
+                                                      : () => Navigator.of(context).pop(),
+                                                  style: OutlinedButton.styleFrom(
+                                                    foregroundColor: isDark
+                                                        ? Colors.white
+                                                        : const Color(0xFF2F4157),
+                                                    side: BorderSide(
+                                                      color: isDark
+                                                          ? Colors.grey[700]!
+                                                          : const Color(0xFF577C8E),
+                                                      width: 2,
+                                                    ),
+                                                    shape: RoundedRectangleBorder(
+                                                      borderRadius: BorderRadius.circular(25),
+                                                    ),
+                                                  ),
+                                                  child: const Text(
+                                                    "Cancelar",
+                                                    style: TextStyle(
+                                                      fontSize: 16,
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                );
+                                              },
                                             ),
                                           ),
                                         ),
@@ -975,52 +971,63 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
           style: TextStyle(
             fontSize: constraints.maxWidth * 0.04,
             fontWeight: FontWeight.bold,
-            color: const Color(0xFF2F4157),
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white
+                : const Color(0xFF2F4157),
           ),
         ),
         SizedBox(height: constraints.maxHeight * 0.01),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(15),
-            border: Border.all(
-              color: const Color(0xFF577C8E).withOpacity(0.3),
-              width: 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 5,
-                offset: const Offset(0, 2),
+        Builder(
+          builder: (context) {
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            return Container(
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(
+                  color: isDark
+                      ? Colors.grey[700]!
+                      : const Color(0xFF577C8E).withOpacity(0.3),
+                  width: 1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
+                    blurRadius: 5,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-            ],
-          ),
-          child: TextField(
-            controller: controller,
-            keyboardType: keyboardType,
-            maxLines: maxLines,
-            decoration: InputDecoration(
-              prefixIcon: Icon(
-                icon,
-                color: const Color(0xFF226602),
-                size: 20,
+              child: TextField(
+                controller: controller,
+                keyboardType: keyboardType,
+                maxLines: maxLines,
+                style: TextStyle(
+                  fontSize: constraints.maxWidth * 0.035,
+                  color: isDark ? Colors.white : const Color(0xFF2F4157),
+                ),
+                decoration: InputDecoration(
+                  prefixIcon: Icon(
+                    icon,
+                    color: const Color(0xFF226602),
+                    size: 20,
+                  ),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: constraints.maxWidth * 0.04,
+                    vertical: constraints.maxHeight * 0.015,
+                  ),
+                  hintText: "$label",
+                  hintStyle: TextStyle(
+                    color: isDark
+                        ? Colors.grey[400]
+                        : const Color(0xFF2F4157).withOpacity(0.6),
+                    fontSize: constraints.maxWidth * 0.035,
+                  ),
+                ),
               ),
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(
-                horizontal: constraints.maxWidth * 0.04,
-                vertical: constraints.maxHeight * 0.015,
-              ),
-              hintText: "$label",
-              hintStyle: TextStyle(
-                color: const Color(0xFF2F4157).withOpacity(0.6),
-                fontSize: constraints.maxWidth * 0.035,
-              ),
-            ),
-            style: TextStyle(
-              fontSize: constraints.maxWidth * 0.035,
-              color: const Color(0xFF2F4157),
-            ),
-          ),
+            );
+          },
         ),
       ],
     );
@@ -1049,11 +1056,12 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
                     width: double.infinity,
                     height: double.infinity,
                     errorBuilder: (context, error, stackTrace) {
+                      final isDark = Theme.of(context).brightness == Brightness.dark;
                       return Container(
-                        color: const Color(0xFFF5F5F5),
-                        child: const Icon(
+                        color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF5F5F5),
+                        child: Icon(
                           Icons.broken_image,
-                          color: Color(0xFF577C8E),
+                          color: isDark ? Colors.grey[400] : const Color(0xFF577C8E),
                           size: 30,
                         ),
                       );
@@ -1066,13 +1074,18 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
                         width: double.infinity,
                         height: double.infinity,
                       )
-                    : Container(
-                        color: const Color(0xFFF5F5F5),
-                        child: const Icon(
-                          Icons.image,
-                          color: Color(0xFF577C8E),
-                          size: 30,
-                        ),
+                    : Builder(
+                        builder: (context) {
+                          final isDark = Theme.of(context).brightness == Brightness.dark;
+                          return Container(
+                            color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF5F5F5),
+                            child: Icon(
+                              Icons.image,
+                              color: isDark ? Colors.grey[400] : const Color(0xFF577C8E),
+                              size: 30,
+                            ),
+                          );
+                        },
                       ),
           ),
           // Botón para eliminar
@@ -1112,10 +1125,14 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
         height: constraints.maxHeight * 0.15,
         margin: EdgeInsets.only(right: constraints.maxWidth * 0.02),
         decoration: BoxDecoration(
-          color: const Color(0xFFF5F5F5),
+          color: Theme.of(context).brightness == Brightness.dark
+              ? const Color(0xFF1E1E1E)
+              : const Color(0xFFF5F5F5),
           borderRadius: BorderRadius.circular(15),
           border: Border.all(
-            color: const Color(0xFF577C8E).withOpacity(0.3),
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.grey[700]!
+                : const Color(0xFF577C8E).withOpacity(0.3),
             width: 2,
             style: BorderStyle.solid,
           ),
@@ -1141,7 +1158,9 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
               "Agregar",
               style: TextStyle(
                 fontSize: constraints.maxWidth * 0.03,
-                color: const Color(0xFF2F4157),
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white
+                    : const Color(0xFF2F4157),
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -1168,65 +1187,76 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
           style: TextStyle(
             fontSize: constraints.maxWidth * 0.04,
             fontWeight: FontWeight.bold,
-            color: const Color(0xFF2F4157),
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white
+                : const Color(0xFF2F4157),
           ),
         ),
         SizedBox(height: constraints.maxHeight * 0.01),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(15),
-            border: Border.all(
-              color: const Color(0xFF577C8E).withOpacity(0.3),
-              width: 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 5,
-                offset: const Offset(0, 2),
+        Builder(
+          builder: (context) {
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            return Container(
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(
+                  color: isDark
+                      ? Colors.grey[700]!
+                      : const Color(0xFF577C8E).withOpacity(0.3),
+                  width: 1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
+                    blurRadius: 5,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-            ],
-          ),
-          child: DropdownButtonFormField<String>(
-            value: value,
-            onChanged: onChanged,
-            dropdownColor: const Color.fromARGB(255, 255, 255, 255),
-            decoration: InputDecoration(
-              prefixIcon: Icon(
-                icon,
-                color: const Color(0xFF226602),
-                size: 20,
-              ),
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(
-                horizontal: constraints.maxWidth * 0.04,
-                vertical: constraints.maxHeight * 0.015,
-              ),
-              hintText: "Selecciona $label",
-              hintStyle: TextStyle(
-                color: const Color(0xFF2F4157).withOpacity(0.6),
-                fontSize: constraints.maxWidth * 0.035,
-              ),
-            ),
-            items: items.map((String item) {
-              return DropdownMenuItem<String>(
-                value: item,
-                child: Text(
-                  item,
-                  style: TextStyle(
+              child: DropdownButtonFormField<String>(
+                value: value,
+                onChanged: onChanged,
+                dropdownColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                decoration: InputDecoration(
+                  prefixIcon: Icon(
+                    icon,
+                    color: const Color(0xFF226602),
+                    size: 20,
+                  ),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: constraints.maxWidth * 0.04,
+                    vertical: constraints.maxHeight * 0.015,
+                  ),
+                  hintText: "Selecciona $label",
+                  hintStyle: TextStyle(
+                    color: isDark
+                        ? Colors.grey[400]
+                        : const Color(0xFF2F4157).withOpacity(0.6),
                     fontSize: constraints.maxWidth * 0.035,
-                    color: Colors.black.withOpacity(0.40),
-                    fontWeight: FontWeight.w500,
                   ),
                 ),
-              );
-            }).toList(),
-            style: TextStyle(
-              fontSize: constraints.maxWidth * 0.035,
-              color: const Color(0xFF2F4157),
-            ),
-          ),
+                items: items.map((String item) {
+                  return DropdownMenuItem<String>(
+                    value: item,
+                    child: Text(
+                      item,
+                      style: TextStyle(
+                        fontSize: constraints.maxWidth * 0.035,
+                        color: isDark ? Colors.white : Colors.black.withOpacity(0.40),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  );
+                }).toList(),
+                style: TextStyle(
+                  fontSize: constraints.maxWidth * 0.035,
+                  color: isDark ? Colors.white : const Color(0xFF2F4157),
+                ),
+              ),
+            );
+          },
         ),
       ],
     );

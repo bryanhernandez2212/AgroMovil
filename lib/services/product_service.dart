@@ -328,16 +328,18 @@ class ProductService {
         };
       }
 
-      // Obtener nombre del usuario de Firestore si está disponible
+      // Obtener nombre y foto de perfil del usuario de Firestore si está disponible
       String userName = user.displayName ?? 'Usuario';
+      String? fotoPerfil;
       try {
         final userDoc = await _firestore.collection('usuarios').doc(user.uid).get();
         if (userDoc.exists) {
           final userData = userDoc.data();
           userName = userData?['nombre'] ?? user.displayName ?? 'Usuario';
+          fotoPerfil = userData?['foto_perfil'];
         }
       } catch (e) {
-        print('No se pudo obtener nombre del usuario de Firestore: $e');
+        print('No se pudo obtener información del usuario de Firestore: $e');
       }
 
       final commentData = {
@@ -346,6 +348,7 @@ class ProductService {
         'usuario_id': user.uid,
         'usuario_nombre': userName,
         'usuario_email': user.email ?? '',
+        'foto_perfil': fotoPerfil,
         'comentario': comentario.trim(),
         'calificacion': calificacion,
         'fecha_creacion': FieldValue.serverTimestamp(),
@@ -400,6 +403,7 @@ class ProductService {
         'email': '',
         'ubicacion': '',
         'totalProductos': 0,
+        'foto_perfil': null,
       };
       
       if (userDoc.exists) {
@@ -407,6 +411,7 @@ class ProductService {
         vendorData['nombre'] = userData['nombre'] ?? '';
         vendorData['email'] = userData['email'] ?? '';
         vendorData['ubicacion'] = userData['ubicacion'] ?? userData['direccion'] ?? 'No especificada';
+        vendorData['foto_perfil'] = userData['foto_perfil'];
       }
       
       // Contar productos activos del vendedor
@@ -426,6 +431,7 @@ class ProductService {
         'email': '',
         'ubicacion': 'No disponible',
         'totalProductos': 0,
+        'foto_perfil': null,
       };
     }
   }

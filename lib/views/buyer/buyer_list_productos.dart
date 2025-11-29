@@ -92,7 +92,7 @@ class _BuyerListProductosViewState extends State<BuyerListProductosView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -106,34 +106,39 @@ class _BuyerListProductosViewState extends State<BuyerListProductosView> {
                       child: CircularProgressIndicator(),
                     )
                   : _filteredProducts.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                _searchQuery.isNotEmpty
-                                    ? 'No se encontraron productos que coincidan'
-                                    : 'No hay productos disponibles',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.grey,
-                                ),
-                                textAlign: TextAlign.center,
+                      ? Builder(
+                          builder: (context) {
+                            final isDark = Theme.of(context).brightness == Brightness.dark;
+                            return Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    _searchQuery.isNotEmpty
+                                        ? 'No se encontraron productos que coincidan'
+                                        : 'No hay productos disponibles',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: isDark ? Colors.grey[400] : Colors.grey,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Text(
+                                    _searchQuery.isNotEmpty
+                                        ? 'Intenta con otra búsqueda'
+                                        : 'Vuelve más tarde para ver productos',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: isDark ? Colors.grey[500] : Colors.grey,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
                               ),
-                              const SizedBox(height: 10),
-                              Text(
-                                _searchQuery.isNotEmpty
-                                    ? 'Intenta con otra búsqueda'
-                                    : 'Vuelve más tarde para ver productos',
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                          ),
+                            );
+                          },
                         )
                       : RefreshIndicator(
                           onRefresh: _loadProducts,
@@ -147,6 +152,7 @@ class _BuyerListProductosViewState extends State<BuyerListProductosView> {
   }
 
   Widget _buildHeader() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -159,10 +165,10 @@ class _BuyerListProductosViewState extends State<BuyerListProductosView> {
               widget.categoryFilter != null && widget.categoryFilter!.isNotEmpty
                   ? widget.categoryFilter!
                   : 'Productos',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF115213),
+                color: isDark ? Colors.white : const Color(0xFF115213),
               ),
             ),
           ),
@@ -178,93 +184,115 @@ class _BuyerListProductosViewState extends State<BuyerListProductosView> {
                       elevation: 3,
                       borderRadius: BorderRadius.circular(25),
                       shadowColor: Colors.black26,
-                      child: TextField(
-                        onChanged: (value) {
-                          setState(() {
-                            _searchQuery = value;
-                          });
+                      child: Builder(
+                        builder: (context) {
+                          final isDark = Theme.of(context).brightness == Brightness.dark;
+                          return TextField(
+                            onChanged: (value) {
+                              setState(() {
+                                _searchQuery = value;
+                              });
+                            },
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: isDark ? Colors.white : Colors.black,
+                            ),
+                            decoration: InputDecoration(
+                              prefixIcon: const Icon(Icons.search, color: Color(0xFF115213), size: 20),
+                              hintText: 'Buscar productos...',
+                              hintStyle: TextStyle(
+                                color: isDark ? Colors.grey[500] : Colors.grey,
+                                fontSize: 14,
+                              ),
+                              filled: true,
+                              fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                              contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                              enabledBorder: _buildInputBorder(
+                                isDark ? Colors.grey[700]! : const Color(0xFF115213),
+                                1,
+                              ),
+                              focusedBorder: _buildInputBorder(
+                                const Color(0xFF115213),
+                                2,
+                              ),
+                            ),
+                          );
                         },
-                        style: const TextStyle(fontSize: 14),
-                        decoration: InputDecoration(
-                          prefixIcon: const Icon(Icons.search, color: Color(0xFF115213), size: 20),
-                          hintText: 'Buscar productos...',
-                          hintStyle: const TextStyle(color: Colors.grey, fontSize: 14),
-                          filled: true,
-                          fillColor: Colors.white,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                          enabledBorder: _buildInputBorder(const Color(0xFF115213), 1),
-                          focusedBorder: _buildInputBorder(const Color(0xFF115213), 2),
-                        ),
                       ),
                     ),
                   ),
                 ),
               ),
               // Botón de filtro
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: _selectedCategories.isNotEmpty 
-                      ? const Color(0xFF115213) 
-                      : Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                  border: Border.all(
-                    color: const Color(0xFF115213),
-                    width: 1.5,
-                  ),
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: () => _showFilterDialog(context),
-                    borderRadius: BorderRadius.circular(24),
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Icon(
-                          Icons.filter_list,
-                          color: _selectedCategories.isNotEmpty 
-                              ? Colors.white 
-                              : const Color(0xFF115213),
-                          size: 20,
+              Builder(
+                builder: (context) {
+                  final isDark = Theme.of(context).brightness == Brightness.dark;
+                  return Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: _selectedCategories.isNotEmpty 
+                          ? const Color(0xFF115213) 
+                          : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(isDark ? 0.3 : 0.1),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
                         ),
-                        if (_selectedCategories.isNotEmpty)
-                          Positioned(
-                            top: 6,
-                            right: 6,
-                            child: Container(
-                              padding: const EdgeInsets.all(3),
-                              decoration: const BoxDecoration(
-                                color: Colors.red,
-                                shape: BoxShape.circle,
-                              ),
-                              constraints: const BoxConstraints(
-                                minWidth: 14,
-                                minHeight: 14,
-                              ),
-                              child: Text(
-                                '${_selectedCategories.length}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          ),
                       ],
+                      border: Border.all(
+                        color: const Color(0xFF115213),
+                        width: 1.5,
+                      ),
                     ),
-                  ),
-                ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => _showFilterDialog(context),
+                        borderRadius: BorderRadius.circular(24),
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Icon(
+                              Icons.filter_list,
+                              color: _selectedCategories.isNotEmpty 
+                                  ? Colors.white 
+                                  : const Color(0xFF115213),
+                              size: 20,
+                            ),
+                            if (_selectedCategories.isNotEmpty)
+                              Positioned(
+                                top: 6,
+                                right: 6,
+                                child: Container(
+                                  padding: const EdgeInsets.all(3),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.red,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  constraints: const BoxConstraints(
+                                    minWidth: 14,
+                                    minHeight: 14,
+                                  ),
+                                  child: Text(
+                                    '${_selectedCategories.length}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
             ],
           ),
@@ -290,12 +318,14 @@ class _BuyerListProductosViewState extends State<BuyerListProductosView> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => Container(
-          height: MediaQuery.of(context).size.height * 0.5,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
+        builder: (context, setDialogState) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          return Container(
+            height: MediaQuery.of(context).size.height * 0.5,
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            ),
           child: Column(
             children: [
             // Header del diálogo
@@ -303,7 +333,9 @@ class _BuyerListProductosViewState extends State<BuyerListProductosView> {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               decoration: BoxDecoration(
                 border: Border(
-                  bottom: BorderSide(color: Colors.grey[200]!),
+                  bottom: BorderSide(
+                    color: isDark ? Colors.grey[700]! : Colors.grey[200]!,
+                  ),
                 ),
               ),
               child: Row(
@@ -314,13 +346,13 @@ class _BuyerListProductosViewState extends State<BuyerListProductosView> {
                     size: 20,
                   ),
                   const SizedBox(width: 10),
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'Filtrar por categoría',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF1A1A1A),
+                        color: isDark ? Colors.white : const Color(0xFF1A1A1A),
                       ),
                     ),
                   ),
@@ -341,9 +373,9 @@ class _BuyerListProductosViewState extends State<BuyerListProductosView> {
                         ),
                       ),
                     IconButton(
-                      icon: const Icon(Icons.close),
+                      icon: Icon(Icons.close),
                       onPressed: () => Navigator.pop(context),
-                      color: const Color(0xFF1A1A1A),
+                      color: isDark ? Colors.white : const Color(0xFF1A1A1A),
                     ),
                   ],
                 ),
@@ -354,7 +386,9 @@ class _BuyerListProductosViewState extends State<BuyerListProductosView> {
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 decoration: BoxDecoration(
                   border: Border(
-                    bottom: BorderSide(color: Colors.grey[200]!),
+                    bottom: BorderSide(
+                      color: isDark ? Colors.grey[700]! : Colors.grey[200]!,
+                    ),
                   ),
                 ),
                 child: Column(
@@ -368,12 +402,12 @@ class _BuyerListProductosViewState extends State<BuyerListProductosView> {
                           size: 18,
                         ),
                         const SizedBox(width: 8),
-                        const Text(
+                        Text(
                           'Ordenar por precio',
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFF1A1A1A),
+                            color: isDark ? Colors.white : const Color(0xFF1A1A1A),
                           ),
                         ),
                       ],
@@ -415,10 +449,12 @@ class _BuyerListProductosViewState extends State<BuyerListProductosView> {
               // Lista de categorías
               Expanded(
                 child: _availableCategories.isEmpty
-                    ? const Center(
+                    ? Center(
                         child: Text(
                           'No hay categorías disponibles',
-                          style: TextStyle(color: Colors.grey),
+                          style: TextStyle(
+                            color: isDark ? Colors.grey[400] : Colors.grey,
+                          ),
                         ),
                       )
                     : ListView.builder(
@@ -436,13 +472,13 @@ class _BuyerListProductosViewState extends State<BuyerListProductosView> {
                               side: BorderSide(
                                 color: isSelected 
                                     ? const Color(0xFF115213) 
-                                    : Colors.grey[300]!,
+                                    : (isDark ? Colors.grey[700]! : Colors.grey[300]!),
                                 width: isSelected ? 2 : 1,
                               ),
                             ),
                             color: isSelected 
                                 ? const Color(0xFF115213).withOpacity(0.1)
-                                : Colors.white,
+                                : (isDark ? const Color(0xFF2A2A2A) : Colors.white),
                             child: ListTile(
                               contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 16,
@@ -458,7 +494,7 @@ class _BuyerListProductosViewState extends State<BuyerListProductosView> {
                                       : FontWeight.normal,
                                   color: isSelected 
                                       ? const Color(0xFF115213) 
-                                      : const Color(0xFF1A1A1A),
+                                      : (isDark ? Colors.white : const Color(0xFF1A1A1A)),
                                 ),
                               ),
                               trailing: isSelected
@@ -491,7 +527,9 @@ class _BuyerListProductosViewState extends State<BuyerListProductosView> {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               decoration: BoxDecoration(
                 border: Border(
-                  top: BorderSide(color: Colors.grey[200]!),
+                  top: BorderSide(
+                    color: isDark ? Colors.grey[700]! : Colors.grey[200]!,
+                  ),
                 ),
               ),
               child: Row(
@@ -553,7 +591,8 @@ class _BuyerListProductosViewState extends State<BuyerListProductosView> {
             ),
             ],
           ),
-        ),
+          );
+        },
       ),
     );
   }
@@ -565,6 +604,7 @@ class _BuyerListProductosViewState extends State<BuyerListProductosView> {
     bool isSelected,
     VoidCallback onTap,
   ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -573,12 +613,12 @@ class _BuyerListProductosViewState extends State<BuyerListProductosView> {
         decoration: BoxDecoration(
           color: isSelected 
               ? const Color(0xFF115213).withOpacity(0.1)
-              : Colors.grey[100],
+              : (isDark ? const Color(0xFF2A2A2A) : Colors.grey[100]),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected 
                 ? const Color(0xFF115213)
-                : Colors.grey[300]!,
+                : (isDark ? Colors.grey[700]! : Colors.grey[300]!),
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -596,7 +636,7 @@ class _BuyerListProductosViewState extends State<BuyerListProductosView> {
               value == 'asc' ? Icons.arrow_upward : Icons.arrow_downward,
               color: isSelected 
                   ? const Color(0xFF115213)
-                  : Colors.grey[600],
+                  : (isDark ? Colors.grey[400] : Colors.grey[600]!),
               size: 16,
             ),
             const SizedBox(width: 4),
@@ -609,7 +649,7 @@ class _BuyerListProductosViewState extends State<BuyerListProductosView> {
                     : FontWeight.normal,
                 color: isSelected 
                     ? const Color(0xFF115213)
-                    : const Color(0xFF1A1A1A),
+                    : (isDark ? Colors.white : const Color(0xFF1A1A1A)),
               ),
             ),
           ],
@@ -635,6 +675,7 @@ class _BuyerListProductosViewState extends State<BuyerListProductosView> {
   }
 
   Widget _buildProductCard(ProductModel product) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     // Obtener la primera imagen del producto
     String imageUrl = product.imagenes.isNotEmpty 
         ? product.imagenes.first 
@@ -652,11 +693,11 @@ class _BuyerListProductosViewState extends State<BuyerListProductosView> {
       borderRadius: BorderRadius.circular(16),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
               blurRadius: 10,
               offset: const Offset(0, 2),
             ),
@@ -673,10 +714,10 @@ class _BuyerListProductosViewState extends State<BuyerListProductosView> {
                   children: [
                     Text(
                       product.nombre,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF333333),
+                        color: isDark ? Colors.white : const Color(0xFF333333),
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -684,9 +725,9 @@ class _BuyerListProductosViewState extends State<BuyerListProductosView> {
                     const SizedBox(height: 4),
                     Text(
                       product.descripcion,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
-                        color: Color(0xFF666666),
+                        color: isDark ? Colors.grey[400] : const Color(0xFF666666),
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -709,30 +750,34 @@ class _BuyerListProductosViewState extends State<BuyerListProductosView> {
                         const SizedBox(width: 4),
                         Text(
                           product.calificacionPromedio.toStringAsFixed(1),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF222222),
+                            color: isDark ? Colors.white : const Color(0xFF222222),
                           ),
                         ),
                         const SizedBox(width: 8),
                         Text(
                           '(${product.totalCalificaciones})',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
-                            color: Colors.grey,
+                            color: isDark ? Colors.grey[400] : Colors.grey,
                           ),
                         ),
                       ] else ...[
                         Row(
                           children: [
-                            const Icon(Icons.comment_outlined, color: Colors.grey, size: 14),
+                            Icon(
+                              Icons.comment_outlined,
+                              color: isDark ? Colors.grey[500] : Colors.grey,
+                              size: 14,
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               'Sin calificaciones',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.grey[600],
+                                color: isDark ? Colors.grey[500] : Colors.grey[600],
                                 fontStyle: FontStyle.italic,
                               ),
                             ),
@@ -746,37 +791,42 @@ class _BuyerListProductosViewState extends State<BuyerListProductosView> {
             ),
             const SizedBox(width: 12),
               // Imagen del producto
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: imageUrl.isNotEmpty
-                      ? Image.network(
-                          imageUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              color: Colors.grey[200],
-                              child: const Icon(
+              Builder(
+                builder: (context) {
+                  final isDark = Theme.of(context).brightness == Brightness.dark;
+                  return Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF2A2A2A) : Colors.grey[200],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: imageUrl.isNotEmpty
+                          ? Image.network(
+                              imageUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  color: isDark ? const Color(0xFF2A2A2A) : Colors.grey[200],
+                                  child: Icon(
+                                    Icons.image_not_supported,
+                                    color: isDark ? Colors.grey[600] : Colors.grey,
+                                  ),
+                                );
+                              },
+                            )
+                          : Container(
+                              color: isDark ? const Color(0xFF2A2A2A) : Colors.grey[200],
+                              child: Icon(
                                 Icons.image_not_supported,
-                                color: Colors.grey,
+                                color: isDark ? Colors.grey[600] : Colors.grey,
                               ),
-                            );
-                          },
-                        )
-                      : Container(
-                          color: Colors.grey[200],
-                          child: const Icon(
-                            Icons.image_not_supported,
-                            color: Colors.grey,
-                          ),
-                        ),
-                ),
+                            ),
+                    ),
+                  );
+                },
               ),
             ],
           ),

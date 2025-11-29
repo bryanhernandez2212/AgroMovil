@@ -5,10 +5,12 @@ import 'package:agromarket/controllers/auth_controller.dart';
 import 'package:agromarket/views/profile/profile_view.dart';
 import 'package:agromarket/views/profile/notifications_view.dart';
 import 'package:agromarket/views/profile/chat_view.dart';
+import 'package:agromarket/views/about/about_view.dart';
 import 'package:agromarket/services/user_role_service.dart';
 import 'package:agromarket/views/buyer/my_orders_view.dart';
 import 'package:agromarket/views/vendor/seller_orders_view.dart';
 import 'package:agromarket/views/auth/login_view.dart';
+import 'package:agromarket/services/notification_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class UserProfileMenuView extends StatefulWidget {
@@ -40,6 +42,14 @@ class _UserProfileMenuViewState extends State<UserProfileMenuView> {
 
     final uri = Uri.parse('https://dashboard.stripe.com/login');
     await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  /// Trunca el nombre si excede el máximo de caracteres
+  String _truncateName(String name, {int maxLength = 25}) {
+    if (name.length <= maxLength) {
+      return name;
+    }
+    return '${name.substring(0, maxLength)}...';
   }
 
   @override
@@ -125,12 +135,17 @@ class _UserProfileMenuViewState extends State<UserProfileMenuView> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            userModel?.nombre ?? user?.displayName ?? 'Usuario',
+                            _truncateName(
+                              userModel?.nombre ?? user?.displayName ?? 'Usuario',
+                              maxLength: 25,
+                            ),
                             style: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
                               color: Color(0xFF1A1A1A),
                             ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
                           if (user?.email != null)
                             Text(
@@ -302,6 +317,20 @@ class _UserProfileMenuViewState extends State<UserProfileMenuView> {
                         );
                       },
                     ),
+                    const SizedBox(height: 8),
+                    _buildMenuButton(
+                      context,
+                      icon: Icons.info_outline,
+                      title: 'Acerca de',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const AboutView(),
+                          ),
+                        );
+                      },
+                    ),
                   ],
                 ),
               ),
@@ -408,27 +437,57 @@ class _UserProfileMenuViewState extends State<UserProfileMenuView> {
   void _showLogoutDialog(BuildContext context, AuthController authController) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Cerrar sesión'),
         content: const Text('¿Estás seguro de que quieres cerrar sesión?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(dialogContext).pop(),
             child: const Text('Cancelar'),
           ),
-          TextButton(
-            onPressed: () async {
-              if (authController.isLoggingOut) return;
-              Navigator.of(context).pop();
-              await authController.logout();
-              if (context.mounted) {
-                Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => const LoginPage()),
-                  (route) => false,
-                );
-              }
+          Consumer<AuthController>(
+            builder: (dialogContext, authController, child) {
+              return TextButton(
+                onPressed: authController.isLoggingOut ? null : () async {
+                  // Prevenir múltiples clics
+                  if (authController.isLoggingOut) {
+                    print('⚠️ Logout ya en progreso, ignorando clic');
+                    return;
+                  }
+                  
+                  print('🔘 Usuario confirmó logout');
+                  
+                  // Cerrar el diálogo primero
+                  Navigator.of(dialogContext).pop();
+                  
+                  // Navegar a login PRIMERO para evitar que se vea la app sin usuario
+                  final navigator = NotificationService.navigatorKey.currentState;
+                  if (navigator != null) {
+                    print('🧭 Navegando a login ANTES del logout...');
+                    navigator.pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (context) => const LoginPage()),
+                      (route) => false,
+                    );
+                    print('✅ Navegación a login completada');
+                  }
+                  
+                  // Esperar un momento para que la navegación se procese
+                  await Future.delayed(const Duration(milliseconds: 100));
+                  
+                  // Hacer logout después de navegar para limpiar el estado
+                  print('🚪 Iniciando logout...');
+                  await authController.logout();
+                  print('✅ Logout completado');
+                },
+                child: authController.isLoggingOut
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Cerrar sesión'),
+              );
             },
-            child: const Text('Cerrar sesión'),
           ),
         ],
       ),
@@ -474,4 +533,3 @@ class _UserProfileMenuViewState extends State<UserProfileMenuView> {
     );
   }
 }
-

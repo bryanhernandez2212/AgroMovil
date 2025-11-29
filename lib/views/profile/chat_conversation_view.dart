@@ -87,6 +87,31 @@ class _ChatConversationViewState extends State<ChatConversationView> {
     _currentUserId = currentUser.id;
 
     try {
+      // Verificar acceso al chat antes de cargar mensajes
+      print('🔍 Verificando acceso al chat: ${widget.chatId}');
+      final chatDoc = await ChatService.getChat(widget.chatId);
+      
+      if (chatDoc == null) {
+        print('❌ Chat no existe: ${widget.chatId}');
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'El chat no existe';
+        });
+        return;
+      }
+      
+      final participants = chatDoc['participants'] as List? ?? [];
+      if (!participants.contains(currentUser.id)) {
+        print('❌ Usuario no es participante del chat');
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'No tienes acceso a este chat';
+        });
+        return;
+      }
+      
+      print('✅ Usuario tiene acceso al chat');
+      
       if (_hasOrderId) {
         await ChatService.ensureChat(
           orderId: widget.orderId,
@@ -111,6 +136,7 @@ class _ChatConversationViewState extends State<ChatConversationView> {
       );
     } catch (e) {
       if (!mounted) return;
+      print('❌ Error en _initialize: $e');
       setState(() {
         _isLoading = false;
         _errorMessage = 'No se pudo cargar la conversación: $e';
@@ -120,10 +146,14 @@ class _ChatConversationViewState extends State<ChatConversationView> {
 
   void _listenToMessages() {
     _messagesSubscription?.cancel();
+    print('🔍 Iniciando listener de mensajes para chat: ${widget.chatId}');
+    print('🔍 Usuario actual: $_currentUserId');
+    
     _messagesSubscription =
         ChatService.streamChatMessages(widget.chatId).listen(
       (messages) {
         if (!mounted) return;
+        print('✅ Mensajes recibidos: ${messages.length}');
         setState(() {
           _messages = messages;
           _isLoading = false;
@@ -139,9 +169,19 @@ class _ChatConversationViewState extends State<ChatConversationView> {
       },
       onError: (error) {
         if (!mounted) return;
+        print('❌ Error en listener de mensajes: $error');
+        print('❌ Tipo de error: ${error.runtimeType}');
+        
+        // Intentar obtener más detalles del error
+        String errorMessage = 'Error cargando mensajes: ${error.toString()}';
+        if (error.toString().contains('permission-denied')) {
+          errorMessage = 'Error de permisos: No tienes acceso a estos mensajes. '
+              'Verifica que eres participante del chat.';
+        }
+        
         setState(() {
           _isLoading = false;
-          _errorMessage = 'Error cargando mensajes: ${error.toString()}';
+          _errorMessage = errorMessage;
         });
       },
     );
@@ -380,8 +420,9 @@ class _ChatConversationViewState extends State<ChatConversationView> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Row(
           children: [
@@ -391,7 +432,7 @@ class _ChatConversationViewState extends State<ChatConversationView> {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF115213).withOpacity(0.1),
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: widget.userImage != null
@@ -401,17 +442,17 @@ class _ChatConversationViewState extends State<ChatConversationView> {
                             widget.userImage!,
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) {
-                              return const Icon(
+                              return Icon(
                                 Icons.person,
-                                color: Color(0xFF115213),
+                                color: Theme.of(context).colorScheme.primary,
                                 size: 20,
                               );
                             },
                           ),
                         )
-                      : const Icon(
+                      : Icon(
                           Icons.person,
-                          color: Color(0xFF115213),
+                          color: Theme.of(context).colorScheme.primary,
                           size: 20,
                         ),
                 ),
@@ -441,17 +482,17 @@ class _ChatConversationViewState extends State<ChatConversationView> {
                 children: [
                   Text(
                     widget.userName,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF1A1A1A),
+                      color: Theme.of(context).textTheme.titleMedium?.color,
                     ),
                   ),
                   Text(
                     _presenceStatusText(),
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey[600],
+                      color: isDark ? Colors.grey[400] : Colors.grey[600],
                     ),
                   ),
                 ],
@@ -459,10 +500,10 @@ class _ChatConversationViewState extends State<ChatConversationView> {
             ),
           ],
         ),
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF1A1A1A)),
+          icon: Icon(Icons.arrow_back, color: Theme.of(context).iconTheme.color),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -470,10 +511,10 @@ class _ChatConversationViewState extends State<ChatConversationView> {
         children: [
           Expanded(
             child: _isLoading
-                ? const Center(
+                ? Center(
                     child: CircularProgressIndicator(
                       valueColor: AlwaysStoppedAnimation<Color>(
-                        Color(0xFF115213),
+                        Theme.of(context).colorScheme.primary,
                       ),
                     ),
                   )
@@ -484,9 +525,9 @@ class _ChatConversationViewState extends State<ChatConversationView> {
                           child: Text(
                             _errorMessage!,
                             textAlign: TextAlign.center,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 16,
-                              color: Colors.black54,
+                              color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
                             ),
                           ),
                         ),
@@ -499,14 +540,14 @@ class _ChatConversationViewState extends State<ChatConversationView> {
                                 Icon(
                                   Icons.chat_bubble_outline,
                                   size: 64,
-                                  color: Colors.grey[400],
+                                  color: isDark ? Colors.grey[600] : Colors.grey[400],
                                 ),
                                 const SizedBox(height: 16),
                                 Text(
                                   'No hay mensajes',
                                   style: TextStyle(
                                     fontSize: 16,
-                                    color: Colors.grey[600],
+                                    color: isDark ? Colors.grey[400] : Colors.grey[600],
                                   ),
                                 ),
                                 const SizedBox(height: 8),
@@ -514,7 +555,7 @@ class _ChatConversationViewState extends State<ChatConversationView> {
                                   'Envía un mensaje para comenzar la conversación',
                                   style: TextStyle(
                                     fontSize: 14,
-                                    color: Colors.grey[500],
+                                    color: isDark ? Colors.grey[500] : Colors.grey[500],
                                   ),
                                   textAlign: TextAlign.center,
                                 ),
@@ -545,7 +586,7 @@ class _ChatConversationViewState extends State<ChatConversationView> {
                                         vertical: 6,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: Colors.grey[300],
+                                        color: isDark ? Colors.grey[800] : Colors.grey[300],
                                         borderRadius:
                                             BorderRadius.circular(12),
                                       ),
@@ -553,7 +594,7 @@ class _ChatConversationViewState extends State<ChatConversationView> {
                                         _formatDate(timestamp),
                                         style: TextStyle(
                                           fontSize: 12,
-                                          color: Colors.grey[700],
+                                          color: isDark ? Colors.grey[400] : Colors.grey[700],
                                           fontWeight: FontWeight.w500,
                                         ),
                                       ),
@@ -569,14 +610,13 @@ class _ChatConversationViewState extends State<ChatConversationView> {
                                           width: 32,
                                           height: 32,
                                           decoration: BoxDecoration(
-                                            color: const Color(0xFF115213)
-                                                .withOpacity(0.1),
+                                            color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
                                             borderRadius:
                                                 BorderRadius.circular(16),
                                           ),
-                                          child: const Icon(
+                                          child: Icon(
                                             Icons.person,
-                                            color: Color(0xFF115213),
+                                            color: Theme.of(context).colorScheme.primary,
                                             size: 18,
                                           ),
                                         ),
@@ -596,8 +636,8 @@ class _ChatConversationViewState extends State<ChatConversationView> {
                                           ),
                                           decoration: BoxDecoration(
                                             color: isMe
-                                                ? const Color(0xFF115213)
-                                                : Colors.white,
+                                                ? Theme.of(context).colorScheme.primary
+                                                : (isDark ? Theme.of(context).cardColor : Colors.white),
                                             borderRadius: BorderRadius.only(
                                               topLeft:
                                                   const Radius.circular(20),
@@ -611,7 +651,7 @@ class _ChatConversationViewState extends State<ChatConversationView> {
                                             boxShadow: [
                                               BoxShadow(
                                                 color: Colors.black
-                                                    .withOpacity(0.1),
+                                                    .withOpacity(isDark ? 0.3 : 0.1),
                                                 blurRadius: 4,
                                                 offset: const Offset(0, 2),
                                               ),
@@ -654,10 +694,10 @@ class _ChatConversationViewState extends State<ChatConversationView> {
                                                       errorBuilder: (context, error, stackTrace) => Container(
                                                         width: 200,
                                                         height: 200,
-                                                        color: Colors.grey[300],
+                                                        color: isDark ? Colors.grey[800] : Colors.grey[300],
                                                         child: Icon(
                                                           Icons.broken_image,
-                                                          color: Colors.grey[600],
+                                                          color: isDark ? Colors.grey[500] : Colors.grey[600],
                                                         ),
                                                       ),
                                                     ),
@@ -669,7 +709,7 @@ class _ChatConversationViewState extends State<ChatConversationView> {
                                                   text,
                                                   style: TextStyle(
                                                     fontSize: 15,
-                                                    color: isMe ? Colors.white : const Color(0xFF1A1A1A),
+                                                    color: isMe ? Colors.white : Theme.of(context).textTheme.bodyLarge?.color,
                                                     height: 1.4,
                                                   ),
                                                 ),
@@ -684,7 +724,7 @@ class _ChatConversationViewState extends State<ChatConversationView> {
                                                       fontSize: 11,
                                                       color: isMe
                                                           ? Colors.white70
-                                                          : Colors.grey[600],
+                                                          : (isDark ? Colors.grey[400] : Colors.grey[600]),
                                                     ),
                                                   ),
                                                   if (isMe) ...[
@@ -717,10 +757,10 @@ class _ChatConversationViewState extends State<ChatConversationView> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: isDark ? Theme.of(context).cardColor : Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
                   blurRadius: 10,
                   offset: const Offset(0, -2),
                 ),
@@ -731,20 +771,20 @@ class _ChatConversationViewState extends State<ChatConversationView> {
                 children: [
                   Container(
                     decoration: BoxDecoration(
-                      color: Colors.grey[100],
+                      color: isDark ? Colors.grey[800] : Colors.grey[100],
                       shape: BoxShape.circle,
                     ),
                     child: IconButton(
                       icon: _isSendingImage
-                          ? const SizedBox(
+                          ? SizedBox(
                               width: 20,
                               height: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF115213)),
+                                valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.primary),
                               ),
                             )
-                          : const Icon(Icons.image_outlined, color: Color(0xFF115213)),
+                          : Icon(Icons.image_outlined, color: Theme.of(context).colorScheme.primary),
                       onPressed: _isSendingImage ? null : _pickAndSendImage,
                     ),
                   ),
@@ -752,14 +792,15 @@ class _ChatConversationViewState extends State<ChatConversationView> {
                   Expanded(
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Colors.grey[100],
+                        color: isDark ? Colors.grey[800] : Colors.grey[100],
                         borderRadius: BorderRadius.circular(24),
                       ),
                       child: TextField(
                         controller: _messageController,
+                        style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color),
                         decoration: InputDecoration(
                           hintText: 'Escribe un mensaje...',
-                          hintStyle: TextStyle(color: Colors.grey[500]),
+                          hintStyle: TextStyle(color: isDark ? Colors.grey[500] : Colors.grey[500]),
                           border: InputBorder.none,
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 20,
@@ -778,8 +819,8 @@ class _ChatConversationViewState extends State<ChatConversationView> {
                   ),
                   const SizedBox(width: 8),
                   Container(
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF115213),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary,
                       shape: BoxShape.circle,
                     ),
                     child: IconButton(

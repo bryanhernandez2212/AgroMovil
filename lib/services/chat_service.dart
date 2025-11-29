@@ -105,17 +105,42 @@ class ChatService {
         );
   }
 
+  /// Obtener un chat por su ID (para verificar acceso)
+  static Future<Map<String, dynamic>?> getChat(String chatId) async {
+    try {
+      final chatDoc = await _chatCollection.doc(chatId).get();
+      if (chatDoc.exists) {
+        return chatDoc.data();
+      }
+      return null;
+    } catch (e) {
+      print('❌ Error obteniendo chat: $e');
+      return null;
+    }
+  }
+
   static Stream<List<ChatMessage>> streamChatMessages(String chatId) {
-    return _chatCollection
+    print('📨 ChatService: Iniciando stream de mensajes para chat: $chatId');
+    
+    final messagesRef = _chatCollection
         .doc(chatId)
         .collection('messages')
-        .orderBy('createdAt', descending: false)
-        .snapshots()
-        .map(
-          (snapshot) => snapshot.docs
-              .map(ChatMessage.fromSnapshot)
-              .toList(growable: false),
-        );
+        .orderBy('createdAt', descending: false);
+    
+    print('📨 ChatService: Query creada, iniciando snapshots...');
+    
+    return messagesRef.snapshots().map(
+      (snapshot) {
+        print('📨 ChatService: Snapshot recibido con ${snapshot.docs.length} documentos');
+        return snapshot.docs
+            .map(ChatMessage.fromSnapshot)
+            .toList(growable: false);
+      },
+    ).handleError((error) {
+      print('❌ ChatService: Error en stream de mensajes: $error');
+      print('❌ ChatService: Tipo de error: ${error.runtimeType}');
+      // El error se propaga automáticamente
+    });
   }
 
   static Future<void> sendMessage({
