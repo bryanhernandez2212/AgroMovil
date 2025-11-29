@@ -115,7 +115,7 @@ class _ProductEstructureViewState extends State<ProductEstructureView> {
                           style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF115213),
+                            color: Color(0xFF2E7D32),
                           ),
                         ),
                         const Spacer(),
@@ -136,7 +136,7 @@ class _ProductEstructureViewState extends State<ProductEstructureView> {
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
-                                  color: Color(0xFF1B4332),
+                                  color: Color(0xFF2E7D32),
                                 ),
                                 overflow: TextOverflow.ellipsis,
                                 maxLines: 1,
@@ -202,12 +202,15 @@ class _ProductEstructureViewState extends State<ProductEstructureView> {
 
   /// Barra de navegación inferior
   Widget _buildCurvedNavigationBar() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final navColor = isDark ? const Color(0xFF1E1E1E) : const Color(0xFF2E7D32);
+    
     return CurvedNavigationBar(
       index: currentIndex,
       height: 75,
       backgroundColor: Colors.transparent,
-      color: const Color(0xFF226602),
-      buttonBackgroundColor: const Color(0xFF226602),
+      color: navColor,
+      buttonBackgroundColor: navColor,
       animationCurve: Curves.easeInOut,
       animationDuration: const Duration(milliseconds: 300),
       items: _buildNavigationItems(),

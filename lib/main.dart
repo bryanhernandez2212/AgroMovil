@@ -14,6 +14,7 @@ import 'package:agromarket/config/stripe_config.dart';
 import 'package:agromarket/services/notification_service.dart';
 import 'package:agromarket/views/profile/chat_conversation_view.dart';
 import 'package:agromarket/views/buyer/my_orders_view.dart';
+import 'package:agromarket/widgets/auth_wrapper.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(
@@ -27,9 +28,7 @@ Future<void> _firebaseMessagingBackgroundHandler(
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Manejar errores de inicialización para evitar que la app se cierre
   try {
-    // Inicializar Firebase con opciones por defecto
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
@@ -37,10 +36,8 @@ void main() async {
     FirebaseMessaging.onBackgroundMessage(
         _firebaseMessagingBackgroundHandler);
     
-    // Inicializar Stripe con la clave pública
     Stripe.publishableKey = StripeConfig.publishableKey;
     
-    // Inicializar AdMob (puede fallar en algunos dispositivos, pero no debe bloquear la app)
     try {
       await AdService.initialize();
     } catch (e) {
@@ -57,8 +54,6 @@ void main() async {
     // Ejecutar la app
     runApp(const AgroMarketApp());
     
-    // Verificar mensajes iniciales después de un pequeño delay
-    // para asegurar que la app esté completamente inicializada
     Future.delayed(const Duration(milliseconds: 500), () {
       NotificationService.checkInitialMessage();
     });
@@ -66,8 +61,6 @@ void main() async {
     debugPrint('❌ Error crítico al inicializar la app: $e');
     debugPrint('Stack trace: $stackTrace');
     
-    // Ejecutar la app de todos modos para que el usuario vea algo
-    // en lugar de solo un crash
     runApp(const AgroMarketApp());
   }
 }
@@ -233,31 +226,33 @@ class AgroMarketApp extends StatelessWidget {
               ),
             ),
             themeMode: themeController.isDarkMode ? ThemeMode.dark : ThemeMode.light,
-        home: const AuthWrapper(), 
-        routes: {
-          '/home': (context) => const ProductEstructureView(), 
-        },
-        onGenerateRoute: (settings) {
-          if (settings.name == '/chat/conversation') {
-            final args =
-                settings.arguments as Map<String, dynamic>?;
-            if (args == null) return null;
-            return MaterialPageRoute(
-              builder: (_) => ChatConversationView(
-                chatId: args['chatId']?.toString() ?? '',
-                otherUserId: args['otherUserId']?.toString() ?? '',
-                userName: args['userName']?.toString() ?? 'Usuario',
-                userImage: args['userImage']?.toString(),
-                orderId: args['orderId']?.toString() ?? '',
-              ),
-            );
-          }
-          if (settings.name == '/orders') {
-            return MaterialPageRoute(
-              builder: (_) => const MyOrdersView(),
-            );
-          }
-          return null;
+            home: const AuthWrapper(),
+            routes: {
+              '/home': (context) => const ProductEstructureView(),
+            },
+            onGenerateRoute: (settings) {
+              if (settings.name == '/chat/conversation') {
+                final args =
+                    settings.arguments as Map<String, dynamic>?;
+                if (args == null) return null;
+                return MaterialPageRoute(
+                  builder: (_) => ChatConversationView(
+                    chatId: args['chatId']?.toString() ?? '',
+                    otherUserId: args['otherUserId']?.toString() ?? '',
+                    userName: args['userName']?.toString() ?? 'Usuario',
+                    userImage: args['userImage']?.toString(),
+                    orderId: args['orderId']?.toString() ?? '',
+                  ),
+                );
+              }
+              if (settings.name == '/orders') {
+                return MaterialPageRoute(
+                  builder: (_) => const MyOrdersView(),
+                );
+              }
+              return null;
+            },
+          );
         },
       ),
     );

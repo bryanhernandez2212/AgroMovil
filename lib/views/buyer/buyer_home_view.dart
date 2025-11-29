@@ -19,31 +19,31 @@ class _BuyerHomeViewState extends State<BuyerHomeView> {
       {
         'label': 'Verduras',
         'icon': Icons.eco_outlined,
-        'color': isDark ? const Color(0xFF1E3A5F) : const Color(0xFFE3F2FD),
+        'color': isDark ? const Color(0xFF1E3A5F) : const Color(0xFFE8F5E9),
         'value': 'verduras',
       },
       {
         'label': 'Frutas',
         'icon': Icons.apple_outlined,
-        'color': isDark ? const Color(0xFF4A2C1A) : const Color(0xFFFFF3E0),
+        'color': isDark ? const Color(0xFF4A2C1A) : const Color(0xFFFFE0B2),
         'value': 'frutas',
       },
       {
         'label': 'Granos',
         'icon': Icons.grain,
-        'color': isDark ? const Color(0xFF2D3E2D) : const Color(0xFFF1F8E9),
+        'color': isDark ? const Color(0xFF2D3E2D) : const Color(0xFFFFF9C4),
         'value': 'granos',
       },
       {
         'label': 'Lácteos',
         'icon': Icons.local_drink_outlined,
-        'color': isDark ? const Color(0xFF2D2D3E) : const Color(0xFFE8EAF6),
+        'color': isDark ? const Color(0xFF2D2D3E) : const Color(0xFFE1F5FE),
         'value': 'lacteos',
       },
       {
         'label': 'Orgánicos',
         'icon': Icons.spa_outlined,
-        'color': isDark ? const Color(0xFF1E3A3A) : const Color(0xFFE0F2F1),
+        'color': isDark ? const Color(0xFF1E3A3A) : const Color(0xFFC8E6C9),
         'value': 'organicos',
       },
     ];
@@ -661,6 +661,23 @@ class _QuickCategoryChip extends StatelessWidget {
     this.onTap,
   });
 
+  Color _getIconColor(String label) {
+    switch (label) {
+      case 'Verduras':
+        return const Color(0xFF4CAF50); // Verde vibrante
+      case 'Frutas':
+        return const Color(0xFFFF7043); // Naranja vibrante
+      case 'Granos':
+        return const Color(0xFFFFA726); // Ámbar vibrante
+      case 'Lácteos':
+        return const Color(0xFF42A5F5); // Azul vibrante
+      case 'Orgánicos':
+        return const Color(0xFF66BB6A); // Verde claro vibrante
+      default:
+        return const Color(0xFFFF7043);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -688,7 +705,7 @@ class _QuickCategoryChip extends StatelessWidget {
                   ),
                 ],
               ),
-              child: Icon(icon, color: const Color(0xFFFF7043), size: 20),
+              child: Icon(icon, color: _getIconColor(label), size: 20),
             ),
             const SizedBox(height: 10),
             Text(
@@ -696,7 +713,7 @@ class _QuickCategoryChip extends StatelessWidget {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: isDark ? Colors.white : const Color(0xFF3F3D56),
+                color: isDark ? Colors.white : const Color(0xFF2E7D32),
               ),
             ),
           ],

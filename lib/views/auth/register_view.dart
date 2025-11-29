@@ -581,8 +581,9 @@ class _RegisterPageState extends State<RegisterPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       resizeToAvoidBottomInset: true,
       body: Stack(
         children: [
@@ -609,7 +610,7 @@ class _RegisterPageState extends State<RegisterPage> {
             right: 0,
             child: CustomPaint(
               size: Size(MediaQuery.of(context).size.width, 100),
-              painter: SmoothWavePainter(),
+              painter: SmoothWavePainter(isDark: isDark),
             ),
           ),
 
@@ -646,17 +647,17 @@ class _RegisterPageState extends State<RegisterPage> {
             right: 0,
             bottom: 0,
             child: Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(
+              decoration: BoxDecoration(
+                color: Theme.of(context).scaffoldBackgroundColor,
+                borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(40),
                   topRight: Radius.circular(40),
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Color(0xFF1B5E20),
+                    color: isDark ? Colors.black.withOpacity(0.5) : const Color(0xFF1B5E20).withOpacity(0.3),
                     blurRadius: 20,
-                    offset: Offset(0, -5),
+                    offset: const Offset(0, -5),
                   ),
                 ],
               ),
@@ -669,13 +670,13 @@ class _RegisterPageState extends State<RegisterPage> {
                     // Título
                     Row(
                       children: [
-                        const Expanded(
+                        Expanded(
                           child: Text(
                             'Crear cuenta',
                             style: TextStyle(
                               fontSize: 32,
                               fontWeight: FontWeight.w700,
-                              color: Color(0xFF1B5E20),
+                              color: isDark ? Colors.white : const Color(0xFF2E7D32),
                               letterSpacing: -0.5,
                             ),
                           ),
@@ -694,11 +695,11 @@ class _RegisterPageState extends State<RegisterPage> {
                     
                     const SizedBox(height: 8),
                     
-                    const Text(
+                    Text(
                       'Regístrate para comenzar',
                       style: TextStyle(
                         fontSize: 18,
-                        color: Color(0xFF757575),
+                        color: isDark ? Colors.grey[400] : const Color(0xFF757575),
                         fontWeight: FontWeight.w400,
                       ),
                     ),
@@ -912,19 +913,21 @@ class _RegisterPageState extends State<RegisterPage> {
     required IconData icon,
     TextInputType? keyboardType,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: Colors.grey[100],
+        color: isDark ? Colors.grey[800] : Colors.grey[100],
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.grey[300]!),
+        border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[300]!),
       ),
       child: TextField(
         controller: controller,
         keyboardType: keyboardType,
+        style: TextStyle(color: isDark ? Colors.white : Colors.black),
         decoration: InputDecoration(
           hintText: hintText,
-          hintStyle: TextStyle(color: Colors.grey[500]),
-          prefixIcon: Icon(icon, color: Colors.grey[600]),
+          hintStyle: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[500]),
+          prefixIcon: Icon(icon, color: isDark ? Colors.grey[400] : Colors.grey[600]),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
         ),
@@ -939,24 +942,26 @@ class _RegisterPageState extends State<RegisterPage> {
     required bool obscureText,
     required VoidCallback onToggle,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: Colors.grey[100],
+        color: isDark ? Colors.grey[800] : Colors.grey[100],
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.grey[300]!),
+        border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[300]!),
       ),
       child: TextField(
         controller: controller,
         obscureText: obscureText,
+        style: TextStyle(color: isDark ? Colors.white : Colors.black),
         decoration: InputDecoration(
           hintText: hintText,
-          hintStyle: TextStyle(color: Colors.grey[500]),
-          prefixIcon: Icon(icon, color: Colors.grey[600]),
+          hintStyle: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[500]),
+          prefixIcon: Icon(icon, color: isDark ? Colors.grey[400] : Colors.grey[600]),
           suffixIcon: GestureDetector(
             onTap: onToggle,
             child: Icon(
               obscureText ? Icons.visibility_off : Icons.visibility,
-              color: Colors.grey[600],
+              color: isDark ? Colors.grey[400] : Colors.grey[600],
             ),
           ),
           border: InputBorder.none,
@@ -967,18 +972,19 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Widget _buildRoleSelector() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: Colors.grey[100],
+        color: isDark ? Colors.grey[800] : Colors.grey[100],
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.grey[300]!),
+        border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[300]!),
       ),
       child: DropdownButtonFormField<String>(
         value: _selectedRole,
         decoration: InputDecoration(
           hintText: 'Selecciona tu rol',
-          hintStyle: TextStyle(color: Colors.grey[500]),
-          prefixIcon: Icon(Icons.person_outline, color: Colors.grey[600]),
+          hintStyle: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[500]),
+          prefixIcon: Icon(Icons.person_outline, color: isDark ? Colors.grey[400] : Colors.grey[600]),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
         ),
@@ -987,9 +993,9 @@ class _RegisterPageState extends State<RegisterPage> {
             value: role,
             child: Text(
               _getRoleDisplayName(role),
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 16,
-                color: Color(0xFF333333),
+                color: isDark ? Colors.white : const Color(0xFF333333),
               ),
             ),
           );
@@ -1007,31 +1013,33 @@ class _RegisterPageState extends State<RegisterPage> {
             });
           }
         },
-        dropdownColor: Colors.white,
-        style: const TextStyle(
+        dropdownColor: isDark ? Colors.grey[800] : Colors.white,
+        style: TextStyle(
           fontSize: 16,
-          color: Color(0xFF333333),
+          color: isDark ? Colors.white : const Color(0xFF333333),
         ),
       ),
     );
   }
 
   Widget _buildLocationField() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
           decoration: BoxDecoration(
-            color: Colors.grey[100],
+            color: isDark ? Colors.grey[800] : Colors.grey[100],
             borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: Colors.grey[300]!),
+            border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[300]!),
           ),
           child: TextField(
             controller: _ubicacionController,
+            style: TextStyle(color: isDark ? Colors.white : Colors.black),
             decoration: InputDecoration(
               hintText: 'Ubicación (empieza a escribir...)',
-              hintStyle: TextStyle(color: Colors.grey[500]),
-              prefixIcon: Icon(Icons.location_on, color: Colors.grey[600]),
+              hintStyle: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[500]),
+              prefixIcon: Icon(Icons.location_on, color: isDark ? Colors.grey[400] : Colors.grey[600]),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
             ),
@@ -1049,12 +1057,12 @@ class _RegisterPageState extends State<RegisterPage> {
           Container(
             margin: const EdgeInsets.only(top: 5),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: isDark ? Colors.grey[800] : Colors.white,
               borderRadius: BorderRadius.circular(15),
-              border: Border.all(color: Colors.grey[300]!),
+              border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[300]!),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withOpacity(isDark ? 0.3 : 0.1),
                   blurRadius: 10,
                   offset: const Offset(0, 2),
                 ),
@@ -1067,10 +1075,10 @@ class _RegisterPageState extends State<RegisterPage> {
               itemBuilder: (context, index) {
                 final prediction = _placePredictions[index];
                 return ListTile(
-                  leading: const Icon(Icons.location_on, color: Color(0xFF115213)),
+                  leading: const Icon(Icons.location_on, color: Color(0xFF2E7D32)),
                   title: Text(
                     prediction.description,
-                    style: const TextStyle(fontSize: 14),
+                    style: TextStyle(fontSize: 14, color: isDark ? Colors.white : Colors.black),
                   ),
                   onTap: () {
                     _selectPlace(prediction);
@@ -1185,10 +1193,14 @@ class _RegisterPageState extends State<RegisterPage> {
 }
 
 class SmoothWavePainter extends CustomPainter {
+  final bool isDark;
+  
+  SmoothWavePainter({this.isDark = false});
+  
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.white
+      ..color = isDark ? const Color(0xFF1E1E1E) : Colors.white
       ..style = PaintingStyle.fill;
 
     final path = Path();

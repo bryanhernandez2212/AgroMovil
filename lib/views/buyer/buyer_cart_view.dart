@@ -72,16 +72,7 @@ class _BuyerCartViewState extends State<BuyerCartView> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+      color: Theme.of(context).scaffoldBackgroundColor,
       child: Row(
         children: [
           const Text(
@@ -89,7 +80,7 @@ class _BuyerCartViewState extends State<BuyerCartView> {
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF115213),
+              color: Color(0xFF2E7D32),
             ),
           ),
           const Spacer(),
@@ -100,7 +91,8 @@ class _BuyerCartViewState extends State<BuyerCartView> {
                 '$totalItemCount producto${totalItemCount != 1 ? 's' : ''}',
                 style: TextStyle(
                   fontSize: 14,
-                  color: isDark ? Colors.grey[400] : const Color(0xFF666666),
+                  fontWeight: FontWeight.w500,
+                  color: isDark ? Colors.grey[400] : const Color(0xFF2E7D32),
                 ),
               );
             },

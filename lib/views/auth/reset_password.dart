@@ -115,8 +115,9 @@ class _ResetPasswordState extends State<ResetPassword> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       resizeToAvoidBottomInset: true,
       body: Stack(
         children: [
@@ -141,7 +142,7 @@ class _ResetPasswordState extends State<ResetPassword> {
             right: 0,
             child: CustomPaint(
               size: Size(MediaQuery.of(context).size.width, 100),
-              painter: SmoothWavePainter(),
+              painter: SmoothWavePainter(isDark: isDark),
             ),
           ),
 
@@ -177,17 +178,17 @@ class _ResetPasswordState extends State<ResetPassword> {
             right: 0,
             bottom: 0,
             child: Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(
+              decoration: BoxDecoration(
+                color: Theme.of(context).scaffoldBackgroundColor,
+                borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(40),
                   topRight: Radius.circular(40),
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black12,
+                    color: isDark ? Colors.black.withOpacity(0.5) : Colors.black12,
                     blurRadius: 20,
-                    offset: Offset(0, -5),
+                    offset: const Offset(0, -5),
                   ),
                 ],
               ),
@@ -200,13 +201,13 @@ class _ResetPasswordState extends State<ResetPassword> {
                     children: [
                     Row(
                       children: [
-                        const Expanded(
+                        Expanded(
                           child: Text(
                             'Recuperar contraseña',
                             style: TextStyle(
                               fontSize: 36,
                               fontWeight: FontWeight.w700,
-                              color: Color(0xFF1B5E20),
+                              color: isDark ? Colors.white : const Color(0xFF2E7D32),
                               letterSpacing: -0.5,
                             ),
                           ),
@@ -225,11 +226,11 @@ class _ResetPasswordState extends State<ResetPassword> {
 
                     const SizedBox(height: 8),
 
-                    const Text(
+                    Text(
                       'Recupera tu cuenta mediante correo electrónico',
                       style: TextStyle(
                         fontSize: 18,
-                        color: Color(0xFF757575),
+                        color: isDark ? Colors.grey[400] : const Color(0xFF757575),
                         fontWeight: FontWeight.w400,
                       ),
                     ),
@@ -318,15 +319,17 @@ class _ResetPasswordState extends State<ResetPassword> {
   }
 
   Widget _buildEmailField() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: Colors.grey[100],
+        color: isDark ? Colors.grey[800] : Colors.grey[100],
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.grey[300]!),
+        border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[300]!),
       ),
       child: TextFormField(
         controller: _emailController,
         keyboardType: TextInputType.emailAddress,
+        style: TextStyle(color: isDark ? Colors.white : Colors.black),
         validator: (value) {
           if (value == null || value.isEmpty) {
             return 'Por favor ingresa tu email';
@@ -338,8 +341,8 @@ class _ResetPasswordState extends State<ResetPassword> {
         },
         decoration: InputDecoration(
           hintText: 'Correo electrónico',
-          hintStyle: TextStyle(color: Colors.grey[500]),
-          prefixIcon: Icon(Icons.email, color: Colors.grey[600]),
+          hintStyle: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[500]),
+          prefixIcon: Icon(Icons.email, color: isDark ? Colors.grey[400] : Colors.grey[600]),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 20,
@@ -353,10 +356,14 @@ class _ResetPasswordState extends State<ResetPassword> {
 }
 
 class SmoothWavePainter extends CustomPainter {
+  final bool isDark;
+  
+  SmoothWavePainter({this.isDark = false});
+  
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.white
+      ..color = isDark ? const Color(0xFF1E1E1E) : Colors.white
       ..style = PaintingStyle.fill;
 
     final path = Path();
