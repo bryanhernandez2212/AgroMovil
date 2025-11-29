@@ -1,9 +1,9 @@
+import 'dart:async';
+import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:agromarket/services/email_service.dart';
-import 'package:agromarket/services/api_service.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert';
 
 class FirebaseService {
   static final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -246,90 +246,65 @@ class FirebaseService {
     }
   }
 
-  /// Enviar email de recuperación de contraseña usando nuestro servicio personalizado
+  /// Enviar código de 6 dígitos para recuperación de contraseña usando Cloud Functions
   static Future<Map<String, dynamic>> sendPasswordResetEmail(String email) async {
     try {
-      print('📧 Enviando email de recuperación personalizado a: $email');
+      print('📧 Enviando código de recuperación a: $email usando Cloud Functions');
       
-      // Verificar que el usuario existe y obtener su nombre desde Firestore
-      String? userName;
-      try {
-        final userQuery = await _firestore
-            .collection('usuarios')
-            .where('email', isEqualTo: email)
-            .limit(1)
-            .get();
+      final projectId = _auth.app.options.projectId;
+      final region = 'us-central1';
+      final functionUrl = 'https://$region-$projectId.cloudfunctions.net/sendPasswordResetCode';
+      
+      final response = await http.post(
+        Uri.parse(functionUrl),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'data': {
+            'email': email,
+          },
+        }),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw TimeoutException('Cloud Function timeout');
+        },
+      );
+      
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        final data = (responseData['result'] ?? responseData) as Map<String, dynamic>;
         
-        if (userQuery.docs.isNotEmpty) {
-          final userData = userQuery.docs.first.data();
-          userName = userData['nombre'] as String?;
-          print('✅ Usuario encontrado en Firestore');
+        if (data['success'] == true) {
+          print('✅ Código de recuperación enviado exitosamente');
+          return {
+            'success': true,
+            'message': data['message'] ?? 'Se ha enviado un código de recuperación a $email',
+          };
+        } else {
+          print('❌ Error en Cloud Function: ${data['message']}');
+          return {
+            'success': false,
+            'message': data['message'] ?? 'Error enviando código de recuperación',
+          };
         }
-      } catch (e) {
-        print('⚠️ Error verificando usuario en Firestore: $e');
-        // Continuar intentando enviar el correo
-      }
-      
-      // Generar enlace de recuperación usando Firebase
-      // Usamos ActionCodeSettings para manejar el enlace en la app
-      final actionCodeSettings = ActionCodeSettings(
-        url: 'https://agromarket.com/reset-password',
-        handleCodeInApp: true,
-        androidPackageName: 'com.example.agromarket',
-        iOSBundleId: 'com.example.agromarket',
-      );
-      
-      // Usar nuestro servicio personalizado para enviar correo con código de 6 dígitos
-      print('📧 Enviando correo personalizado con código de 6 dígitos...');
-      final emailResult = await EmailService.sendPasswordResetEmail(
-        email: email,
-        userName: userName,
-      );
-      
-      if (emailResult['success']) {
-        print('✅ Email personalizado con código enviado exitosamente');
-        return {
-          'success': true,
-          'message': 'Se ha enviado un código de recuperación a $email',
-        };
       } else {
-        // Si falla nuestro servicio, usar Firebase como respaldo SOLO EN ESTE CASO
-        print('⚠️ Falló nuestro servicio de email, usando Firebase como respaldo');
-        await _auth.sendPasswordResetEmail(
-          email: email,
-          actionCodeSettings: actionCodeSettings,
-        );
+        print('❌ Error del servidor: ${response.statusCode}');
+        print('📄 Respuesta: ${response.body}');
         return {
-          'success': true,
-          'message': 'Se ha enviado un email de recuperación a $email',
+          'success': false,
+          'message': 'Error enviando código: ${response.statusCode}',
         };
       }
-    } on FirebaseAuthException catch (e) {
-      String message;
-      switch (e.code) {
-        case 'user-not-found':
-          message = 'No existe una cuenta con este email';
-          break;
-        case 'invalid-email':
-          message = 'El email no es válido';
-          break;
-        case 'too-many-requests':
-          message = 'Demasiados intentos. Intenta más tarde';
-          break;
-        case 'network-request-failed':
-          message = 'Error de conexión. Verifica tu internet';
-          break;
-        default:
-          message = 'Error al enviar el email. Inténtalo de nuevo';
-      }
-      
-      print('❌ Error enviando email de recuperación: $message');
+    } on TimeoutException catch (e) {
+      print('❌ Timeout enviando código: ${e.message}');
       return {
         'success': false,
-        'message': message,
+        'message': 'Tiempo de espera agotado. Intenta de nuevo.',
       };
     } catch (e) {
-      print('❌ Error inesperado enviando email: $e');
+      print('❌ Error inesperado enviando código: $e');
       return {
         'success': false,
         'message': 'Error inesperado: ${e.toString()}',
@@ -337,8 +312,72 @@ class FirebaseService {
     }
   }
 
-  /// Cambiar contraseña después de verificar código de recuperación
-  /// Usa el backend para cambiar la contraseña directamente
+  /// Verificar código de recuperación usando Cloud Functions
+  static Future<Map<String, dynamic>> verifyResetCode({
+    required String email,
+    required String code,
+    String? sessionToken, // Ya no es requerido, se genera en la función
+  }) async {
+    try {
+      print('🔐 Verificando código de recuperación usando Cloud Functions...');
+      
+      final projectId = _auth.app.options.projectId;
+      final region = 'us-central1';
+      final functionUrl = 'https://$region-$projectId.cloudfunctions.net/verifyPasswordResetCode';
+      
+      final response = await http.post(
+        Uri.parse(functionUrl),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'data': {
+            'email': email,
+            'code': code,
+          }
+        }),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw TimeoutException('Cloud Function timeout');
+        },
+      );
+      
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        final data = (responseData['result'] ?? responseData) as Map<String, dynamic>;
+        
+        if (data['success'] == true) {
+          print('✅ Código verificado exitosamente');
+          return {
+            'success': true,
+            'message': data['message'] ?? 'Código verificado correctamente',
+            'session_token': data['sessionToken'],
+          };
+        } else {
+          return {
+            'success': false,
+            'message': data['message'] ?? 'Código incorrecto',
+          };
+        }
+      } else {
+        print('❌ Error del servidor: ${response.statusCode}');
+        print('📄 Respuesta: ${response.body}');
+        return {
+          'success': false,
+          'message': 'Error verificando código: ${response.statusCode}',
+        };
+      }
+    } catch (e) {
+      print('❌ Error verificando código: $e');
+      return {
+        'success': false,
+        'message': 'Error verificando código: ${e.toString()}',
+      };
+    }
+  }
+
+  /// Cambiar contraseña después de verificar código de recuperación usando Cloud Functions
   static Future<Map<String, dynamic>> resetPasswordWithCode({
     required String email,
     required String sessionToken,
@@ -346,119 +385,152 @@ class FirebaseService {
   }) async {
     try {
       print('🔄 Cambiando contraseña con código verificado para: $email');
-      print('🔑 Session Token: ${sessionToken.substring(0, 20)}...');
-      print('🔒 Nueva contraseña: ${"*" * newPassword.length} (${newPassword.length} caracteres)');
-
-      final requestBody = {
-        'email': email,
-        'session_token': sessionToken,
-        'new_password': newPassword,
-      };
       
-      print('📤 Enviando solicitud a: ${ApiService.baseUrl}/reset-password-with-code');
-      print('📦 Body: ${jsonEncode({
-        'email': email,
-        'session_token': sessionToken.substring(0, 20) + '...',
-        'new_password': '*' * newPassword.length,
-      })}');
-
-      // Enviar solicitud al backend para cambiar la contraseña
+      final projectId = _auth.app.options.projectId;
+      final region = 'us-central1';
+      final functionUrl = 'https://$region-$projectId.cloudfunctions.net/resetPasswordWithVerifiedCode';
+      
       final response = await http.post(
-        Uri.parse('${ApiService.baseUrl}/reset-password-with-code'),
+        Uri.parse(functionUrl),
         headers: {
           'Content-Type': 'application/json',
         },
-        body: jsonEncode(requestBody),
+        body: jsonEncode({
+          'data': {
+            'email': email,
+            'sessionToken': sessionToken,
+            'newPassword': newPassword,
+          },
+        }),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw TimeoutException('Cloud Function timeout');
+        },
       );
-
+      
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final responseData = jsonDecode(response.body);
+        final data = (responseData['result'] ?? responseData) as Map<String, dynamic>;
         
-        // Si el backend dice que debemos usar Firebase directamente
-        if (data['use_firebase'] == true) {
-          print('🔄 Usando Firebase directamente para cambiar contraseña');
-          
-          // Generar enlace de recuperación de Firebase
-          final actionCodeSettings = ActionCodeSettings(
-            url: 'https://agromarket.com/reset-password',
-            handleCodeInApp: false,
-          );
-
-          try {
-            // Enviar email de reset - esto generará un enlace que el usuario puede usar
-            await _auth.sendPasswordResetEmail(
-              email: email,
-              actionCodeSettings: actionCodeSettings,
-            );
-
-            print('✅ Email de cambio de contraseña enviado desde Firebase');
-            
-            return {
-              'success': true,
-              'message': 'Se ha enviado un enlace a tu correo para cambiar la contraseña. Por favor, revisa tu bandeja de entrada.',
-              'requires_email_link': true,
-            };
-          } catch (e) {
-            print('⚠️ Error generando enlace de Firebase: $e');
-            return {
-              'success': false,
-              'message': 'Error generando enlace de recuperación. Por favor, intenta de nuevo.',
-            };
-          }
+        if (data['success'] == true) {
+          print('✅ Contraseña cambiada exitosamente');
+          return {
+            'success': true,
+            'message': data['message'] ?? 'Contraseña cambiada exitosamente',
+          };
+        } else {
+          print('❌ Error en Cloud Function: ${data['message']}');
+          return {
+            'success': false,
+            'message': data['message'] ?? 'Error cambiando contraseña',
+          };
         }
-        
-        print('✅ Contraseña cambiada exitosamente por el backend');
-        
-        // Enviar notificación por correo
-        try {
-          final userDoc = await _firestore
-              .collection('usuarios')
-              .where('email', isEqualTo: email)
-              .limit(1)
-              .get();
-          
-          String? userName;
-          if (userDoc.docs.isNotEmpty) {
-            final userData = userDoc.docs.first.data();
-            userName = userData['nombre'] as String?;
-          }
-          
-          await _sendPasswordChangedNotification(
-            email: email,
-            userName: userName,
-          );
-        } catch (e) {
-          print('⚠️ Advertencia: No se pudo enviar notificación: $e');
-        }
-        
-        return {
-          'success': true,
-          'message': data['message'] ?? 'Contraseña cambiada exitosamente',
-        };
       } else {
         print('❌ Error del servidor: ${response.statusCode}');
-        print('📄 Respuesta del servidor: ${response.body}');
-        try {
-          final errorData = jsonDecode(response.body);
-          final errorMessage = errorData['message'] ?? 'Error cambiando contraseña';
-          print('💬 Mensaje de error: $errorMessage');
-          return {
-            'success': false,
-            'message': errorMessage,
-          };
-        } catch (e) {
-          print('⚠️ Error parseando respuesta: $e');
-          return {
-            'success': false,
-            'message': 'Error del servidor: ${response.statusCode}. ${response.body}',
-          };
-        }
+        print('📄 Respuesta: ${response.body}');
+        return {
+          'success': false,
+          'message': 'Error cambiando contraseña: ${response.statusCode}',
+        };
       }
-    } catch (e) {
-      print('❌ Error inesperado: $e');
+    } on TimeoutException catch (e) {
+      print('❌ Timeout cambiando contraseña: ${e.message}');
       return {
         'success': false,
-        'message': 'Error de conexión: ${e.toString()}',
+        'message': 'Tiempo de espera agotado. Intenta de nuevo.',
+      };
+    } catch (e) {
+      print('❌ Error inesperado cambiando contraseña: $e');
+      return {
+        'success': false,
+        'message': 'Error inesperado: ${e.toString()}',
+      };
+    }
+  }
+
+  /// Enviar comprobante de compra por email usando Cloud Functions
+  static Future<Map<String, dynamic>> sendReceiptEmail({
+    required String email,
+    required String orderId,
+    required double total,
+    required List<Map<String, dynamic>> productos,
+    String? userName,
+    double? subtotal,
+    double? envio,
+    double? impuestos,
+    String? ciudad,
+    String? telefono,
+    String? direccionEntrega,
+    String? metodoPago,
+    DateTime? fechaCompra,
+  }) async {
+    try {
+      print('📧 Enviando comprobante de compra a: $email usando Cloud Functions');
+      
+      // Obtener el projectId de Firebase
+      final projectId = _auth.app.options.projectId;
+      final region = 'us-central1';
+      final functionUrl = 'https://$region-$projectId.cloudfunctions.net/sendReceiptEmail';
+      
+      final response = await http.post(
+        Uri.parse(functionUrl),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'data': {
+            'orderId': orderId,
+            'userEmail': email,
+            'total': total,
+            'productos': productos,
+            if (userName != null) 'userName': userName,
+            if (subtotal != null) 'subtotal': subtotal,
+            if (envio != null) 'envio': envio,
+            if (impuestos != null) 'impuestos': impuestos,
+            if (ciudad != null) 'ciudad': ciudad,
+            if (telefono != null) 'telefono': telefono,
+            if (direccionEntrega != null) 'direccionEntrega': direccionEntrega,
+            if (metodoPago != null) 'metodoPago': metodoPago,
+            if (fechaCompra != null) 'fechaCompra': fechaCompra.toIso8601String(),
+          }
+        }),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw TimeoutException('Cloud Function timeout');
+        },
+      );
+      
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        final data = (responseData['result'] ?? responseData) as Map<String, dynamic>;
+        
+        if (data['success'] == true) {
+          print('✅ Comprobante enviado exitosamente');
+          return {
+            'success': true,
+            'message': data['message'] ?? 'Comprobante enviado exitosamente',
+          };
+        } else {
+          return {
+            'success': false,
+            'message': data['message'] ?? 'Error al enviar el comprobante',
+          };
+        }
+      } else {
+        print('❌ Error del servidor: ${response.statusCode}');
+        print('📄 Respuesta: ${response.body}');
+        return {
+          'success': false,
+          'message': 'Error al enviar el comprobante. Por favor, intenta más tarde.',
+        };
+      }
+    } catch (e) {
+      print('❌ Error enviando comprobante: $e');
+      return {
+        'success': false,
+        'message': 'Error de conexión al enviar el comprobante. Por favor, intenta más tarde.',
       };
     }
   }

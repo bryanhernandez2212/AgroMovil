@@ -1,87 +1,216 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:agromarket/services/api_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class EmailService {
-  static String get backendUrl => ApiService.baseUrl;
+  // Usar Firebase Functions en lugar de Railway
+  static String get _projectId {
+    try {
+      return FirebaseAuth.instance.app.options.projectId;
+    } catch (e) {
+      return 'agromarket-625b2';
+    }
+  }
+  static String get _region => 'us-central1';
+  static String _getFunctionUrl(String functionName) => 
+      'https://$_region-$_projectId.cloudfunctions.net/$functionName';
 
-  /// Enviar correo de recuperación de contraseña con código de 6 dígitos
+  /// Parsea y mejora mensajes de error comunes de SMTP
+  static String _parseSmtpError(String? errorMessage, int? statusCode) {
+    if (errorMessage == null) {
+      return 'Error desconocido al enviar correo';
+    }
+
+    final errorLower = errorMessage.toLowerCase();
+    
+    // Errores del servidor (502, 503, 504, etc.)
+    if (statusCode == 502 || errorLower.contains('application failed to respond') || 
+        errorLower.contains('bad gateway')) {
+      return 'El servidor no está respondiendo. El servicio de correo puede estar temporalmente no disponible. Por favor, intenta más tarde o contacta al soporte.';
+    }
+    
+    if (statusCode == 503 || errorLower.contains('service unavailable')) {
+      return 'El servicio de correo no está disponible temporalmente. Intenta más tarde.';
+    }
+    
+    if (statusCode == 504 || errorLower.contains('gateway timeout')) {
+      return 'El servidor tardó demasiado en responder. Intenta nuevamente.';
+    }
+    
+    if (statusCode == 500 || errorLower.contains('internal server error')) {
+      return 'Error interno del servidor. El problema ha sido reportado. Intenta más tarde.';
+    }
+    
+    // Errores comunes de Google SMTP
+    if (errorLower.contains('authentication failed') || 
+        errorLower.contains('invalid login') ||
+        errorLower.contains('535')) {
+      return 'Error de autenticación con Google SMTP. Verifica las credenciales del servidor.';
+    }
+    
+    if (errorLower.contains('connection refused') || 
+        errorLower.contains('connection timeout') ||
+        errorLower.contains('econnrefused')) {
+      return 'No se pudo conectar al servidor SMTP de Google. Verifica la configuración de red.';
+    }
+    
+    if (errorLower.contains('rate limit') || 
+        errorLower.contains('quota exceeded') ||
+        errorLower.contains('550')) {
+      return 'Límite de envío de correos excedido. Intenta más tarde.';
+    }
+    
+    if (errorLower.contains('invalid recipient') || 
+        errorLower.contains('550-5.1.1')) {
+      return 'Dirección de correo inválida. Verifica el email del destinatario.';
+    }
+    
+    if (errorLower.contains('tls') || 
+        errorLower.contains('ssl') ||
+        errorLower.contains('certificate')) {
+      return 'Error de seguridad SSL/TLS. Verifica la configuración del servidor SMTP.';
+    }
+    
+    if (errorLower.contains('timeout')) {
+      return 'Tiempo de espera agotado. El servidor SMTP no respondió a tiempo.';
+    }
+    
+    // Si no coincide con ningún patrón conocido, devolver el mensaje original
+    return errorMessage;
+  }
+
+  /// Enviar correo de recuperación de contraseña con código de 6 dígitos usando Firebase Functions
   static Future<Map<String, dynamic>> sendPasswordResetEmail({
     required String email,
     String? userName,
   }) async {
     try {
-      print('📧 Enviando correo de recuperación a $email');
+      print('📧 Enviando correo de recuperación a $email usando Firebase Functions');
+      
+      final functionUrl = _getFunctionUrl('sendPasswordResetCode');
       
       final response = await http.post(
-        Uri.parse('$backendUrl/send-password-reset'),
+        Uri.parse(functionUrl),
         headers: {
           'Content-Type': 'application/json',
         },
         body: jsonEncode({
-          'email': email,
-          if (userName != null) 'user_name': userName,
+          'data': {
+            'email': email,
+            if (userName != null) 'userName': userName,
+          },
         }),
+      ).timeout(
+        const Duration(seconds: 60),
+        onTimeout: () {
+          throw TimeoutException('Firebase Function está tardando demasiado en responder. Por favor, intenta más tarde.');
+        },
       );
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        print('✅ Correo de recuperación enviado exitosamente');
-        return {
-          'success': true,
-          'message': data['message'] ?? 'Correo enviado exitosamente',
-        };
-      } else {
-        print('❌ Error del servidor: ${response.statusCode}');
-        try {
-          final errorData = jsonDecode(response.body);
+        final responseData = jsonDecode(response.body);
+        final data = (responseData['result'] ?? responseData) as Map<String, dynamic>;
+        
+        if (data['success'] == true) {
+          print('✅ Correo de recuperación enviado exitosamente');
+          return {
+            'success': true,
+            'message': data['message'] ?? 'Correo enviado exitosamente',
+          };
+        } else {
+          final rawMessage = data['message'] ?? 'Error enviando correo';
+          final parsedMessage = _parseSmtpError(rawMessage, response.statusCode);
           return {
             'success': false,
-            'message': errorData['message'] ?? 'Error enviando correo',
+            'message': parsedMessage,
+            'raw_error': rawMessage,
+            'status_code': response.statusCode,
+          };
+        }
+      } else {
+        print('❌ Error del servidor: ${response.statusCode}');
+        print('📄 Respuesta del servidor: ${response.body}');
+        try {
+          final errorData = jsonDecode(response.body);
+          final rawMessage = errorData['message'] ?? errorData['error'] ?? 'Error enviando correo';
+          final parsedMessage = _parseSmtpError(rawMessage, response.statusCode);
+          return {
+            'success': false,
+            'message': parsedMessage,
+            'raw_error': rawMessage,
+            'status_code': response.statusCode,
           };
         } catch (e) {
           return {
             'success': false,
-            'message': 'Error del servidor: ${response.statusCode}',
+            'message': _parseSmtpError('Error del servidor: ${response.statusCode}', response.statusCode),
+            'status_code': response.statusCode,
           };
         }
       }
+    } on TimeoutException catch (e) {
+      print('❌ Timeout enviando correo: ${e.message}');
+      return {
+        'success': false,
+        'message': 'Tiempo de espera agotado. Intenta más tarde.',
+        'raw_error': e.toString(),
+      };
     } catch (e) {
       print('❌ Error enviando correo de recuperación: $e');
       return {
         'success': false,
-        'message': 'Error de conexión: ${e.toString()}',
+        'message': _parseSmtpError('Error de conexión: ${e.toString()}', null),
+        'raw_error': e.toString(),
       };
     }
   }
 
-  /// Verificar código de recuperación de contraseña
+  /// Verificar código de recuperación de contraseña usando Firebase Functions
   static Future<Map<String, dynamic>> verifyResetCode({
     required String email,
     required String code,
   }) async {
     try {
-      print('🔐 Verificando código de recuperación...');
+      print('🔐 Verificando código de recuperación usando Firebase Functions...');
+      
+      final functionUrl = _getFunctionUrl('verifyPasswordResetCode');
       
       final response = await http.post(
-        Uri.parse('$backendUrl/verify-reset-code'),
+        Uri.parse(functionUrl),
         headers: {
           'Content-Type': 'application/json',
         },
         body: jsonEncode({
-          'email': email,
-          'code': code,
+          'data': {
+            'email': email,
+            'code': code,
+          },
         }),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw TimeoutException('Firebase Function está tardando demasiado en responder.');
+        },
       );
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        print('✅ Código verificado exitosamente');
-        return {
-          'success': true,
-          'message': data['message'] ?? 'Código verificado',
-          'session_token': data['session_token'],
-        };
+        final responseData = jsonDecode(response.body);
+        final data = (responseData['result'] ?? responseData) as Map<String, dynamic>;
+        
+        if (data['success'] == true) {
+          print('✅ Código verificado exitosamente');
+          return {
+            'success': true,
+            'message': data['message'] ?? 'Código verificado',
+            'session_token': data['sessionToken'] ?? data['session_token'],
+          };
+        } else {
+          return {
+            'success': false,
+            'message': data['message'] ?? 'Error verificando código',
+          };
+        }
       } else {
         print('❌ Error del servidor: ${response.statusCode}');
         try {
@@ -97,6 +226,12 @@ class EmailService {
           };
         }
       }
+    } on TimeoutException catch (e) {
+      print('❌ Timeout verificando código: ${e.message}');
+      return {
+        'success': false,
+        'message': 'Tiempo de espera agotado. Intenta más tarde.',
+      };
     } catch (e) {
       print('❌ Error verificando código: $e');
       return {
@@ -106,54 +241,22 @@ class EmailService {
     }
   }
 
-  /// Enviar notificación de cambio de contraseña
+  /// Enviar notificación de cambio de contraseña usando Firebase Functions
+  /// NOTA: Esta función aún no está implementada en Firebase Functions
+  /// Por ahora retorna éxito sin enviar el correo, o puedes implementarla en functions/index.js
   static Future<Map<String, dynamic>> sendPasswordChangedEmail({
     required String email,
     String? userName,
   }) async {
-    try {
-      print('📧 Enviando notificación de cambio de contraseña a $email');
-      
-      final response = await http.post(
-        Uri.parse('$backendUrl/send-password-changed'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'email': email,
-          if (userName != null) 'user_name': userName,
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        print('✅ Notificación enviada exitosamente');
-        return {
-          'success': true,
-          'message': data['message'] ?? 'Notificación enviada exitosamente',
-        };
-      } else {
-        print('❌ Error del servidor: ${response.statusCode}');
-        try {
-          final errorData = jsonDecode(response.body);
-          return {
-            'success': false,
-            'message': errorData['message'] ?? 'Error enviando notificación',
-          };
-        } catch (e) {
-          return {
-            'success': false,
-            'message': 'Error del servidor: ${response.statusCode}',
-          };
-        }
-      }
-    } catch (e) {
-      print('❌ Error enviando notificación: $e');
-      return {
-        'success': false,
-        'message': 'Error de conexión: ${e.toString()}',
-      };
-    }
+    print('📧 Notificación de cambio de contraseña para $email');
+    print('⚠️ Función sendPasswordChangedEmail no implementada aún en Firebase Functions');
+    
+    // Por ahora, solo retornamos éxito ya que no es crítico
+    // TODO: Implementar sendPasswordChangedEmail en Firebase Functions cuando sea necesario
+    return {
+      'success': true,
+      'message': 'Notificación registrada (función aún no implementada)',
+    };
   }
 
   /// Convierte el método de pago a texto legible
@@ -170,7 +273,7 @@ class EmailService {
     }
   }
 
-  /// Enviar comprobante de pago
+  /// Enviar comprobante de pago usando Firebase Functions
   static Future<Map<String, dynamic>> sendReceiptEmail({
     required String email,
     required String orderId,
@@ -187,7 +290,9 @@ class EmailService {
     DateTime? fechaCompra,
   }) async {
     try {
-      print('📧 Enviando comprobante a $email');
+      print('📧 Enviando comprobante a $email usando Firebase Functions');
+      
+      final functionUrl = _getFunctionUrl('sendReceiptEmail');
       
       // Formatear método de pago para que sea más legible
       String? metodoPagoFormateado;
@@ -196,54 +301,89 @@ class EmailService {
       }
       
       final response = await http.post(
-        Uri.parse('$backendUrl/send-receipt'),
+        Uri.parse(functionUrl),
         headers: {
           'Content-Type': 'application/json',
         },
         body: jsonEncode({
-          'order_id': orderId,
-          'user_email': email,
-          'total': total,
-          'productos': productos,
-          if (userName != null) 'user_name': userName,
-          if (subtotal != null) 'subtotal': subtotal,
-          if (envio != null) 'envio': envio,
-          if (impuestos != null) 'impuestos': impuestos,
-          if (ciudad != null) 'ciudad': ciudad,
-          if (telefono != null) 'telefono': telefono,
-          if (direccionEntrega != null && direccionEntrega.isNotEmpty) 'direccion_entrega': direccionEntrega,
-          if (metodoPagoFormateado != null) 'metodo_pago': metodoPagoFormateado,
-          if (fechaCompra != null) 'fecha_compra': fechaCompra.toIso8601String(),
+          'data': {
+            'orderId': orderId,
+            'userEmail': email,
+            'total': total,
+            'productos': productos,
+            if (userName != null) 'userName': userName,
+            if (subtotal != null) 'subtotal': subtotal,
+            if (envio != null) 'envio': envio,
+            if (impuestos != null) 'impuestos': impuestos,
+            if (ciudad != null) 'ciudad': ciudad,
+            if (telefono != null) 'telefono': telefono,
+            if (direccionEntrega != null && direccionEntrega.isNotEmpty) 'direccionEntrega': direccionEntrega,
+            if (metodoPagoFormateado != null) 'metodoPago': metodoPagoFormateado,
+            if (fechaCompra != null) 'fechaCompra': fechaCompra.toIso8601String(),
+          },
         }),
+      ).timeout(
+        const Duration(seconds: 60),
+        onTimeout: () {
+          throw TimeoutException('Firebase Function está tardando demasiado en responder. Por favor, intenta más tarde.');
+        },
       );
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        print('✅ Comprobante enviado exitosamente');
-        return {
-          'success': true,
-          'message': data['message'] ?? 'Comprobante enviado exitosamente',
-        };
-      } else {
-        print('❌ Error del servidor: ${response.statusCode}');
-        try {
-          final errorData = jsonDecode(response.body);
+        final responseData = jsonDecode(response.body);
+        final data = (responseData['result'] ?? responseData) as Map<String, dynamic>;
+        
+        if (data['success'] == true) {
+          print('✅ Comprobante enviado exitosamente');
+          return {
+            'success': true,
+            'message': data['message'] ?? 'Comprobante enviado exitosamente',
+          };
+        } else {
+          final rawMessage = data['message'] ?? 'Error enviando comprobante';
+          final parsedMessage = _parseSmtpError(rawMessage, response.statusCode);
           return {
             'success': false,
-            'message': errorData['message'] ?? 'Error enviando comprobante',
+            'message': parsedMessage,
+            'raw_error': rawMessage,
+            'status_code': response.statusCode,
+          };
+        }
+      } else {
+        print('❌ Error del servidor: ${response.statusCode}');
+        print('📄 Respuesta del servidor: ${response.body}');
+        try {
+          final errorData = jsonDecode(response.body);
+          final rawMessage = errorData['message'] ?? errorData['error'] ?? 'Error enviando comprobante';
+          final parsedMessage = _parseSmtpError(rawMessage, response.statusCode);
+          
+          return {
+            'success': false,
+            'message': parsedMessage,
+            'raw_error': rawMessage,
+            'status_code': response.statusCode,
           };
         } catch (e) {
           return {
             'success': false,
-            'message': 'Error del servidor: ${response.statusCode}',
+            'message': _parseSmtpError('Error del servidor: ${response.statusCode}', response.statusCode),
+            'status_code': response.statusCode,
           };
         }
       }
+    } on TimeoutException catch (e) {
+      print('❌ Timeout enviando comprobante: ${e.message}');
+      return {
+        'success': false,
+        'message': 'Tiempo de espera agotado. Intenta más tarde.',
+        'raw_error': e.toString(),
+      };
     } catch (e) {
       print('❌ Error enviando comprobante: $e');
       return {
         'success': false,
-        'message': 'Error de conexión: ${e.toString()}',
+        'message': _parseSmtpError('Error de conexión: ${e.toString()}', null),
+        'raw_error': e.toString(),
       };
     }
   }

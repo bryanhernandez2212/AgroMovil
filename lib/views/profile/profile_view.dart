@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:agromarket/controllers/auth_controller.dart';
-import 'package:agromarket/views/about/about_view.dart';
 import 'package:agromarket/services/user_role_service.dart';
 import 'package:agromarket/services/firebase_service.dart';
 import 'package:agromarket/services/places_service.dart';
+import 'package:agromarket/services/vendor_request_service.dart';
+import 'package:agromarket/models/solicitud_vendedor_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import 'dart:io';
 
 class ProfileView extends StatefulWidget {
@@ -33,6 +35,15 @@ class _ProfileViewState extends State<ProfileView> {
   File? _selectedImageFile;
   String? _profileImageUrl;
   final ImagePicker _imagePicker = ImagePicker();
+  
+  // Para el formulario de solicitud de vendedor
+  final TextEditingController _tiendaSolicitudController = TextEditingController();
+  final TextEditingController _ubicacionSolicitudController = TextEditingController();
+  File? _documentoSolicitud;
+  String? _documentoSolicitudFileName;
+  PlaceDetails? _selectedPlaceSolicitud;
+  List<PlacePrediction> _placePredictionsSolicitud = [];
+  bool _showPredictionsSolicitud = false;
 
   @override
   void initState() {
@@ -134,24 +145,43 @@ class _ProfileViewState extends State<ProfileView> {
       // Mostrar diálogo para elegir fuente
       final ImageSource? source = await showDialog<ImageSource>(
         context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Seleccionar imagen'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.camera_alt, color: Color(0xFF115213)),
-                title: const Text('Tomar foto'),
-                onTap: () => Navigator.pop(context, ImageSource.camera),
+        builder: (context) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          return AlertDialog(
+            backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            title: Text(
+              'Seleccionar imagen',
+              style: TextStyle(
+                color: isDark ? Colors.white : Colors.black,
               ),
-              ListTile(
-                leading: const Icon(Icons.photo_library, color: Color(0xFF115213)),
-                title: const Text('Elegir de galería'),
-                onTap: () => Navigator.pop(context, ImageSource.gallery),
-              ),
-            ],
-          ),
-        ),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.camera_alt, color: Color(0xFF115213)),
+                  title: Text(
+                    'Tomar foto',
+                    style: TextStyle(
+                      color: isDark ? Colors.white : Colors.black,
+                    ),
+                  ),
+                  onTap: () => Navigator.pop(context, ImageSource.camera),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.photo_library, color: Color(0xFF115213)),
+                  title: Text(
+                    'Elegir de galería',
+                    style: TextStyle(
+                      color: isDark ? Colors.white : Colors.black,
+                    ),
+                  ),
+                  onTap: () => Navigator.pop(context, ImageSource.gallery),
+                ),
+              ],
+            ),
+          );
+        },
       );
 
       if (source == null) return;
@@ -201,21 +231,25 @@ class _ProfileViewState extends State<ProfileView> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Consumer<AuthController>(
       builder: (context, authController, child) {
         return Scaffold(
-          backgroundColor: const Color(0xFFF9F9F9),
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           appBar: AppBar(
-            backgroundColor: Colors.white,
+            backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
             elevation: 0,
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Color(0xFF115213)),
+              icon: Icon(
+                Icons.arrow_back,
+                color: isDark ? Colors.white : const Color(0xFF115213),
+              ),
               onPressed: () => Navigator.pop(context),
             ),
-            title: const Text(
+            title: Text(
               'Mi Perfil',
               style: TextStyle(
-                color: Color(0xFF115213),
+                color: isDark ? Colors.white : const Color(0xFF115213),
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),
@@ -237,7 +271,7 @@ class _ProfileViewState extends State<ProfileView> {
                         onPressed: _toggleEditMode,
                         icon: Icon(
                           _isEditing ? Icons.close : Icons.edit,
-                          color: const Color(0xFF115213),
+                          color: isDark ? Colors.white : const Color(0xFF115213),
                           size: 28,
                         ),
                       ),
@@ -346,15 +380,16 @@ class _ProfileViewState extends State<ProfileView> {
   }
 
   Widget _buildInfoCard(AuthController authController) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
             spreadRadius: 1,
             blurRadius: 10,
             offset: const Offset(0, 2),
@@ -422,12 +457,14 @@ class _ProfileViewState extends State<ProfileView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           "Ubicación",
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF666666),
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.grey[400]
+                : const Color(0xFF666666),
           ),
         ),
         const SizedBox(height: 8),
@@ -435,89 +472,126 @@ class _ProfileViewState extends State<ProfileView> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              TextField(
-                controller: _ubicacionController,
-                enabled: _isEditing,
-                decoration: InputDecoration(
-                  hintText: "Ubicación (empieza a escribir...)",
-                  filled: true,
-                  fillColor: const Color(0xFFF5F5F5),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFF115213), width: 2),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  prefixIcon: const Icon(Icons.location_on, color: Color(0xFF115213)),
-                ),
+              Builder(
+                builder: (context) {
+                  final isDark = Theme.of(context).brightness == Brightness.dark;
+                  return TextField(
+                    controller: _ubicacionController,
+                    enabled: _isEditing,
+                    style: TextStyle(
+                      color: isDark ? Colors.white : Colors.black,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: "Ubicación (empieza a escribir...)",
+                      hintStyle: TextStyle(
+                        color: isDark ? Colors.grey[500] : Colors.grey[600],
+                      ),
+                      filled: true,
+                      fillColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF5F5F5),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: isDark ? Colors.grey[700]! : const Color(0xFFE0E0E0),
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: isDark ? Colors.grey[700]! : const Color(0xFFE0E0E0),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFF115213), width: 2),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      prefixIcon: const Icon(Icons.location_on, color: Color(0xFF115213)),
+                    ),
                 onChanged: (value) {
                   _searchPlaces(value);
                 },
-                onTap: () {
-                  if (_ubicacionController.text.isNotEmpty) {
-                    _searchPlaces(_ubicacionController.text);
-                  }
+                    onTap: () {
+                      if (_ubicacionController.text.isNotEmpty) {
+                        _searchPlaces(_ubicacionController.text);
+                      }
+                    },
+                  );
                 },
               ),
               if (_showPredictions && _placePredictions.isNotEmpty)
-                Container(
-                  margin: const EdgeInsets.only(top: 5),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey[300]!),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 10,
-                        offset: const Offset(0, 2),
+                Builder(
+                  builder: (context) {
+                    final isDark = Theme.of(context).brightness == Brightness.dark;
+                    return Container(
+                      margin: const EdgeInsets.only(top: 5),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(isDark ? 0.3 : 0.1),
+                            blurRadius: 10,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
                   constraints: const BoxConstraints(maxHeight: 200),
                   child: ListView.builder(
                     shrinkWrap: true,
                     itemCount: _placePredictions.length,
                     itemBuilder: (context, index) {
                       final prediction = _placePredictions[index];
-                      return ListTile(
-                        leading: const Icon(Icons.location_on, color: Color(0xFF115213)),
-                        title: Text(
-                          prediction.description,
-                          style: const TextStyle(fontSize: 14),
-                        ),
-                        onTap: () {
-                          _selectPlace(prediction);
-                        },
-                      );
-                    },
-                  ),
+                        return Builder(
+                          builder: (context) {
+                            final isDark = Theme.of(context).brightness == Brightness.dark;
+                            return ListTile(
+                              leading: const Icon(Icons.location_on, color: Color(0xFF115213)),
+                              title: Text(
+                                prediction.description,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: isDark ? Colors.white : Colors.black,
+                                ),
+                              ),
+                              onTap: () {
+                                _selectPlace(prediction);
+                              },
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  );
+                  },
                 ),
             ],
           )
         else
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF5F5F5),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE0E0E0)),
-            ),
-            child: Text(
-              _ubicacionController.text.isEmpty ? "No especificado" : _ubicacionController.text,
-              style: const TextStyle(
-                fontSize: 16,
-                color: Color(0xFF333333),
-              ),
-            ),
+          Builder(
+            builder: (context) {
+              final isDark = Theme.of(context).brightness == Brightness.dark;
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF5F5F5),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isDark ? Colors.grey[700]! : const Color(0xFFE0E0E0),
+                  ),
+                ),
+                child: Text(
+                  _ubicacionController.text.isEmpty ? "No especificado" : _ubicacionController.text,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: isDark ? Colors.white : const Color(0xFF333333),
+                  ),
+                ),
+              );
+            },
           ),
       ],
     );
@@ -531,15 +605,16 @@ class _ProfileViewState extends State<ProfileView> {
     bool obscure = false,
     bool isPassword = false,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF666666),
+            color: isDark ? Colors.grey[400] : const Color(0xFF666666),
           ),
         ),
         const SizedBox(height: 8),
@@ -548,17 +623,27 @@ class _ProfileViewState extends State<ProfileView> {
             controller: controller,
             obscureText: obscure,
             enabled: enabled,
+            style: TextStyle(
+              color: isDark ? Colors.white : Colors.black,
+            ),
             decoration: InputDecoration(
               hintText: value,
+              hintStyle: TextStyle(
+                color: isDark ? Colors.grey[500] : Colors.grey[600],
+              ),
               filled: true,
-              fillColor: const Color(0xFFF5F5F5),
+              fillColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF5F5F5),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+                borderSide: BorderSide(
+                  color: isDark ? Colors.grey[700]! : const Color(0xFFE0E0E0),
+                ),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+                borderSide: BorderSide(
+                  color: isDark ? Colors.grey[700]! : const Color(0xFFE0E0E0),
+                ),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -572,15 +657,17 @@ class _ProfileViewState extends State<ProfileView> {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: const Color(0xFFF5F5F5),
+              color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF5F5F5),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE0E0E0)),
+              border: Border.all(
+                color: isDark ? Colors.grey[700]! : const Color(0xFFE0E0E0),
+              ),
             ),
             child: Text(
               value,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 16,
-                color: Color(0xFF333333),
+                color: isDark ? Colors.white : const Color(0xFF333333),
               ),
             ),
           ),
@@ -657,65 +744,133 @@ class _ProfileViewState extends State<ProfileView> {
         final roles = user?.roles ?? const <String>[];
         final hasSeller = roles.any((r) => r.toLowerCase().contains('vend'));
         final hasBuyer = roles.any((r) => r.toLowerCase().contains('compr') || r.toLowerCase().contains('buyer'));
+        final hasBothRoles = hasSeller && hasBuyer; // Solo mostrar si tiene ambos roles
+        final isOnlyBuyer = hasBuyer && !hasSeller; // Solo tiene rol comprador
 
+        final isDark = Theme.of(context).brightness == Brightness.dark;
         return Column(
           children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF115213)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    "Modo de navegación",
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF115213),
+            // Solo mostrar "Modo de navegación" si el usuario tiene ambos roles
+            if (hasBothRoles) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF115213)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Modo de navegación",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : const Color(0xFF115213),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  RadioListTile<String>(
-                    value: UserRoleService.sellerRole,
-                    groupValue: currentRole ?? (hasSeller ? UserRoleService.sellerRole : UserRoleService.buyerRole),
-                    onChanged: hasSeller ? (val) => _switchRole(true, authController) : null,
-                    activeColor: const Color(0xFF115213),
-                    title: const Text('🏪 Modo Vendedor'),
-                  ),
-                  RadioListTile<String>(
-                    value: UserRoleService.buyerRole,
-                    groupValue: currentRole ?? (hasSeller ? UserRoleService.sellerRole : UserRoleService.buyerRole),
-                    onChanged: hasBuyer ? (val) => _switchRole(false, authController) : null,
-                    activeColor: const Color(0xFF115213),
-                    title: const Text('🛒 Modo Comprador'),
-                  ),
-                ],
+                    const SizedBox(height: 8),
+                    RadioListTile<String>(
+                      value: UserRoleService.sellerRole,
+                      groupValue: currentRole ?? (hasSeller ? UserRoleService.sellerRole : UserRoleService.buyerRole),
+                      onChanged: hasSeller ? (val) => _switchRole(true, authController) : null,
+                      activeColor: const Color(0xFF115213),
+                      title: Text(
+                        '🏪 Modo Vendedor',
+                        style: TextStyle(
+                          color: isDark ? Colors.white : Colors.black,
+                        ),
+                      ),
+                    ),
+                    RadioListTile<String>(
+                      value: UserRoleService.buyerRole,
+                      groupValue: currentRole ?? (hasSeller ? UserRoleService.sellerRole : UserRoleService.buyerRole),
+                      onChanged: hasBuyer ? (val) => _switchRole(false, authController) : null,
+                      activeColor: const Color(0xFF115213),
+                      title: Text(
+                        '🛒 Modo Comprador',
+                        style: TextStyle(
+                          color: isDark ? Colors.white : Colors.black,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            
-            const SizedBox(height: 12),
+              const SizedBox(height: 12),
+            ],
+            // Mensaje informativo cuando solo tiene un rol
+            if (!hasBothRoles) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFFE8F5E9) : const Color(0xFFF1F8F4),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: const Color(0xFF115213).withOpacity(0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      isOnlyBuyer ? Icons.store_outlined : Icons.shopping_cart_outlined,
+                      color: const Color(0xFF115213),
+                      size: 28,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            isOnlyBuyer
+                                ? '¿Quieres vender productos?'
+                                : '¿Quieres comprar productos?',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? const Color(0xFF115213) : const Color(0xFF1B4332),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            isOnlyBuyer
+                                ? 'Activa el rol de vendedor para publicar y vender tus productos agrícolas. Gestiona tus ventas y crece tu negocio en AgroMarket.'
+                                : 'Activa el rol de comprador para explorar y comprar productos de diferentes vendedores en AgroMarket.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: isDark ? Colors.grey[300] : const Color(0xFF4A5568),
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: const Color(0xFF115213)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     "Gestionar roles",
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF115213),
+                      color: isDark ? Colors.white : const Color(0xFF115213),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -730,7 +885,7 @@ class _ProfileViewState extends State<ProfileView> {
                             size: 24,
                           ),
                           const SizedBox(width: 12),
-                          const Column(
+                          Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
@@ -738,14 +893,14 @@ class _ProfileViewState extends State<ProfileView> {
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
-                                  color: Color(0xFF333333),
+                                  color: isDark ? Colors.white : const Color(0xFF333333),
                                 ),
                               ),
                               Text(
                                 'Publicar y vender productos',
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Color(0xFF666666),
+                                  color: isDark ? Colors.grey[400] : const Color(0xFF666666),
                                 ),
                               ),
                             ],
@@ -773,7 +928,7 @@ class _ProfileViewState extends State<ProfileView> {
                             size: 24,
                           ),
                           const SizedBox(width: 12),
-                          const Column(
+                          Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
@@ -781,14 +936,14 @@ class _ProfileViewState extends State<ProfileView> {
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
-                                  color: Color(0xFF333333),
+                                  color: isDark ? Colors.white : const Color(0xFF333333),
                                 ),
                               ),
                               Text(
                                 'Explorar y comprar productos',
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Color(0xFF666666),
+                                  color: isDark ? Colors.grey[400] : const Color(0xFF666666),
                                 ),
                               ),
                             ],
@@ -806,25 +961,6 @@ class _ProfileViewState extends State<ProfileView> {
               ),
             ),
             
-            const SizedBox(height: 12),
-            
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton.icon(
-                onPressed: _navigateToAbout,
-                icon: const Icon(Icons.info_outline, size: 20),
-                label: const Text("Acerca de"),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF115213),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 2,
-                ),
-              ),
-            ),
           ],
         );
       },
@@ -839,6 +975,66 @@ class _ProfileViewState extends State<ProfileView> {
       setState(() {
         _isLoading = true;
       });
+
+      // Si se intenta cambiar a vendedor, verificar solicitud aprobada
+      if (toSeller) {
+        // Verificar si el usuario ya tiene ambos roles usando los datos del AuthController
+        final currentUser = authController.currentUser;
+        final roles = currentUser?.roles ?? const <String>[];
+        final hasSellerRole = roles.any((r) => r.toLowerCase().contains('vend'));
+        final hasBuyerRole = roles.any((r) => r.toLowerCase().contains('compr') || r.toLowerCase().contains('buyer'));
+        
+        if (hasSellerRole && hasBuyerRole) {
+          // Si ya tiene ambos roles, cambiar directamente sin solicitud
+          print('✅ Usuario ya tiene ambos roles, cambiando directamente a modo vendedor...');
+        } else {
+          // Si no tiene ambos roles, verificar solicitud
+          print('🔍 Verificando solicitud de vendedor para el usuario ${user.uid}...');
+          
+          final solicitud = await VendorRequestService.getSolicitudById(user.uid);
+          
+          if (solicitud == null) {
+            setState(() {
+              _isLoading = false;
+            });
+            // Mostrar formulario para crear solicitud
+            await _showVendorRequestForm();
+            return;
+          }
+          
+          final estado = solicitud.estado.toLowerCase();
+          print('📋 Estado de la solicitud: $estado');
+          
+          if (estado == 'pendiente') {
+            setState(() {
+              _isLoading = false;
+            });
+            _showErrorSnackBar(
+              'Tu solicitud de vendedor está pendiente de revisión. '
+              'Te notificaremos cuando sea aprobada.'
+            );
+            return;
+          } else if (estado == 'rechazada') {
+            setState(() {
+              _isLoading = false;
+            });
+            // Mostrar diálogo con opción de reenviar solicitud
+            await _showRejectedRequestDialog(solicitud);
+            return;
+          } else if (estado != 'aprobada') {
+            setState(() {
+              _isLoading = false;
+            });
+            _showErrorSnackBar(
+              'Tu solicitud de vendedor tiene un estado inválido. '
+              'Por favor, contacta al administrador.'
+            );
+            return;
+          }
+          
+          print('✅ Solicitud aprobada, cambiando a modo vendedor...');
+        }
+      }
 
       // Actualizar rol_activo en Firestore
       final newRolActivo = toSeller ? 'vendedor' : 'comprador';
@@ -891,6 +1087,68 @@ class _ProfileViewState extends State<ProfileView> {
       final currentRolActivo = userData?['rol_activo'] ?? 'comprador';
 
       if (enable) {
+        // Si se intenta activar el rol de vendedor, verificar que exista una solicitud aprobada
+        if (role == 'vendedor') {
+          // Verificar si el usuario ya tiene ambos roles
+          final rolesFromData = userData?['roles'] as List<dynamic>?;
+          final rolesList = rolesFromData?.map((r) => r.toString().toLowerCase()).toList() ?? [];
+          final hasSellerRole = rolesList.any((r) => r.contains('vend'));
+          final hasBuyerRole = rolesList.any((r) => r.contains('compr') || r.contains('buyer'));
+          
+          if (hasSellerRole && hasBuyerRole) {
+            // Si ya tiene ambos roles, activar directamente sin solicitud
+            print('✅ Usuario ya tiene ambos roles, activando rol de vendedor directamente...');
+          } else {
+            // Si no tiene ambos roles, verificar solicitud
+            print('🔍 Verificando solicitud de vendedor para el usuario ${user.uid}...');
+            
+            // Obtener la solicitud de vendedor (el ID del documento es el user.uid)
+            final solicitud = await VendorRequestService.getSolicitudById(user.uid);
+            
+            if (solicitud == null) {
+              setState(() {
+                _isLoading = false;
+              });
+              // Mostrar formulario para crear solicitud
+              await _showVendorRequestForm();
+              return;
+            }
+            
+            final estado = solicitud.estado.toLowerCase();
+            print('📋 Estado de la solicitud: $estado');
+            
+            if (estado == 'pendiente') {
+              setState(() {
+                _isLoading = false;
+              });
+              _showErrorSnackBar(
+                'Tu solicitud de vendedor está pendiente de revisión. '
+                'Te notificaremos cuando sea aprobada.'
+              );
+              return;
+            } else if (estado == 'rechazada') {
+              setState(() {
+                _isLoading = false;
+              });
+              // Mostrar diálogo con opción de reenviar solicitud
+              await _showRejectedRequestDialog(solicitud);
+              return;
+            } else if (estado != 'aprobada') {
+              setState(() {
+                _isLoading = false;
+              });
+              _showErrorSnackBar(
+                'Tu solicitud de vendedor tiene un estado inválido. '
+                'Por favor, contacta al administrador.'
+              );
+              return;
+            }
+            
+            // Si llegamos aquí, la solicitud está aprobada
+            print('✅ Solicitud aprobada, activando rol de vendedor...');
+          }
+        }
+        
         // Agregar el rol al array en Firestore
         await FirebaseFirestore.instance
             .collection('usuarios')
@@ -967,13 +1225,6 @@ class _ProfileViewState extends State<ProfileView> {
       _selectedImageFile = null; // Limpiar imagen seleccionada
       _loadUserData(); // Recargar datos originales
     });
-  }
-
-  void _navigateToAbout() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const AboutView()),
-    );
   }
 
   Future<void> _saveChanges() async {
@@ -1119,6 +1370,596 @@ class _ProfileViewState extends State<ProfileView> {
     return "${date.day}/${date.month}/${date.year}";
   }
 
+  /// Mostrar formulario para crear solicitud de vendedor
+  Future<void> _showVendorRequestForm({SolicitudVendedorModel? solicitudAnterior}) async {
+    final authController = Provider.of<AuthController>(context, listen: false);
+    final user = authController.currentUser;
+    
+    // Validar si el usuario ya tiene ambos roles
+    if (user != null) {
+      final roles = user.roles;
+      final hasSellerRole = roles.any((r) => r.toLowerCase().contains('vend'));
+      final hasBuyerRole = roles.any((r) => r.toLowerCase().contains('compr') || r.toLowerCase().contains('buyer'));
+      
+      if (hasSellerRole && hasBuyerRole) {
+        _showErrorSnackBar('Ya tienes ambos roles activos. No es necesario enviar una nueva solicitud.');
+        return;
+      }
+    }
+    
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    if (user == null) {
+      _showErrorSnackBar('Error: Usuario no autenticado');
+      return;
+    }
+
+    // Si hay una solicitud anterior, pre-llenar los campos
+    if (solicitudAnterior != null) {
+      _tiendaSolicitudController.text = solicitudAnterior.nombreTienda;
+      _ubicacionSolicitudController.text = solicitudAnterior.ubicacionFormatted ?? solicitudAnterior.ubicacion;
+      // Restaurar ubicación si tiene coordenadas
+      if (solicitudAnterior.ubicacionLat != null && solicitudAnterior.ubicacionLng != null) {
+        // Crear un PlaceDetails aproximado con los datos guardados
+        _selectedPlaceSolicitud = PlaceDetails(
+          name: solicitudAnterior.ubicacionFormatted ?? solicitudAnterior.ubicacion,
+          formattedAddress: solicitudAnterior.ubicacionFormatted ?? solicitudAnterior.ubicacion,
+          lat: solicitudAnterior.ubicacionLat,
+          lng: solicitudAnterior.ubicacionLng,
+        );
+      }
+    } else {
+      // Limpiar campos del formulario si no hay solicitud anterior
+      _tiendaSolicitudController.clear();
+      _ubicacionSolicitudController.clear();
+      _selectedPlaceSolicitud = null;
+    }
+    
+    // Limpiar documento (siempre se debe subir uno nuevo)
+    _documentoSolicitud = null;
+    _documentoSolicitudFileName = null;
+    _placePredictionsSolicitud = [];
+    _showPredictionsSolicitud = false;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.9,
+              ),
+              padding: const EdgeInsets.all(24),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Solicitud de Vendedor',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : Colors.black,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(context),
+                          color: isDark ? Colors.white : Colors.black,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Completa los siguientes datos para solicitar el rol de vendedor',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: isDark ? Colors.grey[400] : Colors.grey[600],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // Nombre de tienda
+                    TextField(
+                      controller: _tiendaSolicitudController,
+                      decoration: InputDecoration(
+                        labelText: 'Nombre de tienda *',
+                        hintText: 'Ingresa el nombre de tu tienda',
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF5F5F5),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: isDark ? Colors.grey[700]! : const Color(0xFFE0E0E0),
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: isDark ? Colors.grey[700]! : const Color(0xFFE0E0E0),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFF115213), width: 2),
+                        ),
+                        prefixIcon: const Icon(Icons.store, color: Color(0xFF115213)),
+                      ),
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Ubicación
+                    TextField(
+                      controller: _ubicacionSolicitudController,
+                      decoration: InputDecoration(
+                        labelText: 'Ubicación *',
+                        hintText: 'Ubicación (empieza a escribir...)',
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF5F5F5),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: isDark ? Colors.grey[700]! : const Color(0xFFE0E0E0),
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: isDark ? Colors.grey[700]! : const Color(0xFFE0E0E0),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFF115213), width: 2),
+                        ),
+                        prefixIcon: const Icon(Icons.location_on, color: Color(0xFF115213)),
+                      ),
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                      onChanged: (value) async {
+                        if (value.length >= 3) {
+                          final predictions = await PlacesService.getPlacePredictions(value);
+                          setDialogState(() {
+                            _placePredictionsSolicitud = predictions;
+                            _showPredictionsSolicitud = predictions.isNotEmpty;
+                          });
+                        } else {
+                          setDialogState(() {
+                            _placePredictionsSolicitud = [];
+                            _showPredictionsSolicitud = false;
+                          });
+                        }
+                      },
+                      onTap: () async {
+                        if (_ubicacionSolicitudController.text.isNotEmpty) {
+                          final predictions = await PlacesService.getPlacePredictions(_ubicacionSolicitudController.text);
+                          setDialogState(() {
+                            _placePredictionsSolicitud = predictions;
+                            _showPredictionsSolicitud = predictions.isNotEmpty;
+                          });
+                        }
+                      },
+                    ),
+                    if (_showPredictionsSolicitud && _placePredictionsSolicitud.isNotEmpty)
+                      Container(
+                        margin: const EdgeInsets.only(top: 5),
+                        constraints: const BoxConstraints(maxHeight: 150),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                          ),
+                        ),
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: _placePredictionsSolicitud.length,
+                          itemBuilder: (context, index) {
+                            final prediction = _placePredictionsSolicitud[index];
+                            return ListTile(
+                              leading: const Icon(Icons.location_on, color: Color(0xFF115213)),
+                              title: Text(
+                                prediction.description,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: isDark ? Colors.white : Colors.black,
+                                ),
+                              ),
+                              onTap: () async {
+                                final details = await PlacesService.getPlaceDetails(prediction.placeId);
+                                setDialogState(() {
+                                  _selectedPlaceSolicitud = details;
+                                  _ubicacionSolicitudController.text = prediction.description;
+                                  _showPredictionsSolicitud = false;
+                                });
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                    const SizedBox(height: 16),
+                    
+                    // Documento
+                    GestureDetector(
+                      onTap: () => _pickDocumentForRequest(setDialogState),
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF5F5F5),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isDark ? Colors.grey[700]! : const Color(0xFFE0E0E0),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.description, color: Color(0xFF115213)),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _documentoSolicitudFileName ?? 'Documento de identificación *',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: _documentoSolicitudFileName != null
+                                          ? (isDark ? Colors.white : Colors.black)
+                                          : (isDark ? Colors.grey[400] : Colors.grey[600]),
+                                    ),
+                                  ),
+                                  if (_documentoSolicitudFileName == null)
+                                    Text(
+                                      'JPG, PNG o PDF (máx. 5MB)',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: isDark ? Colors.grey[500] : Colors.grey[500],
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            Icon(
+                              Icons.upload_file,
+                              color: isDark ? Colors.grey[400] : Colors.grey[600],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // Botones
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF115213),
+                              side: const BorderSide(color: Color(0xFF115213)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                            ),
+                            child: const Text('Cancelar'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () => _submitVendorRequest(context, setDialogState, user.id, user.nombre, user.email),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF115213),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                            ),
+                            child: const Text('Enviar Solicitud'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _pickDocumentForRequest(StateSetter setDialogState) async {
+    try {
+      final String? fileType = await showDialog<String>(
+        context: context,
+        builder: (context) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          return AlertDialog(
+            backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            title: Text(
+              'Seleccionar documento',
+              style: TextStyle(color: isDark ? Colors.white : Colors.black),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.image, color: Color(0xFF115213)),
+                  title: Text(
+                    'Imagen (JPG, PNG)',
+                    style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                  ),
+                  onTap: () => Navigator.pop(context, 'image'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.picture_as_pdf, color: Color(0xFF115213)),
+                  title: Text(
+                    'PDF',
+                    style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                  ),
+                  onTap: () => Navigator.pop(context, 'pdf'),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+
+      if (fileType == null) return;
+
+      if (fileType == 'image') {
+        final ImageSource? source = await showDialog<ImageSource>(
+          context: context,
+          builder: (context) {
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            return AlertDialog(
+              backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+              title: Text(
+                'Seleccionar imagen',
+                style: TextStyle(color: isDark ? Colors.white : Colors.black),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.camera_alt, color: Color(0xFF115213)),
+                    title: Text(
+                      'Tomar foto',
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                    ),
+                    onTap: () => Navigator.pop(context, ImageSource.camera),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.photo_library, color: Color(0xFF115213)),
+                    title: Text(
+                      'Elegir de galería',
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                    ),
+                    onTap: () => Navigator.pop(context, ImageSource.gallery),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+
+        if (source == null) return;
+
+        final XFile? image = await _imagePicker.pickImage(
+          source: source,
+          imageQuality: 85,
+        );
+
+        if (image != null) {
+          final file = File(image.path);
+          final fileSize = await file.length();
+          const maxSize = 5 * 1024 * 1024; // 5MB
+
+          if (fileSize > maxSize) {
+            _showErrorSnackBar('El archivo es demasiado grande. Máximo 5MB permitido.');
+            return;
+          }
+
+          setDialogState(() {
+            _documentoSolicitud = file;
+            _documentoSolicitudFileName = image.name;
+          });
+        }
+      } else if (fileType == 'pdf') {
+        final result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['pdf'],
+        );
+
+        if (result != null && result.files.single.path != null) {
+          final file = File(result.files.single.path!);
+          final fileSize = await file.length();
+          const maxSize = 5 * 1024 * 1024; // 5MB
+
+          if (fileSize > maxSize) {
+            _showErrorSnackBar('El archivo es demasiado grande. Máximo 5MB permitido.');
+            return;
+          }
+
+          setDialogState(() {
+            _documentoSolicitud = file;
+            _documentoSolicitudFileName = result.files.single.name;
+          });
+        }
+      }
+    } catch (e) {
+      _showErrorSnackBar('Error al seleccionar documento: $e');
+    }
+  }
+
+  /// Mostrar diálogo cuando la solicitud fue rechazada
+  Future<void> _showRejectedRequestDialog(SolicitudVendedorModel solicitud) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final motivo = solicitud.motivoRechazo;
+    
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Row(
+          children: [
+            Icon(
+              Icons.cancel_outlined,
+              color: Colors.red,
+              size: 28,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Solicitud Rechazada',
+                style: TextStyle(
+                  color: isDark ? Colors.white : Colors.black,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              motivo != null && motivo.isNotEmpty
+                  ? 'Motivo del rechazo:\n\n$motivo'
+                  : 'Tu solicitud de vendedor fue rechazada. Por favor, revisa la información y vuelve a intentar.',
+              style: TextStyle(
+                color: isDark ? Colors.grey[300] : Colors.grey[700],
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              '¿Deseas enviar una nueva solicitud?',
+              style: TextStyle(
+                color: isDark ? Colors.white : Colors.black,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Cancelar',
+              style: TextStyle(
+                color: isDark ? Colors.grey[400] : Colors.grey[600],
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // Mostrar formulario para reenviar solicitud con datos anteriores
+              _showVendorRequestForm(solicitudAnterior: solicitud);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF115213),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('Reenviar Solicitud'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _submitVendorRequest(BuildContext dialogContext, StateSetter setDialogState, String userId, String nombre, String email) async {
+    // Validar si el usuario ya tiene ambos roles
+    try {
+      final userData = await FirebaseService.getCurrentUserData();
+      final rolesFromData = userData?['roles'] as List<dynamic>?;
+      final rolesList = rolesFromData?.map((r) => r.toString().toLowerCase()).toList() ?? [];
+      final hasSellerRole = rolesList.any((r) => r.contains('vend'));
+      final hasBuyerRole = rolesList.any((r) => r.contains('compr') || r.contains('buyer'));
+      
+      if (hasSellerRole && hasBuyerRole) {
+        Navigator.pop(dialogContext); // Cerrar el diálogo
+        _showErrorSnackBar('Ya tienes ambos roles activos. No es necesario enviar una nueva solicitud.');
+        return;
+      }
+    } catch (e) {
+      print('⚠️ Error validando roles antes de enviar solicitud: $e');
+    }
+
+    // Validaciones
+    if (_tiendaSolicitudController.text.trim().isEmpty) {
+      _showErrorSnackBar('Por favor, ingresa el nombre de tu tienda');
+      return;
+    }
+
+    if (_selectedPlaceSolicitud == null) {
+      _showErrorSnackBar('Por favor, selecciona una ubicación');
+      return;
+    }
+
+    if (_documentoSolicitud == null) {
+      _showErrorSnackBar('Por favor, sube un documento de verificación');
+      return;
+    }
+
+    setDialogState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final result = await VendorRequestService.createVendorRequestForExistingUser(
+        userId: userId,
+        nombre: nombre,
+        email: email,
+        nombreTienda: _tiendaSolicitudController.text.trim(),
+        ubicacion: _selectedPlaceSolicitud!.formattedAddress,
+        ubicacionFormatted: _selectedPlaceSolicitud!.formattedAddress,
+        ubicacionLat: _selectedPlaceSolicitud!.lat,
+        ubicacionLng: _selectedPlaceSolicitud!.lng,
+        documentoFile: _documentoSolicitud!,
+      );
+
+      if (mounted) {
+        Navigator.pop(dialogContext); // Cerrar diálogo
+        
+        if (result['success']) {
+          _showSuccessSnackBar(result['message'] ?? 'Solicitud enviada exitosamente');
+        } else {
+          _showErrorSnackBar(result['message'] ?? 'Error al enviar la solicitud');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(dialogContext);
+        _showErrorSnackBar('Error inesperado: ${e.toString()}');
+      }
+    }
+  }
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -1126,6 +1967,8 @@ class _ProfileViewState extends State<ProfileView> {
     _passwordController.dispose();
     _tiendaController.dispose();
     _ubicacionController.dispose();
+    _tiendaSolicitudController.dispose();
+    _ubicacionSolicitudController.dispose();
     super.dispose();
   }
 }

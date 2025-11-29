@@ -7,7 +7,7 @@ import 'package:agromarket/services/order_service.dart';
 import 'package:agromarket/services/cart_service.dart';
 import 'package:agromarket/services/stripe_service.dart';
 import 'package:agromarket/services/stock_service.dart';
-import 'package:agromarket/services/email_service.dart';
+import 'package:agromarket/services/firebase_service.dart';
 import 'package:agromarket/views/buyer/order_confirmation_view.dart';
 
 class PaymentView extends StatefulWidget {
@@ -471,7 +471,7 @@ class _PaymentViewState extends State<PaymentView> {
           impuestosGeneral += order.impuestos;
         }
 
-        final emailResult = await EmailService.sendReceiptEmail(
+        final emailResult = await FirebaseService.sendReceiptEmail(
           email: user.email ?? '',
           orderId: processedOrders.map((o) => o['orderId'] as String).join(', '),
           total: totalGeneral,

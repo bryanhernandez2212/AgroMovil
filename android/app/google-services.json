@@ -7,6 +7,25 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:18163605615:android:d3c456ba347dd22fd6ad9a",
+        "android_client_info": {
+          "package_name": "com.bryan.agromarket"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyByE4bpFCOkQySBlI7n_JQ0kYt-oSt31PU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:18163605615:android:3181d4ebb28b88f7d6ad9a",
         "android_client_info": {
           "package_name": "com.example.agromarket"

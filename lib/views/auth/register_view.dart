@@ -3,6 +3,10 @@ import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
 import 'package:agromarket/controllers/auth_controller.dart';
 import 'package:agromarket/services/places_service.dart';
+import 'package:agromarket/services/vendor_request_service.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
+import 'dart:io';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -26,6 +30,9 @@ class _RegisterPageState extends State<RegisterPage> {
   List<PlacePrediction> _placePredictions = [];
   bool _showPredictions = false;
   PlaceDetails? _selectedPlace;
+  File? _selectedDocument;
+  String? _documentFileName;
+  final ImagePicker _imagePicker = ImagePicker();
 
   @override
   void dispose() {
@@ -64,6 +71,116 @@ class _RegisterPageState extends State<RegisterPage> {
     });
   }
 
+  Future<void> _pickDocument() async {
+    try {
+      // Mostrar diálogo para elegir tipo de archivo
+      final String? fileType = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Seleccionar documento'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.image, color: Color(0xFF115213)),
+                title: const Text('Imagen (JPG, PNG)'),
+                onTap: () => Navigator.pop(context, 'image'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.picture_as_pdf, color: Color(0xFF115213)),
+                title: const Text('PDF'),
+                onTap: () => Navigator.pop(context, 'pdf'),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      if (fileType == null) return;
+
+      if (fileType == 'image') {
+        // Usar image_picker para imágenes
+        final ImageSource? source = await showDialog<ImageSource>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Seleccionar imagen'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.camera_alt, color: Color(0xFF115213)),
+                  title: const Text('Tomar foto'),
+                  onTap: () => Navigator.pop(context, ImageSource.camera),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.photo_library, color: Color(0xFF115213)),
+                  title: const Text('Elegir de galería'),
+                  onTap: () => Navigator.pop(context, ImageSource.gallery),
+                ),
+              ],
+            ),
+          ),
+        );
+
+        if (source == null) return;
+
+        final XFile? image = await _imagePicker.pickImage(
+          source: source,
+          imageQuality: 85,
+        );
+
+        if (image != null) {
+          // Validar tamaño (máx. 5MB)
+          final file = File(image.path);
+          final fileSize = await file.length();
+          const maxSize = 5 * 1024 * 1024; // 5MB
+
+          if (fileSize > maxSize) {
+            if (mounted) {
+              _showErrorSnackBar('El archivo es demasiado grande. Máximo 5MB permitido.');
+            }
+            return;
+          }
+
+          setState(() {
+            _selectedDocument = file;
+            _documentFileName = image.name;
+          });
+        }
+      } else if (fileType == 'pdf') {
+        // Usar file_picker para PDFs
+        final result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['pdf'],
+        );
+
+        if (result != null && result.files.single.path != null) {
+          final file = File(result.files.single.path!);
+          
+          // Validar tamaño (máx. 5MB)
+          final fileSize = await file.length();
+          const maxSize = 5 * 1024 * 1024; // 5MB
+
+          if (fileSize > maxSize) {
+            if (mounted) {
+              _showErrorSnackBar('El archivo es demasiado grande. Máximo 5MB permitido.');
+            }
+            return;
+          }
+
+          setState(() {
+            _selectedDocument = file;
+            _documentFileName = result.files.single.name;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorSnackBar('Error al seleccionar documento: $e');
+      }
+    }
+  }
+
   Future<void> _register() async {
     final authController = Provider.of<AuthController>(context, listen: false);
     
@@ -93,24 +210,85 @@ class _RegisterPageState extends State<RegisterPage> {
       return;
     }
 
+    // Si es vendedor, validar campos adicionales y documento
+    if (_selectedRole == 'vendedor') {
+      if (_empresaController.text.isEmpty) {
+        _showErrorSnackBar('Por favor, ingresa el nombre de tu tienda');
+        return;
+      }
+      
+      if (_selectedPlace == null) {
+        _showErrorSnackBar('Por favor, selecciona una ubicación');
+        return;
+      }
+      
+      if (_selectedDocument == null) {
+        _showErrorSnackBar('Por favor, sube un documento de verificación');
+        return;
+      }
+    }
 
+    // Si es vendedor, usar el servicio de solicitudes
+    if (_selectedRole == 'vendedor') {
+      // Mostrar loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+
+      try {
+        final result = await VendorRequestService.createVendorRequest(
+          nombre: _nombreController.text.trim(),
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+          nombreTienda: _empresaController.text.trim(),
+          ubicacion: _selectedPlace!.formattedAddress,
+          ubicacionFormatted: _selectedPlace!.formattedAddress,
+          ubicacionLat: _selectedPlace!.lat,
+          ubicacionLng: _selectedPlace!.lng,
+          documentoFile: _selectedDocument!,
+        );
+
+        if (mounted) {
+          Navigator.pop(context); // Cerrar loading
+          
+          if (result['success']) {
+            _showSuccessSnackBar(
+              result['message'] ?? 'Solicitud enviada exitosamente. Te notificaremos cuando sea revisada.'
+            );
+            // Limpiar formulario
+            _nombreController.clear();
+            _emailController.clear();
+            _passwordController.clear();
+            _confirmPasswordController.clear();
+            _empresaController.clear();
+            _ubicacionController.clear();
+            _selectedPlace = null;
+            _selectedDocument = null;
+            _documentFileName = null;
+            setState(() {});
+          } else {
+            _showErrorSnackBar(result['message'] ?? 'Error al enviar la solicitud. Inténtalo de nuevo');
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          Navigator.pop(context); // Cerrar loading
+          _showErrorSnackBar('Error inesperado: ${e.toString()}');
+        }
+      }
+      return;
+    }
+
+    // Si es comprador, usar el flujo normal de registro
     final success = await authController.register(
       _nombreController.text.trim(),
       _emailController.text.trim(),
       _passwordController.text,
       _selectedRole,
-      nombreEmpresa: _selectedRole == 'vendedor' 
-          ? _empresaController.text.trim() 
-          : null,
-      ubicacion: _selectedRole == 'vendedor' && _selectedPlace != null 
-          ? _selectedPlace!.formattedAddress 
-          : null,
-      ubicacionLat: _selectedRole == 'vendedor' && _selectedPlace != null 
-          ? _selectedPlace!.lat 
-          : null,
-      ubicacionLng: _selectedRole == 'vendedor' && _selectedPlace != null 
-          ? _selectedPlace!.lng 
-          : null,
     );
 
     if (success && mounted) {
@@ -591,6 +769,8 @@ class _RegisterPageState extends State<RegisterPage> {
                       ),
                       const SizedBox(height: 20),
                       _buildLocationField(),
+                      const SizedBox(height: 20),
+                      _buildDocumentField(),
                     ],
                     
                     const SizedBox(height: 20),
@@ -912,6 +1092,94 @@ class _RegisterPageState extends State<RegisterPage> {
       default:
         return role;
     }
+  }
+
+  Widget _buildDocumentField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Documento de verificación',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF333333),
+          ),
+        ),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: _pickDocument,
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(15),
+              border: Border.all(
+                color: _selectedDocument != null 
+                    ? const Color(0xFF2E7D32) 
+                    : Colors.grey[300]!,
+                width: _selectedDocument != null ? 2 : 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  _selectedDocument != null 
+                      ? Icons.check_circle 
+                      : Icons.upload_file,
+                  color: _selectedDocument != null 
+                      ? const Color(0xFF2E7D32) 
+                      : Colors.grey[600],
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _selectedDocument != null 
+                            ? _documentFileName ?? 'Documento seleccionado'
+                            : 'Sube una identificación oficial, RFC o comprobante de domicilio',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: _selectedDocument != null 
+                              ? const Color(0xFF2E7D32) 
+                              : Colors.grey[600],
+                          fontWeight: _selectedDocument != null 
+                              ? FontWeight.w600 
+                              : FontWeight.normal,
+                        ),
+                      ),
+                      if (_selectedDocument != null)
+                        const SizedBox(height: 4),
+                      if (_selectedDocument != null)
+                        const Text(
+                          'JPG, PNG, PDF - máx. 5MB',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                if (_selectedDocument != null)
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 20),
+                    color: Colors.grey[600],
+                    onPressed: () {
+                      setState(() {
+                        _selectedDocument = null;
+                        _documentFileName = null;
+                      });
+                    },
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
 }
