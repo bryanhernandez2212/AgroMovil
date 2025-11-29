@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:agromarket/controllers/auth_controller.dart';
 import 'package:agromarket/views/profile/profile_view.dart';
-import 'package:agromarket/views/profile/notifications_view.dart';
 import 'package:agromarket/views/profile/chat_view.dart';
 import 'package:agromarket/views/about/about_view.dart';
 import 'package:agromarket/services/user_role_service.dart';
@@ -286,19 +285,6 @@ class _UserProfileMenuViewState extends State<UserProfileMenuView> {
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Column(
                   children: [
-                    _buildMenuButton(
-                      context,
-                      icon: Icons.notifications_outlined,
-                      title: 'Notificaciones',
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const NotificationsView(),
-                          ),
-                        );
-                      },
-                    ),
                     const SizedBox(height: 8),
                     _buildMenuButton(
                       context,
@@ -376,14 +362,6 @@ class _UserProfileMenuViewState extends State<UserProfileMenuView> {
                       title: 'Cerrar Sesión',
                       onTap: () => _showLogoutDialog(context, authController),
                       isDestructive: false,
-                    ),
-                    const SizedBox(height: 8),
-                    _buildMenuButton(
-                      context,
-                      icon: Icons.delete_outline,
-                      title: 'Eliminar Cuenta',
-                      onTap: () => _showDeleteDialog(context),
-                      isDestructive: true,
                     ),
                   ],
                 ),

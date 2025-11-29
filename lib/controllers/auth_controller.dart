@@ -46,7 +46,8 @@ class AuthController extends ChangeNotifier {
           print('ℹ️ Usuario desautenticado (no durante logout)');
           _currentUser = null;
           _isLoggedIn = false;
-          notifyListeners();
+          // Diferir la notificación para evitar llamadas durante el build
+          Future.microtask(() => notifyListeners());
         }
       }
     });
@@ -419,7 +420,8 @@ class AuthController extends ChangeNotifier {
         print('✅ AuthController: Activo: ${_currentUser!.activo}');
         _isLoggedIn = true;
         await NotificationService.registerDeviceToken(_currentUser!.id);
-        notifyListeners();
+        // Diferir la notificación para evitar llamadas durante el build
+        Future.microtask(() => notifyListeners());
       } else {
         print('❌ AuthController: No se encontraron datos del usuario');
       }
@@ -498,7 +500,8 @@ class AuthController extends ChangeNotifier {
 
   /// Verificar estado de autenticación
   Future<void> checkAuthStatus() async {
-    _setLoading(true);
+    _isLoading = true;
+    Future.microtask(() => notifyListeners());
     
     try {
       if (FirebaseService.isUserSignedIn()) {
@@ -517,8 +520,9 @@ class AuthController extends ChangeNotifier {
       _currentUser = null;
     }
     
-    _setLoading(false);
-    notifyListeners();
+    _isLoading = false;
+    // Diferir la notificación para evitar llamadas durante el build
+    Future.microtask(() => notifyListeners());
   }
 
   /// Actualizar datos del usuario
@@ -546,17 +550,20 @@ class AuthController extends ChangeNotifier {
 
   void _setLoading(bool loading) {
     _isLoading = loading;
-    notifyListeners();
+    // Diferir la notificación para evitar llamadas durante el build
+    Future.microtask(() => notifyListeners());
   }
 
   void _setError(String error) {
     _errorMessage = error;
-    notifyListeners();
+    // Diferir la notificación para evitar llamadas durante el build
+    Future.microtask(() => notifyListeners());
   }
 
   void _clearError() {
     _errorMessage = null;
-    notifyListeners();
+    // Diferir la notificación para evitar llamadas durante el build
+    Future.microtask(() => notifyListeners());
   }
 
   void clearError() {

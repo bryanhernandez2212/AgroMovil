@@ -20,7 +20,6 @@ class ShippingAddressView extends StatefulWidget {
 class _ShippingAddressViewState extends State<ShippingAddressView> {
   final _formKey = GlobalKey<FormState>();
   final _telefonoController = TextEditingController();
-  final _direccionController = TextEditingController();
   String? _selectedCiudad;
 
   // Ciudades pre-cargadas
@@ -35,7 +34,6 @@ class _ShippingAddressViewState extends State<ShippingAddressView> {
   @override
   void dispose() {
     _telefonoController.dispose();
-    _direccionController.dispose();
     super.dispose();
   }
 
@@ -79,9 +77,6 @@ class _ShippingAddressViewState extends State<ShippingAddressView> {
 
       // Limpiar el teléfono de caracteres no numéricos
       final cleanPhone = _telefonoController.text.trim().replaceAll(RegExp(r'[^\d]'), '');
-      final direccionEntrega = _direccionController.text.trim().isNotEmpty 
-          ? _direccionController.text.trim() 
-          : null;
 
       // Navegar a la vista de pago
       Navigator.push(
@@ -92,7 +87,7 @@ class _ShippingAddressViewState extends State<ShippingAddressView> {
             cartTotal: widget.cartTotal,
             ciudad: _selectedCiudad!,
             telefono: cleanPhone,
-            direccionEntrega: direccionEntrega,
+            direccionEntrega: null,
           ),
         ),
       );
@@ -273,32 +268,6 @@ class _ShippingAddressViewState extends State<ShippingAddressView> {
                 ),
                 const SizedBox(height: 20),
 
-                // Campo de dirección (opcional)
-                TextFormField(
-                  controller: _direccionController,
-                  decoration: InputDecoration(
-                    labelText: 'Dirección de entrega (opcional)',
-                    hintText: 'Ej: Calle Principal #123, Col. Centro',
-                    prefixIcon: const Icon(Icons.home, color: Color(0xFF115213)),
-                    filled: true,
-                    fillColor: Colors.grey[50],
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[300]!),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[300]!),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFF115213), width: 2),
-                    ),
-                  ),
-                  keyboardType: TextInputType.streetAddress,
-                  textInputAction: TextInputAction.done,
-                  maxLines: 2,
-                ),
                 const SizedBox(height: 32),
 
                 // Botón continuar
