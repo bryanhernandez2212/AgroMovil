@@ -12,6 +12,7 @@ import 'package:agromarket/services/ad_service.dart';
 import 'package:agromarket/config/stripe_config.dart';
 import 'package:agromarket/services/notification_service.dart';
 import 'package:agromarket/views/profile/chat_conversation_view.dart';
+import 'package:agromarket/views/buyer/my_orders_view.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(
@@ -97,6 +98,11 @@ class AgroMarketApp extends StatelessWidget {
                 userImage: args['userImage']?.toString(),
                 orderId: args['orderId']?.toString() ?? '',
               ),
+            );
+          }
+          if (settings.name == '/orders') {
+            return MaterialPageRoute(
+              builder: (_) => const MyOrdersView(),
             );
           }
           return null;

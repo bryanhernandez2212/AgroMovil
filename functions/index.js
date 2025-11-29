@@ -58,6 +58,7 @@ exports.notifyNewMessage = onDocumentCreated(
       tokens,
       notification: { title, body },
       data: {
+        type: "chat",
         chatId,
         orderId: chat.metadata?.orderId || "",
         senderId,
