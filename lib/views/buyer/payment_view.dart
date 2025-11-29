@@ -651,13 +651,6 @@ class _PaymentViewState extends State<PaymentView> {
                 Icons.credit_card,
                 _selectedPaymentMethod == 'tarjeta',
               ),
-              const SizedBox(height: 12),
-              _buildPaymentOption(
-                'efectivo',
-                'Pago en efectivo',
-                Icons.money,
-                _selectedPaymentMethod == 'efectivo',
-              ),
               const SizedBox(height: 32),
               // Botón de pago para tarjeta (usará Payment Sheet)
               if (_selectedPaymentMethod == 'tarjeta')
@@ -685,38 +678,6 @@ class _PaymentViewState extends State<PaymentView> {
                           )
                         : const Text(
                             'Pagar con tarjeta',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                  ),
-                ),
-              if (_selectedPaymentMethod != 'tarjeta')
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    onPressed: _isProcessing ? null : _processPayment,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF115213),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: _isProcessing
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          )
-                        : const Text(
-                            'Confirmar y pagar',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
