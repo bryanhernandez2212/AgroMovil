@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:agromarket/models/product_model.dart';
 import 'package:agromarket/services/product_service.dart';
+import 'package:agromarket/services/sanitization_service.dart';
 import 'package:agromarket/views/buyer/product_detail_view.dart';
 import 'package:agromarket/estructure/product_estructure.dart';
+import 'package:provider/provider.dart';
+import 'package:agromarket/controllers/cart_controller.dart';
 
 class BuyerHomeView extends StatefulWidget {
   final Function(String)? onCategoryTap;
@@ -60,7 +63,7 @@ class _BuyerHomeViewState extends State<BuyerHomeView> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      for (var i = 0; i < 4; i++) {
+      for (var i = 0; i < 5; i++) {
         Future.delayed(Duration(milliseconds: 140 * i), () {
           if (!mounted) return;
           setState(() {
@@ -128,13 +131,25 @@ class _BuyerHomeViewState extends State<BuyerHomeView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Barra de búsqueda rápida y resumen del carrito
                 _buildAnimatedSection(
                   index: 0,
+                  child: Column(
+                    children: [
+                      _buildSearchBar(),
+                      const SizedBox(height: 16),
+                      _buildCartSummary(),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                _buildAnimatedSection(
+                  index: 1,
                   child: _buildQuickCategories(),
                 ),
                 const SizedBox(height: 28),
                 _buildAnimatedSection(
-                  index: 1,
+                  index: 2,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -158,12 +173,12 @@ class _BuyerHomeViewState extends State<BuyerHomeView> {
                 ),
                 const SizedBox(height: 28),
                 _buildAnimatedSection(
-                  index: 2,
+                  index: 3,
                   child: _buildDealBanner(),
                 ),
                 const SizedBox(height: 28),
                 _buildAnimatedSection(
-                  index: 3,
+                  index: 4,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -191,6 +206,153 @@ class _BuyerHomeViewState extends State<BuyerHomeView> {
           );
         },
       ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return GestureDetector(
+      onTap: () {
+        // Navegar a la vista de productos para buscar
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const ProductEstructureView(currentIndex: 1),
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(
+            color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+            width: 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.search,
+              color: isDark ? Colors.grey[400] : Colors.grey[600],
+              size: 24,
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Buscar productos...',
+              style: TextStyle(
+                fontSize: 16,
+                color: isDark ? Colors.grey[400] : Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCartSummary() {
+    return Consumer<CartController>(
+      builder: (context, cartController, child) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final itemCount = cartController.totalItemCount;
+        final totalPrice = cartController.totalPrice;
+
+        if (itemCount == 0) {
+          return const SizedBox.shrink(); // No mostrar si el carrito está vacío
+        }
+
+        return GestureDetector(
+          onTap: () {
+            // Navegar al carrito
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const ProductEstructureView(currentIndex: 2),
+              ),
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF2E7D32).withOpacity(0.2) : const Color(0xFF2E7D32).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isDark ? const Color(0xFF2E7D32).withOpacity(0.5) : const Color(0xFF2E7D32).withOpacity(0.3),
+                width: 1.5,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2E7D32),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.shopping_cart,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '$itemCount producto${itemCount != 1 ? 's' : ''} en tu carrito',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white : const Color(0xFF2E7D32),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Total: \$${totalPrice.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark ? Colors.grey[400] : Colors.grey[700],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2E7D32),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '$itemCount',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  Icons.chevron_right,
+                  color: isDark ? Colors.grey[400] : Colors.grey[600],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -293,7 +455,7 @@ class _BuyerHomeViewState extends State<BuyerHomeView> {
         itemBuilder: (context, index) {
           final product = _bestSellerProducts[index];
           final imageUrl = _resolveProductImage(product);
-          final priceLabel = '\$${_formatPrice(product.precio)} / ${product.unidad}';
+          final priceLabel = '\$${_formatPrice(product.precioFinal)} / ${product.unidad}';
           return _BestSellerCard(
             product: product,
             imageUrl: imageUrl,
@@ -381,7 +543,7 @@ class _BuyerHomeViewState extends State<BuyerHomeView> {
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final imageUrl = _resolveProductImage(product);
-    final priceLabel = '\$${_formatPrice(product.precio)} / ${product.unidad}';
+    final priceLabel = '\$${_formatPrice(product.precioFinal)} / ${product.unidad}';
     const accent = Color(0xFFFF7043);
 
     return Container(
@@ -590,7 +752,7 @@ class _BuyerHomeViewState extends State<BuyerHomeView> {
         return _RecommendationCard(
           product: product,
           imageUrl: _resolveProductImage(product),
-          priceLabel: '\$${_formatPrice(product.precio)}',
+          priceLabel: '\$${_formatPrice(product.precioFinal)}',
           unitLabel: product.unidad,
           tag: product.categoria,
           animationDelay: Duration(milliseconds: 100 * index),
@@ -816,7 +978,8 @@ class _BestSellerCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    product.nombre,
+                    // Sanitizar el nombre al mostrarlo para prevenir XSS
+                    SanitizationService.sanitizeName(product.nombre),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(

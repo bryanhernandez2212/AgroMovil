@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import 'package:agromarket/controllers/auth_controller.dart';
 import 'package:agromarket/models/chat_message_model.dart';
 import 'package:agromarket/services/chat_service.dart';
+import 'package:agromarket/services/sanitization_service.dart';
 
 class ChatConversationView extends StatefulWidget {
   final String chatId;
@@ -227,8 +228,34 @@ class _ChatConversationViewState extends State<ChatConversationView> {
   }
 
   Future<void> _sendMessage() async {
-    final text = _messageController.text.trim();
-    if (text.isEmpty || _currentUserId == null || _isSending) return;
+    final textRaw = _messageController.text.trim();
+    if (textRaw.isEmpty || _currentUserId == null || _isSending) return;
+
+    // Sanitizar el mensaje para prevenir inyecciones
+    if (!SanitizationService.isSafe(textRaw)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('El mensaje contiene código no permitido. Por favor, escribe solo texto.'),
+          duration: Duration(seconds: 2),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
+    final text = SanitizationService.sanitizeComment(textRaw);
+    if (text.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('El mensaje contiene caracteres no permitidos'),
+          duration: Duration(seconds: 2),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
 
     setState(() {
       _isSending = true;

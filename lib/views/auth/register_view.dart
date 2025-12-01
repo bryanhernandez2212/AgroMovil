@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:agromarket/controllers/auth_controller.dart';
 import 'package:agromarket/services/places_service.dart';
 import 'package:agromarket/services/vendor_request_service.dart';
+import 'package:agromarket/services/sanitization_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:io';
@@ -190,8 +191,25 @@ class _RegisterPageState extends State<RegisterPage> {
       return;
     }
     
+    // Sanitizar y validar nombre
+    if (!SanitizationService.isSafe(_nombreController.text.trim())) {
+      _showErrorSnackBar('El nombre contiene código no permitido');
+      return;
+    }
+    final nombreSanitizado = SanitizationService.sanitizeName(_nombreController.text.trim());
+    if (nombreSanitizado.isEmpty) {
+      _showErrorSnackBar('El nombre contiene caracteres no permitidos');
+      return;
+    }
+    
     if (_emailController.text.isEmpty) {
       _showErrorSnackBar('Por favor, ingresa tu correo electrónico');
+      return;
+    }
+    
+    // Validar formato de email
+    if (!SanitizationService.isValidEmail(_emailController.text.trim())) {
+      _showErrorSnackBar('Por favor, ingresa un correo electrónico válido');
       return;
     }
     
@@ -214,6 +232,17 @@ class _RegisterPageState extends State<RegisterPage> {
     if (_selectedRole == 'vendedor') {
       if (_empresaController.text.isEmpty) {
         _showErrorSnackBar('Por favor, ingresa el nombre de tu tienda');
+        return;
+      }
+      
+      // Sanitizar nombre de empresa
+      if (!SanitizationService.isSafe(_empresaController.text.trim())) {
+        _showErrorSnackBar('El nombre de la tienda contiene código no permitido');
+        return;
+      }
+      final empresaSanitizada = SanitizationService.sanitizeName(_empresaController.text.trim());
+      if (empresaSanitizada.isEmpty) {
+        _showErrorSnackBar('El nombre de la tienda contiene caracteres no permitidos');
         return;
       }
       
@@ -240,11 +269,15 @@ class _RegisterPageState extends State<RegisterPage> {
       );
 
       try {
+        // Sanitizar datos antes de enviar
+        final nombreSanitizado = SanitizationService.sanitizeName(_nombreController.text.trim());
+        final empresaSanitizada = SanitizationService.sanitizeName(_empresaController.text.trim());
+        
         final result = await VendorRequestService.createVendorRequest(
-          nombre: _nombreController.text.trim(),
+          nombre: nombreSanitizado,
           email: _emailController.text.trim(),
           password: _passwordController.text,
-          nombreTienda: _empresaController.text.trim(),
+          nombreTienda: empresaSanitizada,
           ubicacion: _selectedPlace!.formattedAddress,
           ubicacionFormatted: _selectedPlace!.formattedAddress,
           ubicacionLat: _selectedPlace!.lat,
@@ -284,8 +317,9 @@ class _RegisterPageState extends State<RegisterPage> {
     }
 
     // Si es comprador, usar el flujo normal de registro
+    // Usar nombre ya sanitizado
     final success = await authController.register(
-      _nombreController.text.trim(),
+      nombreSanitizado,
       _emailController.text.trim(),
       _passwordController.text,
       _selectedRole,

@@ -1,8 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:agromarket/models/product_model.dart';
 
 class StockService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  static final FirebaseAuth _auth = FirebaseAuth.instance;
 
   /// Obtener el stock actual de un producto desde Firestore
   static Future<Map<String, dynamic>> getProductStock(String productId) async {
@@ -107,54 +109,71 @@ class StockService {
     int quantitySold,
   ) async {
     try {
+      // Verificar que el usuario esté autenticado
+      final user = _auth.currentUser;
+      if (user == null) {
+        print('❌ StockService: Usuario no autenticado');
+        return {
+          'success': false,
+          'message': 'Usuario no autenticado. Por favor inicia sesión.',
+        };
+      }
+
       print('📦 StockService: Actualizando stock para producto $productId');
+      print('   - Usuario autenticado: ${user.uid}');
       print('   - Cantidad vendida: $quantitySold');
 
       final docRef = _firestore.collection('productos').doc(productId);
       
-      // Usar transacción para evitar condiciones de carrera
-      return await _firestore.runTransaction((transaction) async {
-        final doc = await transaction.get(docRef);
-        
-        if (!doc.exists) {
-          throw Exception('Producto no encontrado');
-        }
-
-        final data = doc.data()!;
-        final currentStock = data['stock'] is int 
-            ? data['stock'] as int 
-            : int.tryParse(data['stock'].toString()) ?? 0;
-        final currentVendido = data['vendido'] is int 
-            ? data['vendido'] as int 
-            : int.tryParse(data['vendido'].toString()) ?? 0;
-
-        final newStock = currentStock - quantitySold;
-        final newVendido = currentVendido + quantitySold;
-
-        if (newStock < 0) {
-          throw Exception('Stock insuficiente. Disponible: $currentStock, Solicitado: $quantitySold');
-        }
-
-        print('   - Stock actual: $currentStock');
-        print('   - Stock nuevo: $newStock');
-        print('   - Vendido anterior: $currentVendido');
-        print('   - Vendido nuevo: $newVendido');
-
-        transaction.update(docRef, {
-          'stock': newStock,
-          'vendido': newVendido,
-          'fecha_actualizacion': FieldValue.serverTimestamp(),
-        });
-
+      // Primero obtener el stock actual para validar
+      final doc = await docRef.get();
+      
+      if (!doc.exists) {
         return {
-          'success': true,
-          'message': 'Stock actualizado exitosamente',
-          'oldStock': currentStock,
-          'newStock': newStock,
-          'oldVendido': currentVendido,
-          'newVendido': newVendido,
+          'success': false,
+          'message': 'Producto no encontrado',
         };
+      }
+
+      final data = doc.data()!;
+      final currentStock = data['stock'] is int 
+          ? data['stock'] as int 
+          : int.tryParse(data['stock'].toString()) ?? 0;
+      final currentVendido = data['vendido'] is int 
+          ? data['vendido'] as int 
+          : int.tryParse(data['vendido'].toString()) ?? 0;
+
+      // Validar que hay stock suficiente
+      if (currentStock < quantitySold) {
+        return {
+          'success': false,
+          'message': 'Stock insuficiente. Disponible: $currentStock, Solicitado: $quantitySold',
+        };
+      }
+
+      final newStock = currentStock - quantitySold;
+      final newVendido = currentVendido + quantitySold;
+
+      print('   - Stock actual: $currentStock');
+      print('   - Stock nuevo: $newStock');
+      print('   - Vendido anterior: $currentVendido');
+      print('   - Vendido nuevo: $newVendido');
+
+      // Usar FieldValue.increment para operaciones atómicas (más eficiente que transacciones)
+      await docRef.update({
+        'stock': FieldValue.increment(-quantitySold),
+        'vendido': FieldValue.increment(quantitySold),
+        'fecha_actualizacion': FieldValue.serverTimestamp(),
       });
+
+      return {
+        'success': true,
+        'message': 'Stock actualizado exitosamente',
+        'oldStock': currentStock,
+        'newStock': newStock,
+        'oldVendido': currentVendido,
+        'newVendido': newVendido,
+      };
     } catch (e) {
       print('❌ StockService: Error actualizando stock: $e');
       return {

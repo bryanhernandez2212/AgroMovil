@@ -3,6 +3,7 @@ import 'package:agromarket/models/product_model.dart';
 import 'package:agromarket/models/comment_model.dart';
 import 'package:agromarket/models/cart_item_model.dart';
 import 'package:agromarket/services/product_service.dart';
+import 'package:agromarket/services/sanitization_service.dart';
 import 'package:agromarket/controllers/cart_controller.dart';
 import 'package:agromarket/views/buyer/shipping_address_view.dart';
 import 'package:agromarket/estructure/product_estructure.dart';
@@ -44,7 +45,10 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
   String? get productId => widget.product?.id;
 
   // Getters para obtener datos del producto (compatibilidad con ambos formatos)
-  double get price => widget.product?.precio ?? (widget.productMap?['price'] as num?)?.toDouble() ?? 0.0;
+  double get price => widget.product?.precioFinal ?? (widget.productMap?['price'] as num?)?.toDouble() ?? 0.0;
+  double get originalPrice => widget.product?.precio ?? (widget.productMap?['price'] as num?)?.toDouble() ?? 0.0;
+  bool get hasDiscount => widget.product?.tieneDescuento ?? false;
+  double get discount => widget.product?.descuento ?? 0.0;
   String get unit => widget.product?.unidad ?? widget.productMap?['unit']?.toString() ?? '';
   String get name => widget.product?.nombre ?? widget.productMap?['name']?.toString() ?? '';
   String get description => widget.product?.descripcion ?? widget.productMap?['description']?.toString() ?? '';
@@ -162,8 +166,8 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
   Future<void> _submitComment() async {
     if (productId == null) return;
     
-    final comentario = _commentController.text.trim();
-    if (comentario.isEmpty) {
+    final comentarioRaw = _commentController.text.trim();
+    if (comentarioRaw.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Por favor escribe un comentario'),
@@ -173,6 +177,41 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
             borderRadius: BorderRadius.all(Radius.circular(20)),
           ),
           margin: EdgeInsets.all(16),
+        ),
+      );
+      return;
+    }
+    
+    // Sanitizar el comentario para prevenir inyecciones
+    if (!SanitizationService.isSafe(comentarioRaw)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('El comentario contiene código no permitido. Por favor, escribe solo texto.'),
+          duration: Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(20)),
+          ),
+          margin: EdgeInsets.all(16),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
+    final comentario = SanitizationService.sanitizeComment(comentarioRaw);
+    
+    if (comentario.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('El comentario contiene caracteres no permitidos'),
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(20)),
+          ),
+          margin: EdgeInsets.all(16),
+          backgroundColor: Colors.red,
         ),
       );
       return;
@@ -420,7 +459,7 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
             MaterialPageRoute(
               builder: (context) => ShippingAddressView(
                 cartItems: [CartItemModel.fromProduct(widget.product!, quantity)],
-                cartTotal: widget.product!.precio * quantity,
+                cartTotal: widget.product!.precioFinal * quantity,
               ),
             ),
           );
@@ -489,7 +528,8 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                   children: [
                         // Título del producto
                     Text(
-                      name,
+                      // Sanitizar el nombre al mostrarlo para prevenir XSS
+                      SanitizationService.sanitizeName(name),
                       style: TextStyle(
                             fontSize: 30,
                             fontWeight: FontWeight.bold,
@@ -502,7 +542,8 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                         
                         // Descripción
                     Text(
-                      description,
+                      // Sanitizar la descripción al mostrarla para prevenir XSS
+                      SanitizationService.sanitizeDescription(description),
                           style: TextStyle(
                             fontSize: 15,
                             color: isDark ? Colors.grey[400] : const Color(0xFF666666),
@@ -520,6 +561,47 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                // Precio original tachado si hay descuento
+                                if (hasDiscount)
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '\$',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: isDark ? Colors.grey[500] : Colors.grey[600],
+                                          decoration: TextDecoration.lineThrough,
+                                        ),
+                                      ),
+                                      Text(
+                                        originalPrice.toStringAsFixed(0),
+                                        style: TextStyle(
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.bold,
+                                          color: isDark ? Colors.grey[500] : Colors.grey[600],
+                                          decoration: TextDecoration.lineThrough,
+                                          height: 1.0,
+                                        ),
+                                      ),
+                                      if (originalPrice % 1 != 0)
+                                        Padding(
+                                          padding: const EdgeInsets.only(left: 2, bottom: 2),
+                                          child: Text(
+                                            originalPrice.toStringAsFixed(1).split('.').last,
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.bold,
+                                              color: isDark ? Colors.grey[500] : Colors.grey[600],
+                                              decoration: TextDecoration.lineThrough,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                if (hasDiscount) const SizedBox(height: 4),
+                                // Precio con descuento o precio normal
                                 Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
@@ -528,7 +610,7 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                                       style: TextStyle(
                                         fontSize: 22,
                                         fontWeight: FontWeight.bold,
-                                        color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                                        color: hasDiscount ? const Color(0xFF4CAF50) : (isDark ? Colors.white : const Color(0xFF1A1A1A)),
                                       ),
                                     ),
                                     Text(
@@ -536,7 +618,7 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                                       style: TextStyle(
                                         fontSize: 34,
                                         fontWeight: FontWeight.bold,
-                                        color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                                        color: hasDiscount ? const Color(0xFF4CAF50) : (isDark ? Colors.white : const Color(0xFF1A1A1A)),
                                         height: 1.0,
                                       ),
                                     ),
@@ -548,12 +630,31 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
                                           style: TextStyle(
                                             fontSize: 18,
                                             fontWeight: FontWeight.bold,
-                                            color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                                            color: hasDiscount ? const Color(0xFF4CAF50) : (isDark ? Colors.white : const Color(0xFF1A1A1A)),
                                           ),
                                         ),
                                       ),
                                   ],
                                 ),
+                                if (hasDiscount)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 4),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF4CAF50).withOpacity(0.15),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        '${discount.toStringAsFixed(0)}% OFF',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF4CAF50),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
                                 const SizedBox(height: 4),
                                 Text(
                                   'por $unit',
@@ -1672,6 +1773,11 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
   }
   Widget _primaryHollowButton({required String label, required VoidCallback onTap}) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final greenColor = const Color(0xFF115213); // Mismo verde que el botón "Comprar ahora"
+    final borderColor = greenColor;
+    final textColor = greenColor;
+    final shadowColor = greenColor.withOpacity(isDark ? 0.3 : 0.25);
+
     return Center(
       child: InkWell(
         onTap: onTap,
@@ -1683,12 +1789,12 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
             color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
             borderRadius: BorderRadius.circular(28),
             border: Border.all(
-              color: const Color(0xFF115213),
+              color: borderColor,
               width: 2,
             ),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF115213).withOpacity(isDark ? 0.3 : 0.15),
+                color: shadowColor,
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
@@ -1697,10 +1803,10 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
           alignment: Alignment.center,
           child: Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF115213),
+              color: textColor,
             ),
           ),
         ),
@@ -1708,6 +1814,7 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
     );
   }
   Widget _filledPillButton({required String label, required VoidCallback onTap}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Center(
       child: InkWell(
         onTap: onTap,
@@ -1716,11 +1823,13 @@ class _BuyerProductDetailViewState extends State<BuyerProductDetailView> {
           width: double.infinity,
           height: 52,
           decoration: BoxDecoration(
-            color: const Color(0xFF115213),
+            color: const Color(0xFF2E7D32),
             borderRadius: BorderRadius.circular(28),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF115213).withOpacity(0.4),
+                color: isDark
+                    ? Colors.black.withOpacity(0.6)
+                    : const Color(0xFF2E7D32).withOpacity(0.4),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
