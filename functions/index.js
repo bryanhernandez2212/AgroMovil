@@ -219,9 +219,16 @@ exports.sendPasswordResetCode = onCall(
     secrets: ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "SMTP_SECURE", "SMTP_FROM"],
   },
   async (request) => {
-    const { email } = request.data;
+    // Manejar datos que pueden venir directamente o dentro de 'data'
+    // Cuando se llama desde HTTP POST, los datos pueden estar en request.data.data
+    const requestData = request.data?.data || request.data || {};
+    
+    console.log("📋 Datos recibidos en sendPasswordResetCode:", JSON.stringify(requestData, null, 2));
+    
+    const { email } = requestData;
 
     if (!email) {
+      console.error("❌ email es requerido");
       return {
         success: false,
         message: "El email es requerido",
@@ -445,6 +452,224 @@ El equipo de AgroMarket
   }
 );
 
+// Cloud Function para notificar cuando se crea una solicitud de vendedor
+exports.notifyVendorRequest = onDocumentCreated(
+  {
+    document: "solicitudes_vendedores/{solicitudId}",
+    region: "us-central1",
+    secrets: ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "SMTP_SECURE", "SMTP_FROM"],
+  },
+  async (event) => {
+    try {
+      const solicitudData = event.data.data();
+      const solicitudId = event.params.solicitudId;
+
+      console.log(`📧 Nueva solicitud de vendedor recibida: ${solicitudId}`);
+      console.log(`📋 Datos: ${JSON.stringify(solicitudData, null, 2)}`);
+
+      // Verificar que el estado sea 'pendiente' (solo notificar nuevas solicitudes)
+      const estado = solicitudData.estado || 'pendiente';
+      if (estado !== 'pendiente') {
+        console.log(`ℹ️ Solicitud con estado '${estado}', no se enviará notificación`);
+        return;
+      }
+
+      // Obtener secrets de SMTP
+      const smtpSecrets = {
+        SMTP_HOST: (process.env.SMTP_HOST || "").trim(),
+        SMTP_PORT: (process.env.SMTP_PORT || "").trim(),
+        SMTP_USER: (process.env.SMTP_USER || "").trim(),
+        SMTP_PASS: (process.env.SMTP_PASS || "").trim(),
+        SMTP_SECURE: (process.env.SMTP_SECURE || "").trim(),
+        SMTP_FROM: (process.env.SMTP_FROM || "").trim(),
+      };
+
+      const transporter = getEmailTransporter(smtpSecrets);
+      if (!transporter) {
+        console.error("❌ SMTP no configurado. No se puede enviar notificación.");
+        return;
+      }
+
+      // Extraer datos de la solicitud
+      const nombre = solicitudData.nombre || 'No especificado';
+      const email = solicitudData.email || 'No especificado';
+      const nombreTienda = solicitudData.nombre_tienda || 'No especificado';
+      const ubicacion = solicitudData.ubicacion || 'No especificada';
+      const ubicacionFormatted = solicitudData.ubicacion_formatted || ubicacion;
+      const documentoUrl = solicitudData.documento_url || '';
+      const fechaSolicitud = solicitudData.fecha_solicitud 
+        ? new Date(solicitudData.fecha_solicitud.toDate()).toLocaleDateString("es-MX", {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : new Date().toLocaleDateString("es-MX");
+
+      // Generar HTML del email
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { 
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; 
+              line-height: 1.6; 
+              color: #333; 
+              background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+              padding: 20px;
+            }
+            .container { 
+              max-width: 650px; 
+              margin: 0 auto; 
+              background-color: #ffffff; 
+              border-radius: 16px; 
+              overflow: hidden; 
+              box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            }
+            .header { 
+              background: linear-gradient(135deg, #2E7D32 0%, #1B5E20 100%);
+              color: white; 
+              padding: 40px 30px; 
+              text-align: center;
+            }
+            .header h1 { 
+              font-size: 28px; 
+              margin-bottom: 8px;
+              font-weight: 700;
+            }
+            .content { 
+              padding: 40px 30px; 
+            }
+            .info-section {
+              background: #f8f9fa;
+              border-radius: 12px;
+              padding: 20px;
+              margin-bottom: 20px;
+            }
+            .info-row {
+              display: flex;
+              justify-content: space-between;
+              padding: 12px 0;
+              border-bottom: 1px solid #e0e0e0;
+            }
+            .info-row:last-child {
+              border-bottom: none;
+            }
+            .info-label {
+              font-weight: 600;
+              color: #555;
+            }
+            .info-value {
+              color: #333;
+              text-align: right;
+            }
+            .footer {
+              background: #f8f9fa;
+              padding: 20px 30px;
+              text-align: center;
+              color: #666;
+              font-size: 14px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>🌾 Nueva Solicitud de Vendedor</h1>
+              <p style="margin-top: 8px; opacity: 0.9;">AgroMarket</p>
+            </div>
+            <div class="content">
+              <p style="font-size: 16px; margin-bottom: 24px;">
+                Se ha recibido una nueva solicitud para acceso como vendedor en AgroMarket.
+              </p>
+              
+              <div class="info-section">
+                <div class="info-row">
+                  <span class="info-label">ID de Solicitud:</span>
+                  <span class="info-value">${solicitudId}</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">Nombre:</span>
+                  <span class="info-value">${nombre}</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">Email:</span>
+                  <span class="info-value">${email}</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">Nombre de Tienda:</span>
+                  <span class="info-value">${nombreTienda}</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">Ubicación:</span>
+                  <span class="info-value">${ubicacionFormatted}</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">Fecha de Solicitud:</span>
+                  <span class="info-value">${fechaSolicitud}</span>
+                </div>
+                ${documentoUrl ? `
+                <div class="info-row">
+                  <span class="info-label">Documento:</span>
+                  <span class="info-value"><a href="${documentoUrl}" target="_blank" style="color: #2E7D32;">Ver documento</a></span>
+                </div>
+                ` : ''}
+              </div>
+
+              <p style="margin-top: 24px; color: #666;">
+                Por favor, revisa la solicitud en el panel de administración de Firebase.
+              </p>
+            </div>
+            <div class="footer">
+              <p>Este es un correo automático del sistema AgroMarket.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+
+      const smtpFrom = smtpSecrets.SMTP_FROM || smtpSecrets.SMTP_USER || "noreply@agromarket.com";
+      const adminEmail = "agromarket559@gmail.com";
+
+      console.log(`📧 Enviando notificación a ${adminEmail}...`);
+
+      await transporter.sendMail({
+        from: `"AgroMarket - Sistema" <${smtpFrom}>`,
+        to: adminEmail,
+        subject: `🌾 Nueva Solicitud de Vendedor - ${nombreTienda}`,
+        html: htmlContent,
+        text: `
+🌾 AgroMarket - Nueva Solicitud de Vendedor
+
+Se ha recibido una nueva solicitud para acceso como vendedor:
+
+ID de Solicitud: ${solicitudId}
+Nombre: ${nombre}
+Email: ${email}
+Nombre de Tienda: ${nombreTienda}
+Ubicación: ${ubicacionFormatted}
+Fecha de Solicitud: ${fechaSolicitud}
+${documentoUrl ? `Documento: ${documentoUrl}` : ''}
+
+Por favor, revisa la solicitud en el panel de administración de Firebase.
+
+Este es un correo automático del sistema AgroMarket.
+        `.trim(),
+      });
+
+      console.log(`✅ Notificación enviada exitosamente a ${adminEmail}`);
+    } catch (error) {
+      console.error("❌ Error enviando notificación de solicitud de vendedor:", error);
+      // No lanzar error para que no falle la creación del documento
+    }
+  }
+);
+
 // Cloud Function para verificar código de recuperación
 exports.verifyPasswordResetCode = onCall(
   {
@@ -453,12 +678,27 @@ exports.verifyPasswordResetCode = onCall(
     cors: true,
   },
   async (request) => {
-    const { email, code } = request.data;
+    // Manejar datos que pueden venir directamente o dentro de 'data'
+    // Cuando se llama desde HTTP POST, los datos pueden estar en request.data.data
+    const requestData = request.data?.data || request.data || {};
+    
+    console.log("📋 Datos recibidos en verifyPasswordResetCode:", JSON.stringify(requestData, null, 2));
+    
+    const { email, code } = requestData;
 
-    if (!email || !code) {
+    if (!email) {
+      console.error("❌ email es requerido");
       return {
         success: false,
-        message: "Email y código son requeridos",
+        message: "El email es requerido",
+      };
+    }
+    
+    if (!code) {
+      console.error("❌ code es requerido");
+      return {
+        success: false,
+        message: "El código es requerido",
       };
     }
 
@@ -569,16 +809,40 @@ exports.resetPasswordWithVerifiedCode = onCall(
     cors: true,
   },
   async (request) => {
-    const { email, sessionToken, newPassword } = request.data;
+    // Manejar datos que pueden venir directamente o dentro de 'data'
+    // Cuando se llama desde HTTP POST, los datos pueden estar en request.data.data
+    const requestData = request.data?.data || request.data || {};
+    
+    console.log("📋 Datos recibidos en resetPasswordWithVerifiedCode:", JSON.stringify(requestData, null, 2));
+    
+    const { email, sessionToken, newPassword } = requestData;
 
-    if (!email || !sessionToken || !newPassword) {
+    if (!email) {
+      console.error("❌ email es requerido");
       return {
         success: false,
-        message: "Email, sessionToken y nueva contraseña son requeridos",
+        message: "El email es requerido",
+      };
+    }
+    
+    if (!sessionToken) {
+      console.error("❌ sessionToken es requerido");
+      return {
+        success: false,
+        message: "El token de sesión es requerido",
+      };
+    }
+    
+    if (!newPassword) {
+      console.error("❌ newPassword es requerido");
+      return {
+        success: false,
+        message: "La nueva contraseña es requerida",
       };
     }
 
     if (newPassword.length < 6) {
+      console.error("❌ La contraseña debe tener al menos 6 caracteres");
       return {
         success: false,
         message: "La contraseña debe tener al menos 6 caracteres",
@@ -660,6 +924,12 @@ exports.sendReceiptEmail = onCall(
     secrets: ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "SMTP_SECURE", "SMTP_FROM"],
   },
   async (request) => {
+    // Manejar datos que pueden venir directamente o dentro de 'data'
+    // Cuando se llama desde HTTP POST, los datos pueden estar en request.data.data
+    const requestData = request.data?.data || request.data || {};
+    
+    console.log("📋 Datos recibidos en sendReceiptEmail:", JSON.stringify(requestData, null, 2));
+    
     const {
       orderId,
       userEmail,
@@ -674,12 +944,38 @@ exports.sendReceiptEmail = onCall(
       direccionEntrega,
       metodoPago,
       fechaCompra,
-    } = request.data;
+    } = requestData;
 
-    if (!userEmail || !orderId || !total || !productos) {
+    // Validar campos requeridos
+    if (!userEmail) {
+      console.error("❌ userEmail es requerido");
       return {
         success: false,
-        message: "Email, orderId, total y productos son requeridos",
+        message: "El email del usuario es requerido",
+      };
+    }
+    
+    if (!orderId) {
+      console.error("❌ orderId es requerido");
+      return {
+        success: false,
+        message: "El ID de la orden es requerido",
+      };
+    }
+    
+    if (total === undefined || total === null) {
+      console.error("❌ total es requerido");
+      return {
+        success: false,
+        message: "El total es requerido",
+      };
+    }
+    
+    if (!productos || !Array.isArray(productos) || productos.length === 0) {
+      console.error("❌ productos es requerido y debe ser un array no vacío");
+      return {
+        success: false,
+        message: "Los productos son requeridos y deben ser un array no vacío",
       };
     }
 

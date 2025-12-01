@@ -75,12 +75,12 @@ class _BuyerCartViewState extends State<BuyerCartView> {
       color: Theme.of(context).scaffoldBackgroundColor,
       child: Row(
         children: [
-          const Text(
+          Text(
             'Mi Carrito',
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF2E7D32),
+              color: isDark ? Colors.white : const Color(0xFF2E7D32),
             ),
           ),
           const Spacer(),
@@ -367,18 +367,23 @@ class _CartItemWidgetState extends State<_CartItemWidget> {
     required VoidCallback? onTap,
     required bool enabled,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: enabled && onTap != null ? onTap : null,
       child: Container(
         width: 32,
         height: 32,
         decoration: BoxDecoration(
-          color: enabled ? const Color(0xFF115213) : Colors.grey[300],
+          color: enabled 
+              ? const Color(0xFF2E7D32) 
+              : (isDark ? Colors.grey[700] : Colors.grey[300]),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(
           icon,
-          color: enabled ? Colors.white : Colors.grey[500],
+          color: enabled 
+              ? Colors.white 
+              : (isDark ? Colors.grey[500] : Colors.grey[500]),
           size: 18,
         ),
       ),
@@ -582,12 +587,12 @@ class _CartSummaryWidget extends StatelessWidget {
                   );
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF115213),
+                  backgroundColor: const Color(0xFF2E7D32),
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  elevation: 0,
+                  elevation: isDark ? 4 : 0,
                 ),
                 child: const Text(
                   'Continuar con la compra',

@@ -311,8 +311,11 @@ class _ChatViewState extends State<ChatView> {
                                                 fontWeight: unreadCount > 0 ? FontWeight.bold : FontWeight.w500,
                                                 color: Theme.of(context).textTheme.titleMedium?.color,
                                               ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
                                             ),
                                           ),
+                                          const SizedBox(width: 8),
                                           Text(
                                             _formatTimestamp(timestamp),
                                             style: TextStyle(

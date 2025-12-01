@@ -1,6 +1,7 @@
 import 'package:agromarket/views/profile/user_profile_menu_view.dart';
 import 'package:agromarket/views/vendor/list_product_view.dart';
 import 'package:agromarket/views/vendor/register_product_view.dart';
+import 'package:agromarket/views/vendor/vendor_welcome_page.dart';
 import 'package:agromarket/views/buyer/buyer_home_view.dart';
 import 'package:agromarket/views/buyer/buyer_cart_view.dart';
 import 'package:agromarket/views/buyer/buyer_list_productos.dart';
@@ -234,8 +235,8 @@ class _ProductEstructureViewState extends State<ProductEstructureView> {
       // Navegación para vendedores
       return [
         _buildNavItem(Icons.home_outlined, currentIndex == 0), 
-        _buildNavItem(Icons.add, currentIndex == 1), 
-        _buildNavItem(Icons.add, currentIndex == 2), 
+        _buildNavItem(Icons.add, currentIndex == 1), // Agregar producto
+        _buildNavItem(Icons.inventory_2_outlined, currentIndex == 2), // Listar productos
         _buildNavItem(Icons.menu, currentIndex == 3),
       ];
     }
@@ -326,35 +327,7 @@ class _ProductEstructureViewState extends State<ProductEstructureView> {
 
   /// Contenido para la pestaña Home
   Widget _buildHomeContent() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.home,
-            size: 80,
-            color: Color.fromARGB(255, 255, 255, 255),
-          ),
-          SizedBox(height: 20),
-          Text(
-            'Bienvenido a AgroMarket',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF115213),
-            ),
-          ),
-          SizedBox(height: 10),
-          Text(
-            'Tu plataforma de productos agrícolas',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey,
-            ),
-          ),
-        ],
-      ),
-    );
+    return const VendorWelcomePageContent();
   }
 
   /// Trunca el nombre si excede el máximo de caracteres

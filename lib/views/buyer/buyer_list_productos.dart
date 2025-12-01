@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:agromarket/models/product_model.dart';
 import 'package:agromarket/services/product_service.dart';
+import 'package:agromarket/services/sanitization_service.dart';
 import 'package:agromarket/views/buyer/product_detail_view.dart';
 
 class BuyerListProductosView extends StatefulWidget {
@@ -713,7 +714,8 @@ class _BuyerListProductosViewState extends State<BuyerListProductosView> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      product.nombre,
+                      // Sanitizar el nombre al mostrarlo para prevenir XSS
+                      SanitizationService.sanitizeName(product.nombre),
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -724,7 +726,8 @@ class _BuyerListProductosViewState extends State<BuyerListProductosView> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      product.descripcion,
+                      // Sanitizar la descripción al mostrarla para prevenir XSS
+                      SanitizationService.sanitizeDescription(product.descripcion),
                       style: TextStyle(
                         fontSize: 14,
                         color: isDark ? Colors.grey[400] : const Color(0xFF666666),
@@ -733,14 +736,66 @@ class _BuyerListProductosViewState extends State<BuyerListProductosView> {
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 8),
-                  Text(
-                    '\$${product.precio.toStringAsFixed(2)} / ${product.unidad}',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF115213),
-                    ),
-                  ),
+                  // Mostrar precio con descuento si existe
+                  product.tieneDescuento
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '\$${product.precio.toStringAsFixed(2)}',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.normal,
+                                color: isDark ? Colors.grey[500] : Colors.grey[600],
+                                decoration: TextDecoration.lineThrough,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Row(
+                              children: [
+                                Text(
+                                  '\$${product.precioFinal.toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF4CAF50),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF4CAF50).withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    '${product.descuento.toStringAsFixed(0)}% OFF',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF4CAF50),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Text(
+                              ' / ${product.unidad}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark ? Colors.grey[400] : const Color(0xFF666666),
+                              ),
+                            ),
+                          ],
+                        )
+                      : Text(
+                          '\$${product.precioFinal.toStringAsFixed(2)} / ${product.unidad}',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF115213),
+                          ),
+                        ),
                   const SizedBox(height: 8),
                   // Mostrar calificación y comentarios
                   Row(

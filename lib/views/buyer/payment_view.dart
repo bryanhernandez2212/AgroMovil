@@ -8,6 +8,7 @@ import 'package:agromarket/services/cart_service.dart';
 import 'package:agromarket/services/stripe_service.dart';
 import 'package:agromarket/services/stock_service.dart';
 import 'package:agromarket/services/firebase_service.dart';
+import 'package:agromarket/services/sanitization_service.dart';
 import 'package:agromarket/views/buyer/order_confirmation_view.dart';
 
 class PaymentView extends StatefulWidget {
@@ -207,7 +208,7 @@ class _PaymentViewState extends State<PaymentView> {
               merchantDisplayName: 'AgroMarket',
               billingDetails: BillingDetails(
                 name: _cardHolderNameController.text.isNotEmpty 
-                    ? _cardHolderNameController.text 
+                    ? SanitizationService.sanitizeName(_cardHolderNameController.text.trim()) 
                     : user.displayName ?? user.email?.split('@').first ?? 'Cliente',
                 email: user.email,
               ),
@@ -345,7 +346,7 @@ class _PaymentViewState extends State<PaymentView> {
                 merchantDisplayName: 'AgroMarket',
                 billingDetails: BillingDetails(
                   name: _cardHolderNameController.text.isNotEmpty 
-                      ? _cardHolderNameController.text 
+                      ? SanitizationService.sanitizeName(_cardHolderNameController.text.trim()) 
                       : user.displayName ?? user.email?.split('@').first ?? 'Cliente',
                   email: user.email,
                 ),
@@ -534,19 +535,23 @@ class _PaymentViewState extends State<PaymentView> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF115213)),
+          icon: Icon(
+            Icons.arrow_back,
+            color: isDark ? Colors.white : const Color(0xFF2E7D32),
+          ),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
+        title: Text(
           'Método de pago',
           style: TextStyle(
-            color: Color(0xFF115213),
+            color: isDark ? Colors.white : const Color(0xFF2E7D32),
             fontSize: 20,
             fontWeight: FontWeight.bold,
           ),
@@ -561,10 +566,14 @@ class _PaymentViewState extends State<PaymentView> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF115213).withOpacity(0.05),
+                  color: isDark 
+                      ? const Color(0xFF1E1E1E) 
+                      : const Color(0xFF115213).withOpacity(0.05),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: const Color(0xFF115213).withOpacity(0.2),
+                    color: isDark 
+                        ? Colors.grey[700]! 
+                        : const Color(0xFF115213).withOpacity(0.2),
                   ),
                 ),
                 child: Column(
@@ -574,11 +583,17 @@ class _PaymentViewState extends State<PaymentView> {
                       children: [
                         Text(
                           'Subtotal',
-                          style: TextStyle(color: Colors.grey[700], fontSize: 14),
+                          style: TextStyle(
+                            color: isDark ? Colors.grey[400] : Colors.grey[700],
+                            fontSize: 14,
+                          ),
                         ),
                         Text(
                           '\$${_subtotal.toStringAsFixed(2)}',
-                          style: TextStyle(color: Colors.grey[700], fontSize: 14),
+                          style: TextStyle(
+                            color: isDark ? Colors.grey[400] : Colors.grey[700],
+                            fontSize: 14,
+                          ),
                         ),
                       ],
                     ),
@@ -588,11 +603,17 @@ class _PaymentViewState extends State<PaymentView> {
                       children: [
                         Text(
                           'Envío',
-                          style: TextStyle(color: Colors.grey[700], fontSize: 14),
+                          style: TextStyle(
+                            color: isDark ? Colors.grey[400] : Colors.grey[700],
+                            fontSize: 14,
+                          ),
                         ),
                         Text(
                           '\$${_envio.toStringAsFixed(2)}',
-                          style: TextStyle(color: Colors.grey[700], fontSize: 14),
+                          style: TextStyle(
+                            color: isDark ? Colors.grey[400] : Colors.grey[700],
+                            fontSize: 14,
+                          ),
                         ),
                       ],
                     ),
@@ -602,32 +623,41 @@ class _PaymentViewState extends State<PaymentView> {
                       children: [
                         Text(
                           'Impuestos (10%)',
-                          style: TextStyle(color: Colors.grey[700], fontSize: 14),
+                          style: TextStyle(
+                            color: isDark ? Colors.grey[400] : Colors.grey[700],
+                            fontSize: 14,
+                          ),
                         ),
                         Text(
                           '\$${_impuestos.toStringAsFixed(2)}',
-                          style: TextStyle(color: Colors.grey[700], fontSize: 14),
+                          style: TextStyle(
+                            color: isDark ? Colors.grey[400] : Colors.grey[700],
+                            fontSize: 14,
+                          ),
                         ),
                       ],
                     ),
-                    const Divider(height: 24),
+                    Divider(
+                      height: 24,
+                      color: isDark ? Colors.grey[700] : Colors.grey[300],
+                    ),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
+                        Text(
                           'Total',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF115213),
+                            color: isDark ? Colors.white : const Color(0xFF2E7D32),
                           ),
                         ),
                         Text(
                           '\$${_total.toStringAsFixed(2)}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF115213),
+                            color: isDark ? Colors.white : const Color(0xFF2E7D32),
                           ),
                         ),
                       ],
@@ -636,12 +666,12 @@ class _PaymentViewState extends State<PaymentView> {
                 ),
               ),
               const SizedBox(height: 32),
-              const Text(
+              Text(
                 'Selecciona método de pago',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF1A1A1A),
+                  color: isDark ? Colors.white : const Color(0xFF1A1A1A),
                 ),
               ),
               const SizedBox(height: 16),
@@ -660,12 +690,12 @@ class _PaymentViewState extends State<PaymentView> {
                   child: ElevatedButton(
                     onPressed: _isProcessing ? null : _processPayment,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF115213),
+                      backgroundColor: const Color(0xFF2E7D32),
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      elevation: 0,
+                      elevation: isDark ? 4 : 0,
                     ),
                     child: _isProcessing
                         ? const SizedBox(
@@ -700,6 +730,7 @@ class _PaymentViewState extends State<PaymentView> {
     IconData icon,
     bool isSelected,
   ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InkWell(
       onTap: () {
         setState(() {
@@ -711,13 +742,13 @@ class _PaymentViewState extends State<PaymentView> {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFF115213).withOpacity(0.1)
-              : Colors.grey[50],
+              ? (isDark ? Colors.grey[800] : Colors.white)
+              : (isDark ? Colors.grey[800] : Colors.grey[50]),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected
-                ? const Color(0xFF115213)
-                : Colors.grey[300]!,
+                ? const Color(0xFF2E7D32)
+                : (isDark ? Colors.grey[700]! : Colors.grey[300]!),
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -725,7 +756,9 @@ class _PaymentViewState extends State<PaymentView> {
           children: [
             Icon(
               icon,
-              color: isSelected ? const Color(0xFF115213) : Colors.grey[600],
+              color: isSelected 
+                  ? const Color(0xFF2E7D32)
+                  : (isDark ? Colors.grey[400] : Colors.grey[600]),
               size: 24,
             ),
             const SizedBox(width: 16),
@@ -735,14 +768,16 @@ class _PaymentViewState extends State<PaymentView> {
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  color: isSelected ? const Color(0xFF115213) : const Color(0xFF1A1A1A),
+                  color: isSelected 
+                      ? const Color(0xFF2E7D32)
+                      : (isDark ? Colors.white : const Color(0xFF1A1A1A)),
                 ),
               ),
             ),
             if (isSelected)
               const Icon(
                 Icons.check_circle,
-                color: Color(0xFF115213),
+                color: Color(0xFF2E7D32),
                 size: 24,
               ),
           ],

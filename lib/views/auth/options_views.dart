@@ -254,7 +254,9 @@ class _OptionPageState extends State<OptionPage> with TickerProviderStateMixin {
                               child: Icon(
                                 icon,
                                 size: constraints.maxWidth * 0.09,
-                                color: cardColor,
+                                color: isDark && icon == Icons.shopping_cart
+                                    ? Colors.white
+                                    : cardColor,
                               ),
                             ),
                             SizedBox(width: constraints.maxWidth * 0.03),

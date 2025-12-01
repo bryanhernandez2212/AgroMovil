@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:agromarket/models/cart_item_model.dart';
+import 'package:agromarket/services/sanitization_service.dart';
 import 'package:agromarket/views/buyer/payment_view.dart';
 
 class ShippingAddressView extends StatefulWidget {
@@ -96,19 +97,23 @@ class _ShippingAddressViewState extends State<ShippingAddressView> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF115213)),
+          icon: Icon(
+            Icons.arrow_back,
+            color: isDark ? Colors.white : const Color(0xFF2E7D32),
+          ),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
+        title: Text(
           'Dirección de envío',
           style: TextStyle(
-            color: Color(0xFF115213),
+            color: isDark ? Colors.white : const Color(0xFF2E7D32),
             fontSize: 20,
             fontWeight: FontWeight.bold,
           ),
@@ -126,17 +131,21 @@ class _ShippingAddressViewState extends State<ShippingAddressView> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF115213).withOpacity(0.05),
+                    color: isDark 
+                        ? const Color(0xFF1E1E1E) 
+                        : const Color(0xFF115213).withOpacity(0.05),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: const Color(0xFF115213).withOpacity(0.2),
+                      color: isDark 
+                          ? Colors.grey[700]! 
+                          : const Color(0xFF115213).withOpacity(0.2),
                     ),
                   ),
                   child: Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.shopping_cart_outlined,
-                        color: Color(0xFF115213),
+                        color: const Color(0xFF2E7D32),
                         size: 24,
                       ),
                       const SizedBox(width: 12),
@@ -146,17 +155,17 @@ class _ShippingAddressViewState extends State<ShippingAddressView> {
                           children: [
                             Text(
                               '${widget.cartItems.length} producto${widget.cartItems.length != 1 ? 's' : ''}',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 14,
-                                color: Colors.grey,
+                                color: isDark ? Colors.grey[400] : Colors.grey,
                               ),
                             ),
                             Text(
                               'Total: \$${widget.cartTotal.toStringAsFixed(2)}',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFF115213),
+                                color: isDark ? Colors.white : const Color(0xFF2E7D32),
                               ),
                             ),
                           ],
@@ -168,12 +177,12 @@ class _ShippingAddressViewState extends State<ShippingAddressView> {
                 const SizedBox(height: 32),
 
                 // Título
-                const Text(
+                Text(
                   'Información de envío',
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF1A1A1A),
+                    color: isDark ? Colors.white : const Color(0xFF1A1A1A),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -181,7 +190,43 @@ class _ShippingAddressViewState extends State<ShippingAddressView> {
                   'Ingresa los datos para la entrega de tu pedido',
                   style: TextStyle(
                     fontSize: 14,
-                    color: Colors.grey[600],
+                    color: isDark ? Colors.grey[400] : Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Mensaje informativo sobre tiempo de entrega
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isDark 
+                        ? const Color(0xFF2E7D32).withOpacity(0.2)
+                        : const Color(0xFF2E7D32).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isDark 
+                          ? const Color(0xFF2E7D32).withOpacity(0.3)
+                          : const Color(0xFF2E7D32).withOpacity(0.2),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.local_shipping_outlined,
+                        color: const Color(0xFF2E7D32),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Tu pedido llegará en 1 a 2 días hábiles',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: isDark ? Colors.white : const Color(0xFF2E7D32),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -189,22 +234,32 @@ class _ShippingAddressViewState extends State<ShippingAddressView> {
                 // Campo de ciudad (Dropdown)
                 DropdownButtonFormField<String>(
                   value: _selectedCiudad,
+                  style: TextStyle(
+                    color: isDark ? Colors.white : Colors.black,
+                  ),
                   decoration: InputDecoration(
                     labelText: 'Ciudad *',
-                    prefixIcon: const Icon(Icons.location_city, color: Color(0xFF115213)),
+                    labelStyle: TextStyle(
+                      color: isDark ? Colors.grey[400] : Colors.grey[600],
+                    ),
+                    prefixIcon: const Icon(Icons.location_city, color: Color(0xFF2E7D32)),
                     filled: true,
-                    fillColor: Colors.grey[50],
+                    fillColor: isDark ? Colors.grey[800] : Colors.grey[50],
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[300]!),
+                      borderSide: BorderSide(
+                        color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                      ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[300]!),
+                      borderSide: BorderSide(
+                        color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                      ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFF115213), width: 2),
+                      borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
                     ),
                     errorBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -215,11 +270,17 @@ class _ShippingAddressViewState extends State<ShippingAddressView> {
                       borderSide: const BorderSide(color: Colors.red, width: 2),
                     ),
                   ),
+                  dropdownColor: isDark ? Colors.grey[800] : Colors.white,
                   validator: _validateCiudad,
                   items: _ciudades.map((ciudad) {
                     return DropdownMenuItem<String>(
                       value: ciudad,
-                      child: Text(ciudad),
+                      child: Text(
+                        ciudad,
+                        style: TextStyle(
+                          color: isDark ? Colors.white : Colors.black,
+                        ),
+                      ),
                     );
                   }).toList(),
                   onChanged: (value) {
@@ -233,23 +294,36 @@ class _ShippingAddressViewState extends State<ShippingAddressView> {
                 // Campo de teléfono
                 TextFormField(
                   controller: _telefonoController,
+                  style: TextStyle(
+                    color: isDark ? Colors.white : Colors.black,
+                  ),
                   decoration: InputDecoration(
                     labelText: 'Teléfono *',
+                    labelStyle: TextStyle(
+                      color: isDark ? Colors.grey[400] : Colors.grey[600],
+                    ),
                     hintText: 'Ej: 9671636739',
-                    prefixIcon: const Icon(Icons.phone, color: Color(0xFF115213)),
+                    hintStyle: TextStyle(
+                      color: isDark ? Colors.grey[500] : Colors.grey[400],
+                    ),
+                    prefixIcon: const Icon(Icons.phone, color: Color(0xFF2E7D32)),
                     filled: true,
-                    fillColor: Colors.grey[50],
+                    fillColor: isDark ? Colors.grey[800] : Colors.grey[50],
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[300]!),
+                      borderSide: BorderSide(
+                        color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                      ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[300]!),
+                      borderSide: BorderSide(
+                        color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                      ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFF115213), width: 2),
+                      borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
                     ),
                     errorBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -277,12 +351,12 @@ class _ShippingAddressViewState extends State<ShippingAddressView> {
                   child: ElevatedButton(
                     onPressed: _continueToPayment,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF115213),
+                      backgroundColor: const Color(0xFF2E7D32),
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      elevation: 0,
+                      elevation: isDark ? 4 : 0,
                     ),
                     child: const Text(
                       'Continuar al pago',

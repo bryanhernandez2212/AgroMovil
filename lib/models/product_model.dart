@@ -20,6 +20,8 @@ class ProductModel {
   final double calificacionPromedio;
   final int totalCalificaciones;
   final int vendido;
+  final double descuento; // Porcentaje de descuento (0-100)
+  final double precioConDescuento; // Precio calculado con descuento aplicado
 
   ProductModel({
     required this.id,
@@ -41,6 +43,8 @@ class ProductModel {
     this.calificacionPromedio = 0.0,
     this.totalCalificaciones = 0,
     this.vendido = 0,
+    this.descuento = 0.0,
+    this.precioConDescuento = 0.0,
   });
 
   factory ProductModel.fromJson(Map<String, dynamic> json) {
@@ -88,6 +92,8 @@ class ProductModel {
       calificacionPromedio: (json['calificacion_promedio'] ?? 0.0).toDouble(),
       totalCalificaciones: json['total_calificaciones'] ?? 0,
       vendido: json['vendido'] ?? 0,
+      descuento: (json['descuento'] ?? 0.0).toDouble(),
+      precioConDescuento: (json['precio_con_descuento'] ?? 0.0).toDouble(),
     );
   }
 
@@ -115,6 +121,8 @@ class ProductModel {
       'calificacion_promedio': calificacionPromedio,
       'total_calificaciones': totalCalificaciones,
       'vendido': vendido,
+      'descuento': descuento,
+      'precio_con_descuento': precioConDescuento,
     };
   }
 
@@ -132,9 +140,16 @@ class ProductModel {
     required String vendedorId,
     required String vendedorNombre,
     String? id,
+    double descuento = 0.0,
   }) {
     // Determinar la imagen principal (primera del array o imagen individual)
     String imagenPrincipal = imagenes.isNotEmpty ? imagenes.first : imagenUrl;
+    
+    // Calcular precio con descuento
+    double precioConDescuentoCalculado = precio;
+    if (descuento > 0 && descuento <= 100) {
+      precioConDescuentoCalculado = precio * (1 - descuento / 100);
+    }
     
     return ProductModel(
       id: id ?? '',
@@ -156,8 +171,21 @@ class ProductModel {
       calificacionPromedio: 0.0,
       totalCalificaciones: 0,
       vendido: 0,
+      descuento: descuento,
+      precioConDescuento: precioConDescuentoCalculado,
     );
   }
+  
+  // Getter para obtener el precio final (con descuento si existe, sino precio normal)
+  double get precioFinal {
+    if (descuento > 0 && precioConDescuento > 0) {
+      return precioConDescuento;
+    }
+    return precio;
+  }
+  
+  // Getter para verificar si tiene descuento
+  bool get tieneDescuento => descuento > 0 && precioConDescuento > 0;
 
   @override
   String toString() {

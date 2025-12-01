@@ -924,7 +924,9 @@ class _ProfileViewState extends State<ProfileView> {
                         children: [
                           Icon(
                             Icons.shopping_cart,
-                            color: hasBuyer ? const Color(0xFF1976D2) : Colors.grey,
+                            color: hasBuyer 
+                                ? (isDark ? Colors.white : const Color(0xFF1976D2))
+                                : Colors.grey,
                             size: 24,
                           ),
                           const SizedBox(width: 12),
@@ -953,7 +955,7 @@ class _ProfileViewState extends State<ProfileView> {
                       Switch(
                         value: hasBuyer,
                         onChanged: (value) => _toggleRole('comprador', value, authController),
-                        activeColor: const Color(0xFF1976D2),
+                        activeColor: isDark ? Colors.white : const Color(0xFF1976D2),
                       ),
                     ],
                   ),

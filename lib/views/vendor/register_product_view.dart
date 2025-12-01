@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:agromarket/models/product_model.dart';
 import 'package:agromarket/services/product_service.dart';
+import 'package:agromarket/services/sanitization_service.dart';
 import 'package:agromarket/widgets/role_guard.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -26,6 +27,7 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
   final TextEditingController _categoryController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _unitController = TextEditingController();
+  final TextEditingController _discountController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
   late AnimationController _animationController;
@@ -74,6 +76,14 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
     if (widget.productToEdit != null) {
       _loadProductData(widget.productToEdit!);
     }
+    
+    // Listener para actualizar precio con descuento en tiempo real
+    _discountController.addListener(() {
+      setState(() {}); // Actualizar UI cuando cambie el descuento
+    });
+    _priceController.addListener(() {
+      setState(() {}); // Actualizar UI cuando cambie el precio
+    });
   }
 
   // Cargar datos del producto para editar
@@ -84,6 +94,7 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
     _descriptionController.text = product.descripcion;
     _selectedCategory = product.categoria;
     _selectedUnit = product.unidad;
+    _discountController.text = product.descuento.toString();
     // Cargar imágenes existentes (array o imagen única)
     _existingImageUrls = product.imagenes.isNotEmpty
         ? List<String>.from(product.imagenes)
@@ -119,6 +130,7 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
     _categoryController.dispose();
     _descriptionController.dispose();
     _unitController.dispose();
+    _discountController.dispose();
     _animationController.dispose();
     super.dispose();
   }
@@ -288,6 +300,15 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
       return;
     }
 
+    // Validar descuento si se ingresó
+    if (_discountController.text.trim().isNotEmpty) {
+      final descuento = double.tryParse(_discountController.text.trim());
+      if (descuento == null || descuento < 0 || descuento > 100) {
+        _showErrorDialog('El descuento debe ser un número entre 0 y 100');
+        return;
+      }
+    }
+
     // Validar que haya al menos una imagen (nueva o existente)
     if (_selectedImages.isEmpty && _existingImageUrls.isEmpty) {
       _showErrorDialog('Por favor selecciona al menos una imagen del producto');
@@ -320,10 +341,16 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
         // Si es producto nuevo, primero crear el documento para obtener el ID
         if (productId.isEmpty) {
           print('Creando documento temporal para obtener ID...');
+          final descuento = double.tryParse(_discountController.text.trim()) ?? 0.0;
+          
+          // Sanitizar entradas
+          final nombreSanitizado = SanitizationService.sanitizeName(_nameController.text.trim());
+          final descripcionSanitizada = SanitizationService.sanitizeDescription(_descriptionController.text.trim());
+          
           final tempProduct = ProductModel.fromForm(
-            nombre: _nameController.text.trim(),
+            nombre: nombreSanitizado,
             categoria: _selectedCategory!,
-            descripcion: _descriptionController.text.trim(),
+            descripcion: descripcionSanitizada,
             precio: double.parse(_priceController.text.trim()),
             stock: int.parse(_stockController.text.trim()),
             unidad: _selectedUnit!,
@@ -334,6 +361,7 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
             vendedorEmail: user.email ?? '',
             vendedorId: user.uid,
             vendedorNombre: user.displayName ?? 'Usuario',
+            descuento: descuento,
           );
 
           // Crear documento temporal
@@ -375,10 +403,38 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
 
       // Crear el modelo del producto con todas las URLs
       print('Creando modelo del producto...');
+      final descuento = double.tryParse(_discountController.text.trim()) ?? 0.0;
+      
+      // Sanitizar entradas de usuario para prevenir inyecciones
+      final nombreSanitizado = SanitizationService.sanitizeName(_nameController.text.trim());
+      final descripcionSanitizada = SanitizationService.sanitizeDescription(_descriptionController.text.trim());
+      
+      // Validar que los campos sanitizados no estén vacíos
+      if (nombreSanitizado.isEmpty) {
+        _showErrorDialog('El nombre del producto contiene caracteres no permitidos');
+        return;
+      }
+      
+      if (descripcionSanitizada.isEmpty) {
+        _showErrorDialog('La descripción contiene caracteres no permitidos');
+        return;
+      }
+      
+      // Validar que no contenga código malicioso
+      if (!SanitizationService.isSafe(_nameController.text.trim())) {
+        _showErrorDialog('El nombre del producto contiene código no permitido');
+        return;
+      }
+      
+      if (!SanitizationService.isSafe(_descriptionController.text.trim())) {
+        _showErrorDialog('La descripción contiene código no permitido');
+        return;
+      }
+      
       final product = ProductModel.fromForm(
-        nombre: _nameController.text.trim(),
+        nombre: nombreSanitizado,
         categoria: _selectedCategory!,
-        descripcion: _descriptionController.text.trim(),
+        descripcion: descripcionSanitizada,
         precio: double.parse(_priceController.text.trim()),
         stock: int.parse(_stockController.text.trim()),
         unidad: _selectedUnit!,
@@ -390,6 +446,7 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
         vendedorId: user.uid,
         vendedorNombre: user.displayName ?? 'Usuario',
         id: productId,
+        descuento: descuento,
       );
 
       print('Producto creado: ${product.nombre}');
@@ -496,9 +553,6 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
 
   @override
   Widget build(BuildContext context) {
-    final mediaQuery = MediaQuery.of(context);
-    final keyboardHeight = mediaQuery.viewInsets.bottom;
-
     return VendorGuard(
       child: Scaffold(
         resizeToAvoidBottomInset: true,
@@ -771,6 +825,80 @@ class _RegisterProductViewContentState extends State<RegisterProductViewContent>
                                     },
                                     constraints: constraints,
                                   ),
+
+                                  SizedBox(
+                                      height:
+                                          constraints.maxHeight *
+                                              0.015),
+
+                                  // Campo de descuento
+                                  _buildFormField(
+                                    label: "Descuento (%)",
+                                    controller: _discountController,
+                                    icon: Icons.local_offer,
+                                    keyboardType: TextInputType.numberWithOptions(decimal: true),
+                                    constraints: constraints,
+                                  ),
+                                  
+                                  // Mostrar precio con descuento si hay descuento
+                                  if (_discountController.text.isNotEmpty)
+                                    Builder(
+                                      builder: (context) {
+                                        final descuento = double.tryParse(_discountController.text.trim()) ?? 0.0;
+                                        final precio = double.tryParse(_priceController.text.trim()) ?? 0.0;
+                                        if (descuento > 0 && descuento <= 100 && precio > 0) {
+                                          final precioConDescuento = precio * (1 - descuento / 100);
+                                          final isDark = Theme.of(context).brightness == Brightness.dark;
+                                          return Padding(
+                                            padding: EdgeInsets.only(top: constraints.maxHeight * 0.01),
+                                            child: Container(
+                                              padding: const EdgeInsets.all(12),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFF4CAF50).withOpacity(0.1),
+                                                borderRadius: BorderRadius.circular(12),
+                                                border: Border.all(
+                                                  color: const Color(0xFF4CAF50).withOpacity(0.3),
+                                                ),
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.check_circle_outline,
+                                                    color: const Color(0xFF4CAF50),
+                                                    size: 20,
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Expanded(
+                                                    child: Column(
+                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      children: [
+                                                        Text(
+                                                          'Precio con descuento:',
+                                                          style: TextStyle(
+                                                            fontSize: constraints.maxWidth * 0.03,
+                                                            color: isDark ? Colors.grey[300] : const Color(0xFF2F4157),
+                                                            fontWeight: FontWeight.w500,
+                                                          ),
+                                                        ),
+                                                        Text(
+                                                          '\$${precioConDescuento.toStringAsFixed(2)}',
+                                                          style: TextStyle(
+                                                            fontSize: constraints.maxWidth * 0.04,
+                                                            color: const Color(0xFF4CAF50),
+                                                            fontWeight: FontWeight.bold,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          );
+                                        }
+                                        return const SizedBox.shrink();
+                                      },
+                                    ),
 
                                   SizedBox(
                                       height:

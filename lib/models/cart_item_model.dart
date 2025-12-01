@@ -35,7 +35,7 @@ class CartItemModel {
       productImage: product.imagenes.isNotEmpty 
           ? product.imagenes.first 
           : (product.imagen ?? product.imagenUrl),
-      unitPrice: product.precio,
+      unitPrice: product.precioFinal, // Usar precio con descuento si existe
       unit: product.unidad,
       quantity: quantity,
       sellerId: product.vendedorId,

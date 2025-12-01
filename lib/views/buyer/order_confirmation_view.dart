@@ -204,6 +204,48 @@ class _OrderConfirmationViewState extends State<OrderConfirmationView> {
                     _buildInfoRow('Destino', widget.order.ciudad.isNotEmpty ? widget.order.ciudad : 'No especificado'),
                       if (widget.order.telefono.isNotEmpty)
                         _buildInfoRow('Teléfono', widget.order.telefono),
+                      Builder(
+                        builder: (context) {
+                          final isDark = Theme.of(context).brightness == Brightness.dark;
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: isDark 
+                                    ? const Color(0xFF2E7D32).withOpacity(0.2)
+                                    : const Color(0xFF2E7D32).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: isDark 
+                                      ? const Color(0xFF2E7D32).withOpacity(0.3)
+                                      : const Color(0xFF2E7D32).withOpacity(0.2),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.local_shipping_outlined,
+                                    color: Color(0xFF2E7D32),
+                                    size: 18,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      'Tu pedido llegará en 1 a 2 días hábiles',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: isDark ? Colors.white : const Color(0xFF2E7D32),
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                     ]),
                     const SizedBox(height: 24),
 

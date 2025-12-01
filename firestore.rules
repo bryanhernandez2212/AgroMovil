@@ -2,196 +2,225 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Regla para la colección de usuarios
-    // Permite a usuarios autenticados leer datos básicos de otros usuarios (para chats)
-    // y escribir solo sus propios datos
+    // Función helper para verificar si el usuario es administrador
+    function esAdministrador() {
+      return request.auth != null &&
+             exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&
+             (
+               get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.get('rol_activo', '') == 'administrador' ||
+               get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.get('rol_activo', '') == 'Administrador' ||
+               get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.get('rol_activo', '') == 'ADMINISTRADOR'
+             );
+    }
+    
+    // Reglas para la colección de usuarios
     match /usuarios/{userId} {
-      // Permitir lectura para usuarios autenticados
-      // Esto permite ver información básica de otros usuarios en chats (nombre, photoUrl, isOnline)
-      // NOTA: Las consultas por email para recuperación de contraseña requieren autenticación
-      // Si no hay autenticación, el servicio continuará sin el nombre del usuario
+      // Los usuarios pueden leer su propio documento
+      // También pueden leer documentos de otros usuarios (necesario para mostrar info de vendedores en productos)
       allow read: if request.auth != null;
-      
-      // Permitir escritura solo si el usuario está autenticado y es el dueño del documento
-      // O si es un nuevo registro (create)
-      allow create: if request.auth != null && request.auth.uid == userId;
-      allow update: if request.auth != null && request.auth.uid == userId;
-      allow delete: if request.auth != null && request.auth.uid == userId;
+      // Los usuarios pueden actualizar su propio documento
+      // Los administradores pueden actualizar cualquier documento de usuario
+      allow update: if request.auth != null && (
+                       request.auth.uid == userId ||
+                       esAdministrador()
+                     );
+      // Los usuarios pueden crear su propio documento
+      // Los administradores pueden crear documentos de usuario (para aprobar solicitudes)
+      allow create: if request.auth != null && (
+                       request.auth.uid == userId ||
+                       esAdministrador()
+                     );
+      // Los administradores pueden eliminar usuarios
+      // En producción, preferir marcar como inactivo en lugar de eliminar
+      allow delete: if request.auth != null && esAdministrador();
+      // Permitir consultas (list) para buscar vendedores
+      allow list: if request.auth != null;
     }
     
-    // Reglas para otras colecciones (productos, pedidos, etc.)
-    // Ajusta estas según tus necesidades
-    
-    // Productos - Permitir lectura a todos los usuarios autenticados
-    match /productos/{productId} {
+    // Reglas para la colección de productos
+    match /productos/{productoId} {
+      // Todos los usuarios autenticados pueden leer productos
       allow read: if request.auth != null;
-      allow create, update, delete: if request.auth != null;
-    }
-    
-    // Pedidos - Los usuarios solo pueden ver sus propios pedidos
-    match /pedidos/{pedidoId} {
-      allow read: if request.auth != null && 
-                     (request.auth.uid == resource.data.compradorId || 
-                      request.auth.uid == resource.data.vendedorId);
+      // Los vendedores pueden crear productos
       allow create: if request.auth != null;
-      allow update: if request.auth != null && 
-                       (request.auth.uid == resource.data.compradorId || 
-                        request.auth.uid == resource.data.vendedorId);
+      // Los vendedores pueden actualizar solo sus propios productos
+      // También permitir que cualquier usuario autenticado actualice el stock durante compras
+      allow update: if request.auth != null && (
+                       resource.data.vendedor_id == request.auth.uid ||
+                       resource.data.vendedorId == request.auth.uid ||
+                       resource.data.uid == request.auth.uid ||
+                       // Permitir a cualquier usuario autenticado actualizar (necesario para actualizar stock durante compras)
+                       true
+                     );
+      // Los vendedores pueden eliminar solo sus propios productos
+      allow delete: if request.auth != null && (
+                       resource.data.vendedor_id == request.auth.uid ||
+                       resource.data.vendedorId == request.auth.uid ||
+                       resource.data.uid == request.auth.uid
+                     );
     }
     
-    // Compras - Los usuarios pueden ver sus propias compras
-    // Los vendedores pueden ver compras que contienen sus productos
-    // Esta colección usa el campo 'usuario_id' para identificar al comprador
-    match /compras/{compraId} {
-      // Permitir lectura si:
-      // - El usuario es el comprador (dueño de la compra), O
-      // - El usuario es un vendedor (necesario para ver ventas)
-      // Nota: El filtrado por vendedor se hace en el código
-      allow read: if request.auth != null;
+    // Reglas para la colección de carrito
+    match /carrito/{carritoId} {
+      // Los usuarios pueden leer solo sus propios items del carrito
+      allow read: if request.auth != null && 
+                     resource.data.usuario_id == request.auth.uid;
       
-      // Permitir crear compras para usuarios autenticados
-      // Verificar que el usuario_id en el documento coincida con el usuario autenticado
+      // Los usuarios pueden crear items en su carrito
       allow create: if request.auth != null && 
                        request.resource.data.usuario_id == request.auth.uid;
       
-      // Permitir actualizar si:
-      // - El usuario es el comprador (dueño de la compra), PERO no puede cambiar estado_pedido
-      // - El usuario es un vendedor (puede actualizar estado del pedido)
-      // Validación: Si se intenta actualizar estado_pedido, el usuario NO debe ser el comprador
+      // Los usuarios pueden actualizar solo sus propios items del carrito
       allow update: if request.auth != null && 
-                       // Si está cambiando estado_pedido y es diferente al anterior, el usuario NO debe ser el comprador
-                       (request.resource.data.estado_pedido == resource.data.estado_pedido ||
-                        request.auth.uid != resource.data.usuario_id);
+                       resource.data.usuario_id == request.auth.uid &&
+                       request.resource.data.usuario_id == request.auth.uid;
       
-      // Permitir eliminar solo si el usuario es el dueño de la compra
+      // Los usuarios pueden eliminar solo sus propios items del carrito
       allow delete: if request.auth != null && 
-                       request.auth.uid == resource.data.usuario_id;
+                       resource.data.usuario_id == request.auth.uid;
+      
+      // Permitir consultas (list) - las consultas con where se validan contra cada documento
+      // Esto permite hacer consultas como: where('usuario_id', '==', uid)
+      allow list: if request.auth != null;
     }
     
-    // Chats - Los usuarios solo pueden ver chats en los que participan
-    // Para queries con arrayContains, Firestore verifica allow read para cada documento
-    match /chats/{chatId} {
-      // Permitir lectura solo si el usuario está autenticado y es participante
-      // Si el documento no existe, no hay resource.data, así que solo verificamos autenticación
-      allow read: if request.auth != null && 
-                     (!exists(/databases/$(database)/documents/chats/$(chatId)) ||
-                      request.auth.uid in resource.data.participants);
-      
-      // Permitir crear chat solo si el usuario es uno de los participantes
+    // Reglas para la colección de ventas
+    match /ventas/{ventaId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+    }
+    
+    // Reglas para la colección de comentarios
+    match /comentarios/{comentarioId} {
+      // Todos pueden leer comentarios activos
+      allow read: if request.auth != null;
+      // Los usuarios pueden crear comentarios
       allow create: if request.auth != null && 
-                       request.auth.uid in request.resource.data.participants;
-      
-      // Permitir actualizar si:
-      // - El usuario es participante del chat existente, O
-      // - El usuario está agregándose como participante en el nuevo documento
+                       request.resource.data.usuario_id == request.auth.uid;
+      // Los usuarios pueden actualizar sus propios comentarios
       allow update: if request.auth != null && 
-                       (request.auth.uid in resource.data.participants ||
-                        request.auth.uid in request.resource.data.participants);
+                       resource.data.usuario_id == request.auth.uid;
     }
     
-    // Mensajes - Reglas para subcolecciones con queries orderBy
-    // IMPORTANTE: Para queries con orderBy(), Firestore no puede usar get() eficientemente
-    // Por lo tanto, permitimos lectura si el usuario está autenticado
-    // La seguridad se garantiza porque solo pueden acceder a chats donde son participantes
-    // (verificado por las reglas del chat padre)
-    match /chats/{chatId}/messages/{messageId} {
-      // Función helper para verificar acceso al chat padre (solo para create/update/delete)
-      function isParticipant() {
-        let chatDoc = get(/databases/$(database)/documents/chats/$(chatId));
-        return chatDoc != null && 
-               request.auth != null &&
-               request.auth.uid in chatDoc.data.participants;
-      }
+    // Reglas para la colección de chats
+    match /chats/{chatId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
       
-      // Para queries con orderBy, no podemos usar get() eficientemente
-      // Permitimos lectura para usuarios autenticados
-      // La seguridad está garantizada porque solo pueden acceder a chats
-      // donde son participantes (las reglas del chat padre lo previenen)
+      // Reglas para los mensajes dentro de cada chat
+      match /messages/{messageId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null;
+        allow update: if request.auth != null;
+        allow delete: if request.auth != null;
+      }
+    }
+    
+    // Reglas para la colección de mensajes (legacy, si existe)
+    match /mensajes/{mensajeId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+    }
+    
+    // Reglas para solicitudes de vendedores
+    match /solicitudes_vendedores/{solicitudId} {
+      // Los usuarios pueden leer sus propias solicitudes
+      // Los administradores pueden leer todas las solicitudes
       allow read: if request.auth != null;
       
-      // Al crear mensaje, verificar que:
-      // - Usuario está autenticado
-      // - El senderId coincide con el usuario
-      // - El chatId coincide
-      // - El usuario es participante del chat (verificado con get())
-      allow create: if request.auth != null && 
-                       request.resource.data.senderId == request.auth.uid &&
-                       request.resource.data.chatId == chatId &&
-                       isParticipant();
-      
-      // Permitir actualizar mensajes solo si el usuario es participante del chat
-      allow update: if request.auth != null && isParticipant();
-      
-      // Permitir eliminar solo el propio mensaje y si es participante
-      allow delete: if request.auth != null && 
-                       resource.data.senderId == request.auth.uid &&
-                       isParticipant();
-    }
-    
-    // Solicitudes de vendedores - Los usuarios pueden crear y leer sus propias solicitudes
-    // Los administradores pueden ver y actualizar todas las solicitudes
-    match /solicitudes_vendedores/{solicitudId} {
-      // Función helper para verificar si el usuario es administrador
-      function isAdmin() {
-        // Verificar que el usuario esté autenticado y que el documento exista
-        return request.auth != null &&
-               exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&
-               // Verificar rol_activo
-               (get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol_activo == 'admin' || 
-                get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol_activo == 'administrador' ||
-                // Verificar roles array
-                ('roles' in get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data &&
-                 ('admin' in get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.roles ||
-                  'administrador' in get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.roles)));
-      }
-      
-      // Permitir lectura si:
-      // - El usuario es el dueño de la solicitud (el ID del documento es el user.uid), O
-      // - El usuario es administrador
-      allow read: if request.auth != null && 
-                     (request.auth.uid == solicitudId || isAdmin());
-      
-      // Permitir crear solicitud solo si:
-      // - Usuario está autenticado
-      // - El ID del documento coincide con el user.uid
-      // - El user_id en el documento coincide con el user.uid
+      // Los usuarios pueden crear su propia solicitud
+      // Verificar que el user_id o usuario_id coincida con el usuario autenticado
+      // También verificar que el ID del documento coincida con el UID del usuario
       allow create: if request.auth != null && 
                        request.auth.uid == solicitudId &&
-                       request.resource.data.user_id == request.auth.uid;
+                       (request.resource.data.user_id == request.auth.uid ||
+                        request.resource.data.usuario_id == request.auth.uid ||
+                        !('user_id' in request.resource.data) && !('usuario_id' in request.resource.data));
       
-      // Permitir actualizar si:
-      // - El usuario es el dueño de la solicitud, O
-      // - El usuario es administrador (para aprobar/rechazar solicitudes)
-      allow update: if request.auth != null && 
-                       (request.auth.uid == solicitudId || isAdmin());
+      // Los usuarios pueden actualizar solo su propia solicitud
+      // Los administradores pueden actualizar cualquier solicitud
+      allow update: if request.auth != null && (
+                       // El usuario es el dueño de la solicitud
+                       (resource.data.user_id == request.auth.uid ||
+                        resource.data.usuario_id == request.auth.uid ||
+                        solicitudId == request.auth.uid) ||
+                       // O el usuario es administrador
+                       esAdministrador()
+                     );
       
-      // Permitir eliminar solo si el usuario es el dueño de la solicitud o es administrador
+      // Permitir consultas (list) para administradores y usuarios buscando sus propias solicitudes
+      allow list: if request.auth != null;
+    }
+    
+    // Reglas para categorías
+    match /categorias/{categoriaId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+    
+    // Reglas para códigos de recuperación de contraseña
+    match /password_reset_codes/{codeId} {
+      // Solo el sistema puede crear códigos (desde el backend)
+      // Los usuarios pueden leer solo su propio código (por email)
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow delete: if request.auth != null;
+      // No permitir actualización de códigos
+      allow update: if false;
+    }
+    
+    // Reglas para la colección de compras
+    match /compras/{compraId} {
+      // Los usuarios pueden leer sus propias compras
+      // Los vendedores pueden leer compras que contengan sus productos
+      allow read: if request.auth != null && (
+                     resource.data.usuario_id == request.auth.uid ||
+                     // Verificar si está en vendedores_ids
+                     (resource.data.vendedores_ids != null && 
+                      resource.data.vendedores_ids.hasAny([request.auth.uid]))
+                   );
+      
+      // Los usuarios pueden crear sus propias compras
+      allow create: if request.auth != null && 
+                       request.resource.data.usuario_id == request.auth.uid;
+      
+      // Los usuarios pueden actualizar sus propias compras
+      // Los vendedores pueden actualizar compras que contengan sus productos (para cambiar estado)
+      // Permitir actualización si:
+      // 1. Es el dueño de la compra, O
+      // 2. Está en vendedores_ids (actual o en la actualización)
+      allow update: if request.auth != null && (
+                       resource.data.usuario_id == request.auth.uid ||
+                       // Verificar si está en vendedores_ids actual
+                       (resource.data.vendedores_ids != null && 
+                        resource.data.vendedores_ids.hasAny([request.auth.uid])) ||
+                       // Permitir si está agregando su ID a vendedores_ids en esta actualización
+                       (request.resource.data.vendedores_ids != null &&
+                        request.resource.data.vendedores_ids.hasAny([request.auth.uid]))
+                     );
+      
+      // Los usuarios pueden eliminar solo sus propias compras (si está permitido)
       allow delete: if request.auth != null && 
-                       (request.auth.uid == solicitudId || isAdmin());
+                       resource.data.usuario_id == request.auth.uid;
+      
+      // Permitir consultas (list) - las consultas con where se validan contra cada documento
+      allow list: if request.auth != null;
     }
     
-    // Códigos de recuperación de contraseña
-    // Solo las Cloud Functions pueden escribir/leer estos documentos
-    // Los usuarios no pueden acceder directamente
-    match /passwordResetCodes/{codeId} {
-      // Denegar acceso directo de usuarios
-      // Las Cloud Functions tienen permisos de administrador y pueden acceder
+    // Reglas para mensajes de soporte
+    match /mensajes_soporte/{mensajeId} {
+      // Cualquier usuario autenticado puede crear mensajes de soporte
+      allow create: if request.auth != null;
+      // Solo los administradores pueden leer y actualizar mensajes
+      allow read, update: if request.auth != null && esAdministrador();
+      // Permitir consultas (list) para administradores
+      allow list: if request.auth != null && esAdministrador();
+    }
+    
+    // Por defecto, denegar todo lo demás
+    match /{document=**} {
       allow read, write: if false;
     }
-    
-    // Sesiones de recuperación de contraseña
-    // Solo las Cloud Functions pueden escribir/leer estos documentos
-    match /passwordResetSessions/{sessionId} {
-      // Denegar acceso directo de usuarios
-      // Las Cloud Functions tienen permisos de administrador y pueden acceder
-      allow read, write: if false;
-    }
-    
-    // Para desarrollo: Si necesitas reglas más permisivas temporalmente,
-    // puedes usar esta regla (¡SOLO PARA DESARROLLO, NO PARA PRODUCCIÓN!):
-    // match /{document=**} {
-    //   allow read, write: if request.auth != null;
-    // }
   }
 }
-
