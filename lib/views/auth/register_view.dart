@@ -3,6 +3,7 @@ import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
 import 'package:agromarket/controllers/auth_controller.dart';
 import 'package:agromarket/services/places_service.dart';
+import 'package:agromarket/services/shipping_service.dart';
 import 'package:agromarket/services/vendor_request_service.dart';
 import 'package:agromarket/services/sanitization_service.dart';
 import 'package:image_picker/image_picker.dart';
@@ -34,6 +35,7 @@ class _RegisterPageState extends State<RegisterPage> {
   File? _selectedDocument;
   String? _documentFileName;
   final ImagePicker _imagePicker = ImagePicker();
+  String? _selectedCity; // Ciudad seleccionada para vendedores (en lugar de Google Maps)
 
   @override
   void dispose() {
@@ -246,8 +248,9 @@ class _RegisterPageState extends State<RegisterPage> {
         return;
       }
       
-      if (_selectedPlace == null) {
-        _showErrorSnackBar('Por favor, selecciona una ubicación');
+      // Para vendedores, validar que se haya seleccionado una ciudad
+      if (_selectedCity == null || _selectedCity!.isEmpty) {
+        _showErrorSnackBar('Por favor, selecciona una ciudad');
         return;
       }
       
@@ -278,10 +281,10 @@ class _RegisterPageState extends State<RegisterPage> {
           email: _emailController.text.trim(),
           password: _passwordController.text,
           nombreTienda: empresaSanitizada,
-          ubicacion: _selectedPlace!.formattedAddress,
-          ubicacionFormatted: _selectedPlace!.formattedAddress,
-          ubicacionLat: _selectedPlace!.lat,
-          ubicacionLng: _selectedPlace!.lng,
+          ubicacion: _selectedCity!, // Usar la ciudad seleccionada del dropdown
+          ubicacionFormatted: _selectedCity!,
+          ubicacionLat: null, // No necesitamos coordenadas para ciudades predefinidas
+          ubicacionLng: null,
           documentoFile: _selectedDocument!,
         );
 
@@ -300,6 +303,7 @@ class _RegisterPageState extends State<RegisterPage> {
             _empresaController.clear();
             _ubicacionController.clear();
             _selectedPlace = null;
+            _selectedCity = null; // Limpiar ciudad seleccionada
             _selectedDocument = null;
             _documentFileName = null;
             setState(() {});
@@ -1058,6 +1062,57 @@ class _RegisterPageState extends State<RegisterPage> {
 
   Widget _buildLocationField() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    // Para vendedores, usar dropdown con ciudades disponibles
+    if (_selectedRole == 'vendedor') {
+      return DropdownButtonFormField<String>(
+        value: _selectedCity,
+        style: TextStyle(color: isDark ? Colors.white : Colors.black),
+        decoration: InputDecoration(
+          labelText: 'Ciudad *',
+          labelStyle: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600]),
+          hintText: 'Selecciona tu ciudad',
+          hintStyle: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[500]),
+          prefixIcon: Icon(Icons.location_city, color: isDark ? Colors.grey[400] : const Color(0xFF115213)),
+          filled: true,
+          fillColor: isDark ? Colors.grey[800] : Colors.grey[100],
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(15),
+            borderSide: BorderSide(color: isDark ? Colors.grey[700]! : Colors.grey[300]!),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(15),
+            borderSide: BorderSide(color: isDark ? Colors.grey[700]! : Colors.grey[300]!),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(15),
+            borderSide: const BorderSide(color: Color(0xFF115213), width: 2),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+        ),
+        dropdownColor: isDark ? Colors.grey[800] : Colors.white,
+        items: ShippingService.getAvailableCities().map((ciudad) {
+          return DropdownMenuItem<String>(
+            value: ciudad,
+            child: Text(
+              ciudad,
+              style: TextStyle(color: isDark ? Colors.white : Colors.black),
+            ),
+          );
+        }).toList(),
+        onChanged: (value) {
+          setState(() {
+            _selectedCity = value;
+            if (value != null) {
+              _ubicacionController.text = value; // Actualizar el controlador para compatibilidad
+              _selectedPlace = null; // Limpiar selección de Places API
+            }
+          });
+        },
+      );
+    }
+    
+    // Para compradores, usar Google Maps Places API como antes
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

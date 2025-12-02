@@ -14,6 +14,7 @@ class PaymentView extends StatefulWidget {
   final double cartTotal;
   final String ciudad;
   final String telefono;
+  final double? shippingCost; // Costo de envío calculado
 
   const PaymentView({
     super.key,
@@ -21,6 +22,7 @@ class PaymentView extends StatefulWidget {
     required this.cartTotal,
     required this.ciudad,
     required this.telefono,
+    this.shippingCost,
   });
 
   @override
@@ -40,7 +42,8 @@ class _PaymentViewState extends State<PaymentView> {
   
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   
-  final double _envio = 4.5;
+  // Usar el costo de envío calculado o un valor por defecto
+  double get _envio => widget.shippingCost ?? 4.5;
 
   double get _subtotal => widget.cartTotal;
   double get _impuestos => _subtotal * 0.10;

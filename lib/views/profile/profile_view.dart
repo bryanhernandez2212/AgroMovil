@@ -4,6 +4,7 @@ import 'package:agromarket/controllers/auth_controller.dart';
 import 'package:agromarket/services/user_role_service.dart';
 import 'package:agromarket/services/firebase_service.dart';
 import 'package:agromarket/services/places_service.dart';
+import 'package:agromarket/services/shipping_service.dart';
 import 'package:agromarket/services/vendor_request_service.dart';
 import 'package:agromarket/models/solicitud_vendedor_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -32,6 +33,7 @@ class _ProfileViewState extends State<ProfileView> {
   bool _showPredictions = false;
   PlaceDetails? _selectedPlace;
   bool _isVendedor = false;
+  String? _selectedCity; // Ciudad seleccionada para vendedores
   File? _selectedImageFile;
   String? _profileImageUrl;
   final ImagePicker _imagePicker = ImagePicker();
@@ -41,9 +43,7 @@ class _ProfileViewState extends State<ProfileView> {
   final TextEditingController _ubicacionSolicitudController = TextEditingController();
   File? _documentoSolicitud;
   String? _documentoSolicitudFileName;
-  PlaceDetails? _selectedPlaceSolicitud;
-  List<PlacePrediction> _placePredictionsSolicitud = [];
-  bool _showPredictionsSolicitud = false;
+  String? _selectedCitySolicitud; // Ciudad seleccionada en el formulario de solicitud
 
   @override
   void initState() {
@@ -95,13 +95,24 @@ class _ProfileViewState extends State<ProfileView> {
           _tiendaController.text = nombreTienda;
           _ubicacionController.text = ubicacion;
           
+          // Intentar extraer la ciudad de la ubicación
+          final ciudad = ShippingService.extractCityFromAddress(ubicacion);
+          if (ciudad != null) {
+            _selectedCity = ciudad;
+          } else {
+            // Si no se puede extraer, usar la primera ciudad disponible
+            _selectedCity = ShippingService.getAvailableCities().first;
+          }
+          
           print('🔍 ProfileView - nombre_tienda: $nombreTienda');
           print('🔍 ProfileView - ubicacion: $ubicacion');
+          print('🔍 ProfileView - ciudad seleccionada: $_selectedCity');
         } else {
           // Limpiar campos solo si realmente no es vendedor
           _tiendaController.clear();
           _ubicacionController.clear();
           _selectedPlace = null;
+          _selectedCity = null;
         }
         
         // Forzar actualización del widget después de cargar datos
@@ -472,53 +483,119 @@ class _ProfileViewState extends State<ProfileView> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Builder(
-                builder: (context) {
-                  final isDark = Theme.of(context).brightness == Brightness.dark;
-                  return TextField(
-                    controller: _ubicacionController,
-                    enabled: _isEditing,
-                    style: TextStyle(
-                      color: isDark ? Colors.white : Colors.black,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: "Ubicación (empieza a escribir...)",
-                      hintStyle: TextStyle(
-                        color: isDark ? Colors.grey[500] : Colors.grey[600],
+              // Para vendedores, usar dropdown con ciudades disponibles
+              if (_isVendedor)
+                Builder(
+                  builder: (context) {
+                    final isDark = Theme.of(context).brightness == Brightness.dark;
+                    return DropdownButtonFormField<String>(
+                      value: _selectedCity,
+                      style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black,
                       ),
-                      filled: true,
-                      fillColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF5F5F5),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                          color: isDark ? Colors.grey[700]! : const Color(0xFFE0E0E0),
+                      decoration: InputDecoration(
+                        labelText: 'Ciudad',
+                        labelStyle: TextStyle(
+                          color: isDark ? Colors.grey[400] : Colors.grey[600],
                         ),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                          color: isDark ? Colors.grey[700]! : const Color(0xFFE0E0E0),
+                        hintText: 'Selecciona tu ciudad',
+                        hintStyle: TextStyle(
+                          color: isDark ? Colors.grey[500] : Colors.grey[600],
                         ),
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF5F5F5),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: isDark ? Colors.grey[700]! : const Color(0xFFE0E0E0),
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: isDark ? Colors.grey[700]! : const Color(0xFFE0E0E0),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFF115213), width: 2),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        prefixIcon: const Icon(Icons.location_city, color: Color(0xFF115213)),
                       ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFF115213), width: 2),
+                      dropdownColor: isDark ? Colors.grey[800] : Colors.white,
+                      items: ShippingService.getAvailableCities().map((ciudad) {
+                        return DropdownMenuItem<String>(
+                          value: ciudad,
+                          child: Text(
+                            ciudad,
+                            style: TextStyle(
+                              color: isDark ? Colors.white : Colors.black,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedCity = value;
+                          if (value != null) {
+                            _ubicacionController.text = value;
+                            _selectedPlace = null; // Limpiar selección de Places API
+                          }
+                        });
+                      },
+                    );
+                  },
+                )
+              else
+                // Para no vendedores, usar Places API como antes
+                Builder(
+                  builder: (context) {
+                    final isDark = Theme.of(context).brightness == Brightness.dark;
+                    return TextField(
+                      controller: _ubicacionController,
+                      enabled: _isEditing,
+                      style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black,
                       ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      prefixIcon: const Icon(Icons.location_on, color: Color(0xFF115213)),
-                    ),
-                onChanged: (value) {
-                  _searchPlaces(value);
-                },
-                    onTap: () {
-                      if (_ubicacionController.text.isNotEmpty) {
-                        _searchPlaces(_ubicacionController.text);
-                      }
-                    },
-                  );
-                },
-              ),
-              if (_showPredictions && _placePredictions.isNotEmpty)
+                      decoration: InputDecoration(
+                        hintText: "Ubicación (empieza a escribir...)",
+                        hintStyle: TextStyle(
+                          color: isDark ? Colors.grey[500] : Colors.grey[600],
+                        ),
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF5F5F5),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: isDark ? Colors.grey[700]! : const Color(0xFFE0E0E0),
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: isDark ? Colors.grey[700]! : const Color(0xFFE0E0E0),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFF115213), width: 2),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        prefixIcon: const Icon(Icons.location_on, color: Color(0xFF115213)),
+                      ),
+                      onChanged: (value) {
+                        _searchPlaces(value);
+                      },
+                      onTap: () {
+                        if (_ubicacionController.text.isNotEmpty) {
+                          _searchPlaces(_ubicacionController.text);
+                        }
+                      },
+                    );
+                  },
+                ),
+              if (!_isVendedor && _showPredictions && _placePredictions.isNotEmpty)
                 Builder(
                   builder: (context) {
                     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -1277,8 +1354,13 @@ class _ProfileViewState extends State<ProfileView> {
         
         updateData['nombre_tienda'] = nombreTienda;
         
-        // Si se seleccionó un nuevo lugar, usar sus datos
-        if (_selectedPlace != null) {
+        // Para vendedores, usar la ciudad seleccionada del dropdown
+        if (_isVendedor && _selectedCity != null) {
+          updateData['ubicacion'] = _selectedCity!;
+          updateData['ubicacion_formatted'] = _selectedCity!;
+          print('💾 ProfileView - Guardando ciudad seleccionada: $_selectedCity');
+        } else if (_selectedPlace != null) {
+          // Si se seleccionó un nuevo lugar (para no vendedores), usar sus datos
           updateData['ubicacion'] = _selectedPlace!.formattedAddress;
           updateData['ubicacion_formatted'] = _selectedPlace!.formattedAddress;
           if (_selectedPlace!.lat != null && _selectedPlace!.lng != null) {
@@ -1400,28 +1482,27 @@ class _ProfileViewState extends State<ProfileView> {
     if (solicitudAnterior != null) {
       _tiendaSolicitudController.text = solicitudAnterior.nombreTienda;
       _ubicacionSolicitudController.text = solicitudAnterior.ubicacionFormatted ?? solicitudAnterior.ubicacion;
-      // Restaurar ubicación si tiene coordenadas
-      if (solicitudAnterior.ubicacionLat != null && solicitudAnterior.ubicacionLng != null) {
-        // Crear un PlaceDetails aproximado con los datos guardados
-        _selectedPlaceSolicitud = PlaceDetails(
-          name: solicitudAnterior.ubicacionFormatted ?? solicitudAnterior.ubicacion,
-          formattedAddress: solicitudAnterior.ubicacionFormatted ?? solicitudAnterior.ubicacion,
-          lat: solicitudAnterior.ubicacionLat,
-          lng: solicitudAnterior.ubicacionLng,
-        );
+      
+      // Intentar extraer la ciudad de la ubicación
+      final ciudad = ShippingService.extractCityFromAddress(
+        solicitudAnterior.ubicacionFormatted ?? solicitudAnterior.ubicacion
+      );
+      if (ciudad != null) {
+        _selectedCitySolicitud = ciudad;
+      } else {
+        // Si no se puede extraer, usar la primera ciudad disponible
+        _selectedCitySolicitud = ShippingService.getAvailableCities().first;
       }
     } else {
       // Limpiar campos del formulario si no hay solicitud anterior
       _tiendaSolicitudController.clear();
       _ubicacionSolicitudController.clear();
-      _selectedPlaceSolicitud = null;
+      _selectedCitySolicitud = null;
     }
     
     // Limpiar documento (siempre se debe subir uno nuevo)
     _documentoSolicitud = null;
     _documentoSolicitudFileName = null;
-    _placePredictionsSolicitud = [];
-    _showPredictionsSolicitud = false;
 
     await showDialog(
       context: context,
@@ -1500,12 +1581,13 @@ class _ProfileViewState extends State<ProfileView> {
                     ),
                     const SizedBox(height: 16),
                     
-                    // Ubicación
-                    TextField(
-                      controller: _ubicacionSolicitudController,
+                    // Ubicación - Usar dropdown con ciudades disponibles
+                    DropdownButtonFormField<String>(
+                      value: _selectedCitySolicitud,
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black),
                       decoration: InputDecoration(
-                        labelText: 'Ubicación *',
-                        hintText: 'Ubicación (empieza a escribir...)',
+                        labelText: 'Ciudad *',
+                        hintText: 'Selecciona tu ciudad',
                         filled: true,
                         fillColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF5F5F5),
                         border: OutlineInputBorder(
@@ -1524,70 +1606,29 @@ class _ProfileViewState extends State<ProfileView> {
                           borderRadius: BorderRadius.circular(12),
                           borderSide: const BorderSide(color: Color(0xFF115213), width: 2),
                         ),
-                        prefixIcon: const Icon(Icons.location_on, color: Color(0xFF115213)),
+                        prefixIcon: const Icon(Icons.location_city, color: Color(0xFF115213)),
                       ),
-                      style: TextStyle(color: isDark ? Colors.white : Colors.black),
-                      onChanged: (value) async {
-                        if (value.length >= 3) {
-                          final predictions = await PlacesService.getPlacePredictions(value);
-                          setDialogState(() {
-                            _placePredictionsSolicitud = predictions;
-                            _showPredictionsSolicitud = predictions.isNotEmpty;
-                          });
-                        } else {
-                          setDialogState(() {
-                            _placePredictionsSolicitud = [];
-                            _showPredictionsSolicitud = false;
-                          });
-                        }
-                      },
-                      onTap: () async {
-                        if (_ubicacionSolicitudController.text.isNotEmpty) {
-                          final predictions = await PlacesService.getPlacePredictions(_ubicacionSolicitudController.text);
-                          setDialogState(() {
-                            _placePredictionsSolicitud = predictions;
-                            _showPredictionsSolicitud = predictions.isNotEmpty;
-                          });
-                        }
+                      dropdownColor: isDark ? Colors.grey[800] : Colors.white,
+                      items: ShippingService.getAvailableCities().map((ciudad) {
+                        return DropdownMenuItem<String>(
+                          value: ciudad,
+                          child: Text(
+                            ciudad,
+                            style: TextStyle(
+                              color: isDark ? Colors.white : Colors.black,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setDialogState(() {
+                          _selectedCitySolicitud = value;
+                          if (value != null) {
+                            _ubicacionSolicitudController.text = value;
+                          }
+                        });
                       },
                     ),
-                    if (_showPredictionsSolicitud && _placePredictionsSolicitud.isNotEmpty)
-                      Container(
-                        margin: const EdgeInsets.only(top: 5),
-                        constraints: const BoxConstraints(maxHeight: 150),
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
-                          ),
-                        ),
-                        child: ListView.builder(
-                          shrinkWrap: true,
-                          itemCount: _placePredictionsSolicitud.length,
-                          itemBuilder: (context, index) {
-                            final prediction = _placePredictionsSolicitud[index];
-                            return ListTile(
-                              leading: const Icon(Icons.location_on, color: Color(0xFF115213)),
-                              title: Text(
-                                prediction.description,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: isDark ? Colors.white : Colors.black,
-                                ),
-                              ),
-                              onTap: () async {
-                                final details = await PlacesService.getPlaceDetails(prediction.placeId);
-                                setDialogState(() {
-                                  _selectedPlaceSolicitud = details;
-                                  _ubicacionSolicitudController.text = prediction.description;
-                                  _showPredictionsSolicitud = false;
-                                });
-                              },
-                            );
-                          },
-                        ),
-                      ),
                     const SizedBox(height: 16),
                     
                     // Documento
@@ -1918,8 +1959,8 @@ class _ProfileViewState extends State<ProfileView> {
       return;
     }
 
-    if (_selectedPlaceSolicitud == null) {
-      _showErrorSnackBar('Por favor, selecciona una ubicación');
+    if (_selectedCitySolicitud == null || _selectedCitySolicitud!.isEmpty) {
+      _showErrorSnackBar('Por favor, selecciona una ciudad');
       return;
     }
 
@@ -1938,10 +1979,10 @@ class _ProfileViewState extends State<ProfileView> {
         nombre: nombre,
         email: email,
         nombreTienda: _tiendaSolicitudController.text.trim(),
-        ubicacion: _selectedPlaceSolicitud!.formattedAddress,
-        ubicacionFormatted: _selectedPlaceSolicitud!.formattedAddress,
-        ubicacionLat: _selectedPlaceSolicitud!.lat,
-        ubicacionLng: _selectedPlaceSolicitud!.lng,
+        ubicacion: _selectedCitySolicitud!,
+        ubicacionFormatted: _selectedCitySolicitud!,
+        ubicacionLat: null, // No necesitamos coordenadas para ciudades predefinidas
+        ubicacionLng: null,
         documentoFile: _documentoSolicitud!,
       );
 

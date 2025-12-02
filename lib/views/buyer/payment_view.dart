@@ -17,6 +17,7 @@ class PaymentView extends StatefulWidget {
   final String ciudad;
   final String telefono;
   final String? direccionEntrega;
+  final double? shippingCost; // Costo de envío calculado
 
   const PaymentView({
     super.key,
@@ -25,6 +26,7 @@ class PaymentView extends StatefulWidget {
     required this.ciudad,
     required this.telefono,
     this.direccionEntrega,
+    this.shippingCost,
   });
 
   @override
@@ -38,7 +40,8 @@ class _PaymentViewState extends State<PaymentView> {
   // Controlador para el nombre del titular (opcional, para Payment Sheet)
   final TextEditingController _cardHolderNameController = TextEditingController();
   
-  final double _envio = 4.5;
+  // Usar el costo de envío calculado o un valor por defecto
+  double get _envio => widget.shippingCost ?? 4.5;
 
   double get _subtotal => widget.cartTotal;
   double get _impuestos => _subtotal * 0.10;
